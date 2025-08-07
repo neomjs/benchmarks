@@ -36,46 +36,47 @@ class Viewport extends BaseViewport {
             flex  : 'none',
             layout: {ntype: 'hbox', align: 'start', pack: 'start'},
             style : {padding: '1em'},
-            items: [{
-                module: Button,
-                text  : 'Create 1k rows',
+            items : [{
+                module : Button,
+                text   : 'Create 1k rows',
                 handler: 'createRows',
                 rows   : 1000
             }, {
-                module: Button,
-                text  : 'Create 10k rows',
-                style : {marginLeft: '10px'},
+                module : Button,
+                text   : 'Create 10k rows',
+                style  : {marginLeft: '10px'},
                 handler: 'createRows',
                 rows   : 10000
             }, {
-                module: Button,
-                text  : 'Update every 10th row',
-                style : {marginLeft: '10px'},
+                module : Button,
+                text   : 'Update every 10th row',
+                style  : {marginLeft: '10px'},
                 handler: 'updateRows'
             }, {
-                module: Button,
-                text  : 'Select',
-                style : {marginLeft: '10px'},
+                module : Button,
+                text   : 'Select',
+                style  : {marginLeft: '10px'},
                 handler: 'selectRow'
             }, {
-                module: Button,
-                text  : 'Swap',
-                style : {marginLeft: '10px'},
+                module : Button,
+                text   : 'Swap',
+                style  : {marginLeft: '10px'},
                 handler: 'swapRows'
             }, {
-                module: Button,
-                text  : 'Remove',
-                style : {marginLeft: '10px'},
+                module : Button,
+                text   : 'Remove',
+                style  : {marginLeft: '10px'},
                 handler: 'removeRow'
             }, {
-                module: Button,
-                text  : 'Clear',
-                style : {marginLeft: '10px'},
+                module : Button,
+                text   : 'Clear',
+                style  : {marginLeft: '10px'},
                 handler: 'clearRows'
             }]
         }, {
-            module: BenchmarkGrid,
-            flex  : 1
+            module   : BenchmarkGrid,
+            flex     : 1,
+            reference: 'benchmark-grid'
         }]
     }
 }

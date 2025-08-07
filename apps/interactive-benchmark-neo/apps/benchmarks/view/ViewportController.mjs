@@ -40,19 +40,22 @@ class ViewportController extends Base {
     updateRows() {
         let store = this.getStore('benchmarkGridStore'),
             records = store.items,
+            updatedRecords = [],
             i = 0,
-            len = records.length;
+            len = records.length,
+            grid = this.getReference('benchmark-grid');
 
         for (; i < len; i += 10) {
-            records[i].label = 'updated row ' + records[i].id;
+            updatedRecords.push({id: records[i].id, label: 'updated row ' + records[i].id});
         }
+        grid.bulkUpdateRecords(updatedRecords);
     }
 
     selectRow() {
         let store = this.getStore('benchmarkGridStore'),
             records = store.items,
             len = records.length,
-            grid = this.getView().down('benchmark-grid');
+            grid = this.getReference('benchmark-grid');
 
         if (len > 0) {
             let randomIndex = Math.floor(Math.random() * len);
