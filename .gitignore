@@ -15,3 +15,8 @@
 .DS_Store
 Thumbs.db
 resources/data/deck/EditorConfig.json
+
+# Playwright raw output
+/playwright-report/
+/playwright/.cache/
+/test-results/

@@ -141,11 +141,11 @@ This sub-epic covers the creation of a credible, transparent, and easy-to-use be
 - Performance metrics will be captured by instrumenting the showcase applications with the browser's `performance.mark()` and `performance.measure()` APIs. Playwright will then execute scripts to extract these measurements.
 - A top-level Node.js script will be created to run the Playwright scenarios multiple times to ensure statistical relevance, aggregate the results, and generate a final summary report.
 
-- **[ ] Task:** Set up a new project or directory for the benchmark harness.
-- **[ ] Task:** Configure Playwright and create the basic test runner script.
+- **[x] Task:** Set up a new project or directory for the benchmark harness.
+- **[x] Task:** Configure Playwright and create the basic test runner script.
 - **[ ] Task:** Instrument the showcase apps with `performance.mark()` calls at key lifecycle points.
 - **[ ] Task:** Develop the Playwright scripts to run the scenarios, record videos/traces, and extract performance data.
-- **[ ] Task:** Create a `README.md` with clear instructions on how to install dependencies and run the benchmarks, ensuring the results are fully reproducible by the community.
+- **[x] Task:** Create a `README.md` with clear instructions on how to install dependencies and run the benchmarks, ensuring the results are fully reproducible by the community.
 
 ---
 
