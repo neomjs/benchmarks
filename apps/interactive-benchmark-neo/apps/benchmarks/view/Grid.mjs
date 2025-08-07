@@ -25,6 +25,7 @@ class BenchmarkGrid extends GridContainer {
             text     : 'Id'
         }, {
             dataField: 'label',
+            flex     : 1,
             text     : 'Label',
         }]
     }

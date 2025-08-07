@@ -1,8 +1,8 @@
-import Base from '../../../node_modules/neo.mjs/src/controller/Base.mjs';
+import Base from '../../../node_modules/neo.mjs/src/controller/Component.mjs';
 
 /**
  * @class Benchmarks.view.ViewportController
- * @extends Neo.controller.Base
+ * @extends Neo.controller.Component
  */
 class ViewportController extends Base {
     static config = {
@@ -10,27 +10,31 @@ class ViewportController extends Base {
          * @member {String} className='Benchmarks.view.ViewportController'
          * @protected
          */
-        className: 'Benchmarks.view.ViewportController',
-        /**
-         * @member {Number} _counter=0
-         * @private
-         */
-        _counter: 0
+        className: 'Benchmarks.view.ViewportController'
     }
 
     /**
-     * @param {Number} amount
+     * @member {Number} #counter=0
+     * @private
      */
-    createRows(amount) {
-        let data = [],
+    #counter = 0
+
+    /**
+     * @param {Object} data
+     * @param {Neo.button.Base} data.component
+     * @param {Number} data.component.rows
+     */
+    createRows(data) {
+        let amount = data.component.rows,
+            rows = [],
             i    = 0,
             store = this.getStore('benchmarkGridStore');
 
         for (; i < amount; i++) {
-            this._counter++;
-            data.push({id: this._counter, label: 'row ' + this._counter});
+            this.#counter++;
+            rows.push({id: this.#counter, label: 'row ' + this.#counter});
         }
-        store.add(data);
+        store.add(rows);
     }
 
     updateRows() {
@@ -90,7 +94,7 @@ class ViewportController extends Base {
     clearRows() {
         let store = this.getStore('benchmarkGridStore');
         store.clear();
-        this._counter = 0;
+        this.#counter = 0;
     }
 }
 
