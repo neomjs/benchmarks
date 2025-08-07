@@ -1,0 +1,23 @@
+{
+    "name": "neo.mjs-benchmarks",
+    "version": "10.3.3",
+    "description": "Neo.mjs: Benchmarks",
+    "type": "module",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/neomjs/benchmarks.git"
+    },
+    "author": "Tobias Uhlig",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/neomjs/benchmarks/issues"
+    },
+    "homepage": "https://neomjs.com/",
+    "dependencies": {
+        "neo.mjs": "^10.3.3"
+    },
+    "funding": {
+        "type": "GitHub Sponsors",
+        "url": "https://github.com/sponsors/tobiu"
+    }
+}
