@@ -59,7 +59,7 @@ class ViewportController extends Base {
 
         if (len > 0) {
             let randomIndex = Math.floor(Math.random() * len);
-            grid.selection = [records[randomIndex]];
+            grid.selectionModel.selectRow(records[randomIndex].id);
         }
     }
 
