@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test('Neo.mjs benchmark: Create 1k rows', async ({ page }) => {
   await page.goto('/apps/benchmarks/');
