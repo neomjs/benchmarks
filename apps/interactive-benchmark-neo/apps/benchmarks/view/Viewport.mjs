@@ -1,6 +1,9 @@
-import BaseViewport from '../../../node_modules/neo.mjs/src/container/Viewport.mjs';
-import Component    from '../../../node_modules/neo.mjs/src/component/Base.mjs';
-import TabContainer from '../../../node_modules/neo.mjs/src/tab/Container.mjs';
+import BaseViewport       from '../../../node_modules/neo.mjs/src/container/Viewport.mjs';
+import Container          from '../../../node_modules/neo.mjs/src/container/Base.mjs';
+import Button             from '../../../node_modules/neo.mjs/src/button/Base.mjs';
+import BenchmarkGrid      from './Grid.mjs';
+import ViewportController from './ViewportController.mjs';
+import ViewportStateProvider from './ViewportStateProvider.mjs';
 
 /**
  * @class Benchmarks.view.Viewport
@@ -13,39 +16,63 @@ class Viewport extends BaseViewport {
          * @protected
          */
         className: 'Benchmarks.view.Viewport',
-        /*
-         * @member {Object} layout={ntype:'fit'}
+        /**
+         * @member {Object} controller=ViewportController
          */
-        layout: {ntype: 'fit'},
-
+        controller: ViewportController,
+        /**
+         * @member {Object} stateProvider=ViewportStateProvider
+         */
+        stateProvider: ViewportStateProvider,
+        /**
+         * @member {Object} layout={ntype:'vbox',align:'stretch'}
+         */
+        layout: {ntype: 'vbox', align: 'stretch'},
         /**
          * @member {Object[]} items
          */
         items: [{
-            module: TabContainer,
-            height: 300,
-            width : 500,
-            style : {flex: 'none', margin: '20px'},
-
-            itemDefaults: {
-                module: Component,
-                cls   : ['neo-examples-tab-component'],
-                style : {padding: '20px'},
-            },
-
+            module: Container,
+            layout: {ntype: 'hbox', align: 'start', pack: 'start'},
+            padding: 10,
             items: [{
-                header: {
-                    iconCls: 'fa fa-home',
-                    text   : 'Tab 1'
-                },
-                text: 'Welcome to your new Neo App.'
+                module: Button,
+                text  : 'Create 1k rows',
+                handler: 'createRows(1000)'
             }, {
-                header: {
-                    iconCls: 'fa fa-play-circle',
-                    text   : 'Tab 2'
-                },
-                text: 'Have fun creating something awesome!'
+                module: Button,
+                text  : 'Create 10k rows',
+                style : {marginLeft: '10px'},
+                handler: 'createRows(10000)'
+            }, {
+                module: Button,
+                text  : 'Update every 10th row',
+                style : {marginLeft: '10px'},
+                handler: 'updateRows'
+            }, {
+                module: Button,
+                text  : 'Select',
+                style : {marginLeft: '10px'},
+                handler: 'selectRow'
+            }, {
+                module: Button,
+                text  : 'Swap',
+                style : {marginLeft: '10px'},
+                handler: 'swapRows'
+            }, {
+                module: Button,
+                text  : 'Remove',
+                style : {marginLeft: '10px'},
+                handler: 'removeRow'
+            }, {
+                module: Button,
+                text  : 'Clear',
+                style : {marginLeft: '10px'},
+                handler: 'clearRows'
             }]
+        }, {
+            module: BenchmarkGrid,
+            flex  : 1
         }]
     }
 }
