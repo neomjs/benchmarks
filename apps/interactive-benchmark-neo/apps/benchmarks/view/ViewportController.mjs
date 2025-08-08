@@ -55,44 +55,45 @@ class ViewportController extends Base {
     }
 
     selectRow() {
-        let store       = this.getStore('benchmarkGridStore'),
-            records     = store.items,
-            len         = records.length,
-            grid        = this.getReference('benchmark-grid'),
-            mountedRows = grid.body.mountedRows;
+        let store         = this.getStore('benchmarkGridStore'),
+            {count}       = store,
+            grid          = this.getReference('benchmark-grid'),
+            {mountedRows} = grid.body;
 
-        if (len > 0 && mountedRows[1] > mountedRows[0]) {
+        if (count > 0 && mountedRows[1] > mountedRows[0]) {
             // Correctly calculate a random index within the mounted range (inclusive)
             let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0] + 1)) + mountedRows[0];
 
             // Ensure the index is within the bounds of the actual store items
-            if (randomIndex < len) {
-                grid.selectionModel.selectRow(records[randomIndex].id);
+            if (randomIndex < count) {
+                grid.body.selectionModel.selectRow(store.getAt(randomIndex).id);
             }
         }
     }
 
     swapRows() {
-        let store   = this.getStore('benchmarkGridStore'),
-            records = store.items,
-            len     = records.length,
-            grid    = this.getReference('benchmark-grid');
+        let store         = this.getStore('benchmarkGridStore'),
+            {count}       = store,
+            grid          = this.getReference('benchmark-grid'),
+            {mountedRows} = grid.body,
+            range         = mountedRows[1] - mountedRows[0];
 
-        if (len >= 2) {
-            let idx1 = Math.floor(Math.random() * len);
-            let idx2 = Math.floor(Math.random() * len);
+        if (count >= 2 && range >= 2) {
+            let baseIndex = mountedRows[0];
+
+            let idx1 = Math.floor(Math.random() * range) + baseIndex;
+            let idx2 = Math.floor(Math.random() * range) + baseIndex;
 
             while (idx1 === idx2) {
-                idx2 = Math.floor(Math.random() * len);
+                idx2 = Math.floor(Math.random() * range) + baseIndex;
             }
 
-            let record1 = records[idx1];
-            let record2 = records[idx2];
+            let record1 = store.getAt(idx1);
+            let record2 = store.getAt(idx2);
 
-            // The new data to be passed to bulkUpdateRecords
             const updatedRecords = [
-                { id: record1.id, label: record2.label },
-                { id: record2.id, label: record1.label }
+                {id: record1.id, label: record2.label},
+                {id: record2.id, label: record1.label}
             ];
 
             grid.bulkUpdateRecords(updatedRecords);
