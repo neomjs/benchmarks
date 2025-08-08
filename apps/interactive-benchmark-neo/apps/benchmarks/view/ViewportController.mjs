@@ -61,16 +61,22 @@ class ViewportController extends Base {
             grid        = this.getReference('benchmark-grid'),
             mountedRows = grid.body.mountedRows;
 
-        if (len > 0) {
-            let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0])) + mountedRows[0];
-            grid.selectionModel.selectRow(records[randomIndex].id);
+        if (len > 0 && mountedRows[1] > mountedRows[0]) {
+            // Correctly calculate a random index within the mounted range (inclusive)
+            let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0] + 1)) + mountedRows[0];
+
+            // Ensure the index is within the bounds of the actual store items
+            if (randomIndex < len) {
+                grid.selectionModel.selectRow(records[randomIndex].id);
+            }
         }
     }
 
     swapRows() {
         let store   = this.getStore('benchmarkGridStore'),
             records = store.items,
-            len     = records.length;
+            len     = records.length,
+            grid    = this.getReference('benchmark-grid');
 
         if (len >= 2) {
             let idx1 = Math.floor(Math.random() * len);
@@ -80,10 +86,16 @@ class ViewportController extends Base {
                 idx2 = Math.floor(Math.random() * len);
             }
 
-            // Swap the content (labels) of the two records
-            let tempLabel       = records[idx1].label;
-            records[idx1].label = records[idx2].label;
-            records[idx2].label = tempLabel;
+            let record1 = records[idx1];
+            let record2 = records[idx2];
+
+            // The new data to be passed to bulkUpdateRecords
+            const updatedRecords = [
+                { id: record1.id, label: record2.label },
+                { id: record2.id, label: record1.label }
+            ];
+
+            grid.bulkUpdateRecords(updatedRecords);
         }
     }
 
