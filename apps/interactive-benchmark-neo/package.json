@@ -1,7 +1,6 @@
 {
     "name": "benchmarks",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "scripts": {
         "add-config": "node ./node_modules/neo.mjs/buildScripts/addConfig.mjs",

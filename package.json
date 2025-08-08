@@ -14,8 +14,7 @@
     },
     "homepage": "https://neomjs.com/",
     "dependencies": {
-        "@playwright/test": "^1.54.2",
-        "neo.mjs": "^10.3.3"
+        "@playwright/test": "^1.54.2"
     },
     "funding": {
         "type": "GitHub Sponsors",
