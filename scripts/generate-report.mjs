@@ -3,6 +3,7 @@ import path from 'path';
 
 const RESULTS_PATH = path.resolve(process.cwd(), 'test-results.json');
 const OUTPUT_PATH = path.resolve(process.cwd(), 'BENCHMARK_RESULTS.md');
+const BROWSERS = ['chromium', 'firefox', 'webkit'];
 
 /**
  * Parses the raw JSON output from the Playwright JSON reporter.
@@ -12,17 +13,16 @@ const OUTPUT_PATH = path.resolve(process.cwd(), 'BENCHMARK_RESULTS.md');
 function parseResults(rawData) {
     const benchmarks = {};
 
-    // Initialize benchmark structure
     const initializeBenchmark = (name) => {
         if (!benchmarks[name]) {
-            benchmarks[name] = {
-                dev: { times: [], avg: 0 },
-                prod: { times: [], avg: 0 }
-            };
+            benchmarks[name] = { dev: {}, prod: {} };
+            BROWSERS.forEach(browser => {
+                benchmarks[name].dev[browser] = { times: [], avg: 0 };
+                benchmarks[name].prod[browser] = { times: [], avg: 0 };
+            });
         }
     };
 
-    // Recursively process suites to find tests
     const processSuite = (suite) => {
         if (suite.specs) {
             suite.specs.forEach(spec => {
@@ -31,12 +31,13 @@ function parseResults(rawData) {
 
                 spec.tests.forEach(test => {
                     const mode = test.projectName.endsWith('-dev') ? 'dev' : 'prod';
-                    // Only use results from passed tests
-                    if (test.results.every(r => r.status === 'passed')) {
+                    const browser = BROWSERS.find(b => test.projectName.startsWith(b));
+
+                    if (browser && test.results.every(r => r.status === 'passed')) {
                         const durationAnnotation = test.annotations.find(a => a.type === 'duration');
                         if (durationAnnotation) {
                             const duration = parseFloat(durationAnnotation.description);
-                            benchmarks[benchmarkName][mode].times.push(duration);
+                            benchmarks[benchmarkName][mode][browser].times.push(duration);
                         }
                     }
                 });
@@ -52,12 +53,27 @@ function parseResults(rawData) {
     // Calculate averages
     for (const benchmarkName in benchmarks) {
         const benchmark = benchmarks[benchmarkName];
-        if (benchmark.dev.times.length > 0) {
-            benchmark.dev.avg = benchmark.dev.times.reduce((a, b) => a + b, 0) / benchmark.dev.times.length;
-        }
-        if (benchmark.prod.times.length > 0) {
-            benchmark.prod.avg = benchmark.prod.times.reduce((a, b) => a + b, 0) / benchmark.prod.times.length;
-        }
+        let devTotal = 0, devCount = 0;
+        let prodTotal = 0, prodCount = 0;
+
+        BROWSERS.forEach(browser => {
+            const devResult = benchmark.dev[browser];
+            if (devResult.times.length > 0) {
+                devResult.avg = devResult.times.reduce((a, b) => a + b, 0) / devResult.times.length;
+                devTotal += devResult.avg;
+                devCount++;
+            }
+
+            const prodResult = benchmark.prod[browser];
+            if (prodResult.times.length > 0) {
+                prodResult.avg = prodResult.times.reduce((a, b) => a + b, 0) / prodResult.times.length;
+                prodTotal += prodResult.avg;
+                prodCount++;
+            }
+        });
+
+        benchmark.dev.average = devCount > 0 ? devTotal / devCount : 0;
+        benchmark.prod.average = prodCount > 0 ? prodTotal / prodCount : 0;
     }
 
     return benchmarks;
@@ -69,33 +85,49 @@ function parseResults(rawData) {
  * @returns {String} The markdown content as a string.
  */
 function generateMarkdown(benchmarks) {
-    let table = `| Benchmark                 | Dev Mode (Avg ms) | Prod Mode (Avg ms) | Improvement |
-|---------------------------|-------------------|--------------------|-------------|
+    let table = `| Benchmark                 | Browser    | Dev Mode (ms) | Prod Mode (ms) | Improvement |
+|---------------------------|------------|---------------|----------------|-------------|
 `;
 
     const sortedKeys = Object.keys(benchmarks).sort();
 
     for (const key of sortedKeys) {
         const result = benchmarks[key];
-        const devAvg = result.dev.avg.toFixed(2);
-        const prodAvg = result.prod.avg.toFixed(2);
-        let improvement = 'N/A';
-        if (result.dev.avg > 0 && result.prod.avg > 0) {
-            const percentage = ((result.dev.avg - result.prod.avg) / result.dev.avg) * 100;
-            improvement = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
-        }
+        table += `| **${key}**               |            |               |                |             |
+`;
 
-        table += `| ${key.padEnd(25)} | ${devAvg.padEnd(17)} | ${prodAvg.padEnd(18)} | **${improvement}** |
+        BROWSERS.forEach(browser => {
+            const devAvg = result.dev[browser].avg;
+            const prodAvg = result.prod[browser].avg;
+            let improvement = 'N/A';
+            if (devAvg > 0 && prodAvg > 0) {
+                const percentage = ((devAvg - prodAvg) / devAvg) * 100;
+                improvement = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
+            }
+            table += `|                           | ${browser.padEnd(10)} | ${devAvg.toFixed(2).padEnd(13)} | ${prodAvg.toFixed(2).padEnd(14)} | ${improvement.padEnd(11)} |
+`;
+        });
+        
+        const devAvgAll = result.dev.average;
+        const prodAvgAll = result.prod.average;
+        let improvementAll = 'N/A';
+        if (devAvgAll > 0 && prodAvgAll > 0) {
+            const percentage = ((devAvgAll - prodAvgAll) / devAvgAll) * 100;
+            improvementAll = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
+        }
+        table += `|                           | **Average**| **${devAvgAll.toFixed(2)}**        | **${prodAvgAll.toFixed(2)}**         | **${improvementAll}**    |
+`;
+        table += `|---------------------------|------------|---------------|----------------|-------------|
 `;
     }
 
     return `# Benchmark Performance Results
 
 This report compares the performance of the interactive benchmark application running in two different modes:
-- **Development Mode**: Served directly by the webpack dev server (\\\`/apps/benchmarks/\\\`).
-- **Production Mode**: Using the optimized build output (\\\`/dist/production/apps/benchmarks/\\\`).
+- **Development Mode**: Served directly by the webpack dev server (\\\`/apps/benchmarks/\\\\\`).
+- **Production Mode**: Using the optimized build output (\\\`/dist/production/apps/benchmarks/\\\\\`).
 
-The following table shows the average execution time in milliseconds (ms) for each test across Chromium, Firefox, and WebKit. The performance improvement is calculated based on the reduction in time from Development to Production mode.
+The following table shows the execution time in milliseconds (ms) for each test, broken down by browser.
 
 ${table}
 ---
@@ -110,7 +142,7 @@ ${table}
 async function main() {
     try {
         if (!fs.existsSync(RESULTS_PATH)) {
-            console.error('Error: test-results.json not found. Please run the tests first with `npx playwright test`.');
+            console.error('Error: test-results.json not found. Please run the tests first.');
             process.exit(1);
         }
 
