@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "benchmark": "npx playwright test && node ./scripts/generate-report.mjs",
+        "benchmark:accurate": "CI=true npm run benchmark",
         "build:benchmark-app": "npm --prefix apps/interactive-benchmark-neo run build-all"
     },
     "repository": {

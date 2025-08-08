@@ -43,20 +43,21 @@ The `examples/grid/bigData` example will be the foundation. Our strategy is to l
 
 - **Dedicated Scroll Management:** The grid's `ScrollManager` offloads the complex logic of synchronizing horizontal and vertical scroll events, including touch support. While we won't be directly testing this, it's an important part of the architecture that contributes to the overall smoothness and robustness we are showcasing.
 
-- **[ ] Task:** **Phase 1 (Baseline):**
-    - **[ ] Sub-task:** Create a UI with a large table and standard benchmark buttons (`Create 1k rows`, `Create 10k rows`, `Update every 10th row`, `Select`, `Swap`, `Remove`, `Clear`).
-    - **[ ] Sub-task:** Implement the logic for these basic operations to establish a recognizable performance baseline.
+- [x] Task: **Phase 1 (Baseline):**
+    - [x] Sub-task: Create a UI with a large table and standard benchmark buttons (`Create 1k rows`, `Create 10k rows`, `Update every 10th row`, `Select`, `Swap`, `Remove`, `Clear`).
+    - [x] Sub-task: Implement the logic for these basic operations to establish a recognizable performance baseline.
 
-- **[ ] Task:** **Phase 2 (The Neo.mjs Advantage):**
-    - **[ ] Sub-task:** Add a `Start/Stop Real-time Feed` button that simulates high-frequency WebSocket updates to hundreds of rows per second.
-    - **[ ] Sub-task:** Add a `Run Heavy Calculation` button that triggers a multi-second, computationally expensive task in the app worker.
-    - **[ ] Sub-task:** Add a continuously running CSS animation (e.g., a spinner) and a text input field to serve as visual indicators of main-thread responsiveness.
+- [ ] Task: **Phase 2 (The Neo.mjs Advantage):**
+    - [ ] Sub-task: Add a `Start/Stop Real-time Feed` button that simulates high-frequency WebSocket updates to hundreds of rows per second.
+    - [ ] Sub-task: Add a `Run Heavy Calculation` button that triggers a multi-second, computationally expensive task in the app worker.
+    - [ ] Sub-task: Add a continuously running CSS animation (e.g., a spinner) and a text input field to serve as visual indicators of main-thread responsiveness.
 
-- **[ ] Task:** **Phase 3 (Benchmarking & Promotion):**
-    - **[ ] Sub-task:** Build a comparable version in a mainstream framework (e.g., React) to use for side-by-side comparison.
-    - **[ ] Sub-task:** Conduct rigorous performance testing, capturing videos and metrics (FPS, CPU, blocking time) that clearly show the competitor's UI freezing while the Neo.mjs version remains fluid.
-    - **[ ] Sub-task:** Create a compelling presentation (e.g., video, article) to showcase the results and explain the architectural reasons for the performance gap.
-    - **[ ] Sub-task:** Publish the source code for both implementations for transparency.
+- [ ] Task: **Phase 3 (Benchmarking & Promotion):**
+    - [ ] Sub-task: Build a comparable version in a mainstream framework (e.g., React) to use for side-by-side comparison.
+    - [ ] Sub-task: Conduct rigorous performance testing, capturing videos and metrics (FPS, CPU, blocking time) that clearly show the competitor's UI freezing while the Neo.mjs version remains fluid.
+    - [x] Sub-task: Generate a `BENCHMARK_RESULTS.md` file to compare dev vs. prod performance.
+    - [ ] Sub-task: Create a compelling presentation (e.g., video, article) to showcase the results and explain the architectural reasons for the performance gap.
+    - [ ] Sub-task: Publish the source code for both implementations for transparency.
 
 ---
 
@@ -143,8 +144,9 @@ This sub-epic covers the creation of a credible, transparent, and easy-to-use be
 
 - **[x] Task:** Set up a new project or directory for the benchmark harness.
 - **[x] Task:** Configure Playwright and create the basic test runner script.
-- **[ ] Task:** Instrument the showcase apps with `performance.mark()` calls at key lifecycle points.
-- **[ ] Task:** Develop the Playwright scripts to run the scenarios, record videos/traces, and extract performance data.
+- **[x] Task:** Instrument the showcase apps with `performance.mark()` calls at key lifecycle points.
+- **[x] Task:** Develop the Playwright scripts to run the scenarios, record videos/traces, and extract performance data.
+- **[x] Task: Create a script to auto-generate a markdown report from the test results.**
 - **[x] Task:** Create a `README.md` with clear instructions on how to install dependencies and run the benchmarks, ensuring the results are fully reproducible by the community.
 
 ---
