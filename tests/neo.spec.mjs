@@ -72,10 +72,14 @@ const measurePerformanceInBrowser = (testName, action, condition, passThrough) =
     });
 };
 
+const getButtonByText = (text) => {
+    return document.evaluate(`//button[normalize-space(.)='${text}']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+};
+
 test.beforeEach(async ({page}) => {
     // Inject the measurePerformance function into the browser context's window object
     await page.addInitScript({
-        content: `window.measurePerformance = ${measurePerformanceInBrowser.toString()}`
+        content: `window.measurePerformance = ${measurePerformanceInBrowser.toString()}; window.getButtonByText = ${getButtonByText.toString()}`
     });
 
     // Listen for console messages from the browser and print them to Node.js console
@@ -93,9 +97,7 @@ test('Neo.mjs benchmark: Create 1k rows', async ({page}) => {
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            // Use querySelector with a more robust selector
-            const button = document.evaluate(`//button[normalize-space(.)='Create 1k rows']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Create 1k rows').click();
         };
         const condition = () => {
             const grid           = document.querySelector('[role="grid"]');
@@ -119,8 +121,7 @@ test('Neo.mjs benchmark: Create 10k rows', async ({page}) => {
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            const button = document.evaluate(`//button[normalize-space(.)='Create 10k rows']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Create 10k rows').click();
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
@@ -142,8 +143,7 @@ test('Neo.mjs benchmark: Update every 10th row', async ({page}) => {
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            const button = document.evaluate(`//button[normalize-space(.)='Update every 10th row']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Update every 10th row').click();
         };
         const condition = () => {
             const node = document.querySelector('#neo-grid-body-1__row-0__label');
@@ -165,8 +165,7 @@ test('Neo.mjs benchmark: Select row', async ({page}) => {
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            const button = document.evaluate(`//button[normalize-space(.)='Select']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Select').click();
         };
         const condition = () => {
             return document.querySelector('[role="row"][aria-selected="true"]');
@@ -189,8 +188,7 @@ test('Neo.mjs benchmark: Swap rows', async ({page}) => {
 
     const duration = await page.evaluate((labels) => {
         const action    = () => {
-            const button = document.evaluate(`//button[normalize-space(.)='Swap']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Swap').click();
         };
         const condition = (initialLabels) => {
             const newLabels = Array.from(document.querySelectorAll('[role="gridcell"][aria-colindex="2"]'), el => el.textContent);
@@ -212,8 +210,7 @@ test('Neo.mjs benchmark: Remove row', async ({page}) => {
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            const button = document.evaluate(`//button[normalize-space(.)='Remove']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Remove').click();
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
@@ -235,8 +232,7 @@ test('Neo.mjs benchmark: Clear rows', async ({page}) => {
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            const button = document.evaluate(`//button[normalize-space(.)='Clear']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            button.click();
+            window.getButtonByText('Clear').click();
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
