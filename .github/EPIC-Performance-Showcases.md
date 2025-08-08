@@ -53,6 +53,7 @@ The `examples/grid/bigData` example will be the foundation. Our strategy is to l
     - [ ] Sub-task: Add a `Start/Stop Real-time Feed` button that simulates high-frequency WebSocket updates to hundreds of rows per second.
     - [ ] Sub-task: Add a `Run Heavy Calculation` button that triggers a multi-second, computationally expensive task in the app worker.
     - [ ] Sub-task: Add a continuously running CSS animation (e.g., a spinner) and a text input field to serve as visual indicators of main-thread responsiveness.
+- [x] Sub-task: Investigate and implement moving the "Heavy Calculation" to a dedicated Task Worker to ensure the App Worker remains responsive.
 
 - [ ] Task: **Phase 3 (Benchmarking & Promotion):**
     - [ ] Sub-task: Build comparable versions in mainstream frameworks (e.g., React with `react-window`), ensuring they use best-practice virtualization for a fair comparison.

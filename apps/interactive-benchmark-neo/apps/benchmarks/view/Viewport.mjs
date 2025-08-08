@@ -1,6 +1,7 @@
 import BaseViewport          from '../../../node_modules/neo.mjs/src/container/Viewport.mjs';
 import Button                from '../../../node_modules/neo.mjs/src/button/Base.mjs';
 import Container             from '../../../node_modules/neo.mjs/src/container/Base.mjs';
+import TextField             from '../../../node_modules/neo.mjs/src/form/field/Text.mjs';
 import BenchmarkGrid         from './Grid.mjs';
 import ViewportController    from './ViewportController.mjs';
 import ViewportStateProvider from './ViewportStateProvider.mjs';
@@ -16,6 +17,10 @@ class Viewport extends BaseViewport {
          * @protected
          */
         className: 'Benchmarks.view.Viewport',
+        /**
+         * @member {String[]} cls=['benchmarks-viewport']
+         */
+        cls: ['benchmarks-viewport'],
         /**
          * @member {Object} controller=ViewportController
          */
@@ -33,45 +38,60 @@ class Viewport extends BaseViewport {
          */
         items: [{
             module: Container,
+            cls   : 'benchmark-toolbar',
             flex  : 'none',
-            layout: {ntype: 'hbox', align: 'start', pack: 'start'},
-            style : {padding: '1em'},
+            layout: {ntype: 'hbox', align: 'start', pack: 'start', wrap: 'wrap'},
             items : [{
                 module : Button,
-                text   : 'Create 1k rows',
                 handler: 'createRows',
-                rows   : 1000
+                rows   : 1000,
+                text   : 'Create 1k rows'
             }, {
                 module : Button,
-                text   : 'Create 10k rows',
-                style  : {marginLeft: '10px'},
                 handler: 'createRows',
-                rows   : 10000
+                rows   : 10000,
+                text   : 'Create 10k rows'
             }, {
                 module : Button,
-                text   : 'Update every 10th row',
-                style  : {marginLeft: '10px'},
-                handler: 'updateRows'
+                handler: 'updateRows',
+                text   : 'Update every 10th row'
             }, {
                 module : Button,
-                text   : 'Select',
-                style  : {marginLeft: '10px'},
-                handler: 'selectRow'
+                handler: 'selectRow',
+                text   : 'Select'
             }, {
                 module : Button,
-                text   : 'Swap',
-                style  : {marginLeft: '10px'},
-                handler: 'swapRows'
+                handler: 'swapRows',
+                text   : 'Swap'
             }, {
                 module : Button,
-                text   : 'Remove',
-                style  : {marginLeft: '10px'},
-                handler: 'removeRow'
+                handler: 'removeRow',
+                text   : 'Remove'
             }, {
                 module : Button,
-                text   : 'Clear',
-                style  : {marginLeft: '10px'},
-                handler: 'clearRows'
+                handler: 'clearRows',
+                text   : 'Clear'
+            }, {
+                module : Button,
+                handler: 'toggleRealtimeFeed',
+                text   : 'Start/Stop Real-time Feed'
+            }, {
+                module : Button,
+                handler: 'runHeavyCalculation',
+                text   : 'Run Heavy Calculation'
+            }, {
+                module : Button,
+                handler: 'runHeavyCalculationInTaskWorker',
+                text   : 'Run Heavy Calculation (Task Worker)'
+            }, {
+                module         : TextField,
+                hideLabel      : true,
+                placeholderText: 'Type here to test UI responsiveness',
+                reference      : 'main-thread-input',
+                width          : 230
+            }, {
+                ntype: 'component',
+                cls  : 'spinner'
             }]
         }, {
             module   : BenchmarkGrid,

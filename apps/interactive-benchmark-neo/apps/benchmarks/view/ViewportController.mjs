@@ -19,6 +19,12 @@ class ViewportController extends Base {
      */
     #counter = 0
 
+    /**
+     * @member {Number|null} realtimeFeedInterval=null
+     * @private
+     */
+    realtimeFeedInterval = null
+
     clearRows() {
         let store = this.getStore('benchmarkGridStore');
         store.clear();
@@ -52,6 +58,26 @@ class ViewportController extends Base {
             let randomIndex = Math.floor(Math.random() * len);
             store.remove(records[randomIndex]);
         }
+    }
+
+    runHeavyCalculation() {
+        console.log('Heavy calculation started in App Worker...');
+        let result = 0;
+        const iterations = 100000000; // Adjust as needed for desired duration
+
+        for (let i = 0; i < iterations; i++) {
+            result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
+        }
+        console.log('Heavy calculation finished in App Worker. Result:', result);
+    }
+
+    async runHeavyCalculationInTaskWorker() {
+        console.log('Heavy calculation started in Task Worker...');
+        const iterations = 100000000; // Adjust as needed for desired duration
+
+        // Call the method on the Task Worker
+        const result = await Benchmarks.worker.Task.performHeavyCalculation({iterations});
+        console.log('Heavy calculation finished in Task Worker. Result:', result);
     }
 
     selectRow() {
@@ -97,6 +123,39 @@ class ViewportController extends Base {
             ];
 
             grid.bulkUpdateRecords(updatedRecords);
+        }
+    }
+
+    toggleRealtimeFeed() {
+        if (this.realtimeFeedInterval) {
+            clearInterval(this.realtimeFeedInterval);
+            this.realtimeFeedInterval = null;
+            console.log('Real-time feed stopped.');
+        } else {
+            const store = this.getStore('benchmarkGridStore');
+            const grid = this.getReference('benchmark-grid');
+            const updateCount = 100; // Number of rows to update per interval
+
+            this.realtimeFeedInterval = setInterval(() => {
+                const updatedRecords = [];
+                const records = store.items;
+                const len = records.length;
+
+                if (len === 0) {
+                    console.log('No rows to update. Stopping real-time feed.');
+                    clearInterval(this.realtimeFeedInterval);
+                    this.realtimeFeedInterval = null;
+                    return;
+                }
+
+                for (let i = 0; i < updateCount; i++) {
+                    const randomIndex = Math.floor(Math.random() * len);
+                    const record = records[randomIndex];
+                    updatedRecords.push({id: record.id, label: `updated ${record.id} at ${new Date().toLocaleTimeString()}`});
+                }
+                grid.bulkUpdateRecords(updatedRecords);
+            }, 100); // Update every 100ms
+            console.log('Real-time feed started.');
         }
     }
 

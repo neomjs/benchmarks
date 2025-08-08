@@ -6,5 +6,6 @@
     "themes": [
         "neo-theme-dark"
     ],
-    "workerBasePath": "../../node_modules/neo.mjs/src/worker/"
+    "workerBasePath": "../../node_modules/neo.mjs/src/worker/",
+    "useTaskWorker": true
 }
