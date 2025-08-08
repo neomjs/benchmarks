@@ -35,7 +35,9 @@ This showcase directly challenges the limitations of the popular `js-framework-b
 
 The `examples/grid/bigData` example will be the foundation. Our strategy is to leverage the grid's advanced, performance-oriented architectural features to create a showcase that is impossible for main-thread bound frameworks to replicate.
 
-- **Exploit Virtual Rendering:** The `Neo.grid.Body` is the core component. It uses a "buffered" or "virtual" rendering system controlled by `bufferRowRange` and `bufferColumnRange`. It only creates VDOM for the visible rows and columns plus this buffer. This is the key mechanism that allows the grid to handle 10,000+ records without overwhelming the DOM. Our benchmark will push this to its limit, demonstrating that we can handle massive datasets while competitor grids that attempt to render all rows will freeze.
+- **Exploit Virtual Rendering (Fairness Doctrine):** The `Neo.grid.Body` uses a "buffered" or "virtual" rendering system controlled by `bufferRowRange` and `bufferColumnRange`. This is the baseline. For a fair comparison, all competitor implementations (React, Vue, etc.) **must** use an equivalent best-in-class virtualization library (e.g., `react-window`). This focuses the benchmark on architectural differences under load, not on a naive comparison against non-virtualized lists.
+
+- **Benchmark Scrolling Performance:** With virtualization as the baseline, scrolling performance becomes a primary metric. We will programmatically scroll the grid and measure frame rates (FPS) and jank, especially while the "Real-time Feed" or "Heavy Calculation" is active. This will directly expose main-thread contention in competing frameworks.
 
 - **Use Optimized Bulk Updates:** For the "Real-time Feed" test, we will not update records one-by-one. We will use the `Grid.Container#bulkUpdateRecords()` method. This method is specifically designed to handle parallel updates to multiple records efficiently, likely by batching VDOM changes into a single, optimized update cycle. This is a critical performance feature we must highlight.
 
@@ -53,8 +55,9 @@ The `examples/grid/bigData` example will be the foundation. Our strategy is to l
     - [ ] Sub-task: Add a continuously running CSS animation (e.g., a spinner) and a text input field to serve as visual indicators of main-thread responsiveness.
 
 - [ ] Task: **Phase 3 (Benchmarking & Promotion):**
-    - [ ] Sub-task: Build a comparable version in a mainstream framework (e.g., React) to use for side-by-side comparison.
-    - [ ] Sub-task: Conduct rigorous performance testing, capturing videos and metrics (FPS, CPU, blocking time) that clearly show the competitor's UI freezing while the Neo.mjs version remains fluid.
+    - [ ] Sub-task: Build comparable versions in mainstream frameworks (e.g., React with `react-window`), ensuring they use best-practice virtualization for a fair comparison.
+    - [ ] Sub-task: Conduct rigorous performance testing, capturing videos and metrics (FPS, CPU, blocking time) that clearly show the competitor's UI freezing or stuttering during stress tests while the Neo.mjs version remains fluid.
+    - [ ] Sub-task: Implement automated scrolling tests to capture FPS and jank metrics under various load conditions.
     - [x] Sub-task: Generate a `BENCHMARK_RESULTS.md` file to compare dev vs. prod performance.
     - [ ] Sub-task: Create a compelling presentation (e.g., video, article) to showcase the results and explain the architectural reasons for the performance gap.
     - [ ] Sub-task: Publish the source code for both implementations for transparency.
@@ -218,6 +221,24 @@ Inside `page.evaluate`, we cannot use Playwright's `waitFor` helpers. We must us
 2.  **The Unstable Element Problem:** The element being observed (e.g., the grid) may be destroyed and replaced by the VDOM during the update, leaving the observer attached to a detached (orphaned) node.
     -   **Solution:** The observer must be attached to a **stable parent element** (e.g., `document.body`). The observer's callback must then **re-query the DOM** for the target element to check its state, ensuring it is always inspecting the live DOM tree.
 
-- [ ] Task: Refactor the "Create 1k rows" test in `tests/neo.spec.mjs` to use this robust, in-browser measurement pattern.
-- [ ] Task: Validate that the new pattern is stable, accurate, and free of timeouts.
-- [ ] Task: Roll out the validated pattern to all other performance-critical tests in the benchmark suite.
+- [x] Task: Refactor the "Create 1k rows" test in `tests/neo.spec.mjs` to use this robust, in-browser measurement pattern.
+- [x] Task: Validate that the new pattern is stable, accurate, and free of timeouts.
+- [x] Task: Roll out the validated pattern to all other performance-critical tests in the benchmark suite.
+
+---
+
+### 12. Cross-Cutting: Refactor Benchmark Test Logic
+
+**Goal:** To improve the maintainability and readability of the benchmark test suite by eliminating redundant code.
+
+**The Problem: Repetitive Measurement Logic**
+
+The current implementation of `tests/neo.spec.mjs` repeats the entire `measure` function (which includes the `Promise` and `MutationObserver` logic) inside every test case. This makes the code unnecessarily verbose and difficult to maintain. Any future changes to the measurement logic would need to be applied in multiple places.
+
+**The Solution: A Reusable Helper Function**
+
+The `measure` function should be extracted into a single, reusable helper function. This function will accept the `action` and `condition` callbacks as parameters and be called from each test.
+
+- [ ] Task: Create a new `measurePerformance` helper function in `tests/neo.spec.mjs` that encapsulates the `Promise` and `MutationObserver` logic.
+- [ ] Task: Refactor all test cases to use the new `measurePerformance` helper, passing their specific `action` and `condition` logic.
+- [ ] Task: Ensure the refactored tests continue to pass and produce the same accurate results.
