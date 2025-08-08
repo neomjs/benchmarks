@@ -28,7 +28,6 @@
         }
     },
     "apps": [
-        "Benchmarks",
-        "Docs"
+        "Benchmarks"
     ]
 }
