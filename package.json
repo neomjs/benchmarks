@@ -4,8 +4,8 @@
     "description": "Neo.mjs: Benchmarks",
     "type": "module",
     "scripts": {
-        "benchmark": "npx playwright test && node ./scripts/generate-report.mjs",
-        "benchmark:accurate": "CI=true npm run benchmark",
+        "benchmark:testing": "npx playwright test",
+        "benchmark:accurate": "node ./scripts/run-benchmarks.mjs",
         "build:benchmark-app": "npm --prefix apps/interactive-benchmark-neo run build-all"
     },
     "repository": {
@@ -20,7 +20,8 @@
     "homepage": "https://neomjs.com/",
     "dependencies": {
         "@playwright/test": "^1.54.2",
-        "fs-extra": "^11.3.0"
+        "fs-extra": "^11.3.0",
+        "glob": "^11.0.3"
     },
     "funding": {
         "type": "GitHub Sponsors",

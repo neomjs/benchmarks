@@ -1,79 +1,84 @@
-import fs from 'fs-extra';
-import path from 'path';
+import fs     from 'fs-extra';
+import path   from 'path';
+import {glob} from 'glob';
 
-const RESULTS_PATH = path.resolve(process.cwd(), 'test-results.json');
+const RESULTS_DIR = path.resolve(process.cwd(), 'test-results-data');
 const OUTPUT_PATH = path.resolve(process.cwd(), 'BENCHMARK_RESULTS.md');
 const BROWSERS = ['chromium', 'firefox', 'webkit'];
 
 /**
- * Parses the raw JSON output from the Playwright JSON reporter.
- * @param {Object} rawData The raw JSON data from test-results.json
- * @returns {Object} A structured object with benchmark results.
+ * Calculates the standard deviation of an array of numbers.
+ * @param {number[]} arr The array of numbers.
+ * @returns {number} The standard deviation.
  */
-function parseResults(rawData) {
+function getStandardDeviation(arr) {
+    if (arr.length < 2) return 0;
+    const n = arr.length;
+    const mean = arr.reduce((a, b) => a + b) / n;
+    return Math.sqrt(arr.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
+}
+
+/**
+ * Parses raw JSON data from multiple Playwright reports and aggregates it.
+ * @param {Object[]} allRunsData An array of raw JSON data objects.
+ * @returns {Object} A structured object with aggregated benchmark results.
+ */
+function parseResults(allRunsData) {
     const benchmarks = {};
 
     const initializeBenchmark = (name) => {
         if (!benchmarks[name]) {
             benchmarks[name] = { dev: {}, prod: {} };
             BROWSERS.forEach(browser => {
-                benchmarks[name].dev[browser] = { times: [], avg: 0 };
-                benchmarks[name].prod[browser] = { times: [], avg: 0 };
+                benchmarks[name].dev[browser] = { times: [], avg: 0, stdDev: 0 };
+                benchmarks[name].prod[browser] = { times: [], avg: 0, stdDev: 0 };
             });
         }
     };
 
-    const processSuite = (suite) => {
-        if (suite.specs) {
-            suite.specs.forEach(spec => {
-                const benchmarkName = spec.title.replace('Neo.mjs benchmark: ', '');
-                initializeBenchmark(benchmarkName);
+    allRunsData.forEach(runData => {
+        const processSuite = (suite) => {
+            if (suite.specs) {
+                suite.specs.forEach(spec => {
+                    const benchmarkName = spec.title.replace('Neo.mjs benchmark: ', '');
+                    initializeBenchmark(benchmarkName);
 
-                spec.tests.forEach(test => {
-                    const mode = test.projectName.endsWith('-dev') ? 'dev' : 'prod';
-                    const browser = BROWSERS.find(b => test.projectName.startsWith(b));
+                    spec.tests.forEach(test => {
+                        const mode = test.projectName.endsWith('-dev') ? 'dev' : 'prod';
+                        const browser = BROWSERS.find(b => test.projectName.startsWith(b));
 
-                    if (browser && test.results.every(r => r.status === 'passed')) {
-                        const durationAnnotation = test.annotations.find(a => a.type === 'duration');
-                        if (durationAnnotation) {
-                            const duration = parseFloat(durationAnnotation.description);
-                            benchmarks[benchmarkName][mode][browser].times.push(duration);
+                        if (browser && test.results.every(r => r.status === 'passed')) {
+                            const durationAnnotation = test.annotations.find(a => a.type === 'duration');
+                            if (durationAnnotation) {
+                                const duration = parseFloat(durationAnnotation.description);
+                                benchmarks[benchmarkName][mode][browser].times.push(duration);
+                            }
                         }
-                    }
+                    });
                 });
-            });
-        }
-        if (suite.suites) {
-            suite.suites.forEach(processSuite);
-        }
-    };
+            }
+            if (suite.suites) {
+                suite.suites.forEach(processSuite);
+            }
+        };
+        runData.suites.forEach(processSuite);
+    });
 
-    rawData.suites.forEach(processSuite);
-
-    // Calculate averages
+    // Calculate averages and standard deviations
     for (const benchmarkName in benchmarks) {
         const benchmark = benchmarks[benchmarkName];
-        let devTotal = 0, devCount = 0;
-        let prodTotal = 0, prodCount = 0;
-
         BROWSERS.forEach(browser => {
             const devResult = benchmark.dev[browser];
             if (devResult.times.length > 0) {
                 devResult.avg = devResult.times.reduce((a, b) => a + b, 0) / devResult.times.length;
-                devTotal += devResult.avg;
-                devCount++;
+                devResult.stdDev = getStandardDeviation(devResult.times);
             }
-
             const prodResult = benchmark.prod[browser];
             if (prodResult.times.length > 0) {
                 prodResult.avg = prodResult.times.reduce((a, b) => a + b, 0) / prodResult.times.length;
-                prodTotal += prodResult.avg;
-                prodCount++;
+                prodResult.stdDev = getStandardDeviation(prodResult.times);
             }
         });
-
-        benchmark.dev.average = devCount > 0 ? devTotal / devCount : 0;
-        benchmark.prod.average = prodCount > 0 ? prodTotal / prodCount : 0;
     }
 
     return benchmarks;
@@ -82,9 +87,10 @@ function parseResults(rawData) {
 /**
  * Generates the markdown content for the results file.
  * @param {Object} benchmarks The structured benchmark data.
+ * @param {number} runCount The number of runs the data was aggregated from.
  * @returns {String} The markdown content as a string.
  */
-function generateMarkdown(benchmarks) {
+function generateMarkdown(benchmarks, runCount) {
     let table = `| Benchmark                 | Browser    | Dev Mode (ms) | Prod Mode (ms) | Improvement |
 |---------------------------|------------|---------------|----------------|-------------|
 `;
@@ -95,29 +101,38 @@ function generateMarkdown(benchmarks) {
         const result = benchmarks[key];
         table += `| **${key}**               |            |               |                |             |\n`;
 
+        let totalDevAvg = 0, totalProdAvg = 0, browserCount = 0;
+
         BROWSERS.forEach(browser => {
-            const devAvg = result.dev[browser].avg;
-            const prodAvg = result.prod[browser].avg;
+            const devResult = result.dev[browser];
+            const prodResult = result.prod[browser];
+            if (devResult.times.length === 0 && prodResult.times.length === 0) return;
+
+            browserCount++;
+            totalDevAvg += devResult.avg;
+            totalProdAvg += prodResult.avg;
+
+            const devAvg =
+`${devResult.avg.toFixed(2)} (±${devResult.stdDev.toFixed(2)})`;
+            const prodAvg =
+`${prodResult.avg.toFixed(2)} (±${prodResult.stdDev.toFixed(2)})`;
             let improvement = 'N/A';
-            if (devAvg > 0 && prodAvg > 0) {
-                const percentage = ((devAvg - prodAvg) / devAvg) * 100;
+            if (devResult.avg > 0 && prodResult.avg > 0) {
+                const percentage = ((devResult.avg - prodResult.avg) / devResult.avg) * 100;
                 improvement = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
             }
-            table += `|                           | ${browser.padEnd(10)} | ${devAvg.toFixed(2).padEnd(13)} | ${prodAvg.toFixed(2).padEnd(14)} | ${improvement.padEnd(11)} |
-`;
+            table += `|                           | ${browser.padEnd(10)} | ${devAvg.padEnd(13)} | ${prodAvg.padEnd(14)} | ${improvement.padEnd(11)} |\n`;
         });
-        
-        const devAvgAll = result.dev.average;
-        const prodAvgAll = result.prod.average;
+
+        const devAvgAll = totalDevAvg / browserCount;
+        const prodAvgAll = totalProdAvg / browserCount;
         let improvementAll = 'N/A';
         if (devAvgAll > 0 && prodAvgAll > 0) {
             const percentage = ((devAvgAll - prodAvgAll) / devAvgAll) * 100;
             improvementAll = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
         }
-        table += `|                           | **Average**| **${devAvgAll.toFixed(2)}**        | **${prodAvgAll.toFixed(2)}**         | **${improvementAll}**    |
-`;
-        table += `|---------------------------|------------|---------------|----------------|-------------|
-`;
+        table += `|                           | **Average**| **${devAvgAll.toFixed(2)}**        | **${prodAvgAll.toFixed(2)}**         | **${improvementAll}**    |\n`;
+        table += `|---------------------------|------------|---------------|----------------|-------------|\n`;
     }
 
     const devPath = '`/apps/benchmarks/`';
@@ -129,7 +144,7 @@ This report compares the performance of the interactive benchmark application ru
 - **Development Mode**: Served directly by the webpack dev server (${devPath}).
 - **Production Mode**: Using the optimized build output (${prodPath}).
 
-The following table shows the execution time in milliseconds (ms) for each test, broken down by browser.
+The following table shows the average execution time in milliseconds (ms) for each test, aggregated over **${runCount} run(s)**. The value in parentheses (±) is the standard deviation, which measures the result's variance.
 
 ${table}
 ---
@@ -143,14 +158,16 @@ ${table}
  */
 async function main() {
     try {
-        if (!fs.existsSync(RESULTS_PATH)) {
-            console.error('Error: test-results.json not found. Please run the tests first.');
+        const resultFiles = glob.sync(`${RESULTS_DIR}/*.json`);
+        if (resultFiles.length === 0) {
+            console.error(`Error: No result files found in ${RESULTS_DIR}. Please run the tests first.`);
             process.exit(1);
         }
 
-        const rawData = await fs.readJson(RESULTS_PATH);
-        const benchmarks = parseResults(rawData);
-        const markdown = generateMarkdown(benchmarks);
+        const allRunsData = await Promise.all(resultFiles.map(file => fs.readJson(file)));
+
+        const benchmarks = parseResults(allRunsData);
+        const markdown = generateMarkdown(benchmarks, resultFiles.length);
         await fs.writeFile(OUTPUT_PATH, markdown);
 
         console.log(`Successfully generated benchmark report at: ${OUTPUT_PATH}`);

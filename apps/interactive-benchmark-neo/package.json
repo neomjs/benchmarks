@@ -18,6 +18,7 @@
         "generate-docs-json": "node ./node_modules/neo.mjs/buildScripts/docs/jsdocx.mjs",
         "inject-package-version": "node ./node_modules/neo.mjs/buildScripts/injectPackageVersion.mjs",
         "server-start": "webpack serve -c ./buildScripts/webpack/webpack.server.config.mjs --open",
+        "server-start:headless": "webpack serve -c ./buildScripts/webpack/webpack.server.config.mjs",
         "test": "echo \"Error: no test specified\" && exit 1",
         "watch-themes": "node ./node_modules/neo.mjs/buildScripts/watchThemes.mjs"
     },
