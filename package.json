@@ -3,6 +3,9 @@
     "version": "10.3.3",
     "description": "Neo.mjs: Benchmarks",
     "type": "module",
+    "scripts": {
+        "build:benchmark-app": "npm --prefix apps/interactive-benchmark-neo run build-all"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/neomjs/benchmarks.git"

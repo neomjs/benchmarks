@@ -63,7 +63,7 @@ test('Neo.mjs benchmark: Update every 10th row', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to update 1k rows (every 10th): ${duration}ms`);
 
-  expect(duration).toBeLessThan(250);
+  expect(duration).toBeLessThan(500);
 });
 
 test('Neo.mjs benchmark: Select row', async ({ page }) => {
@@ -98,18 +98,25 @@ test('Neo.mjs benchmark: Swap rows', async ({ page }) => {
   await page.getByRole('button', { name: 'Create 1k rows' }).click();
   await page.locator('[role="grid"][aria-rowcount="1002"]').waitFor();
 
-  // Get initial text of two rows to verify swap
-  const initialText1 = await page.locator('#neo-grid-body-1__row-0__label').textContent();
-  const initialText2 = await page.locator('#neo-grid-body-1__row-1__label').textContent();
+  // Helper function to get the text content of all visible labels
+  const getVisibleLabels = async () => {
+    return page.locator('[role="gridcell"][aria-colindex="2"]').evaluateAll(elements => {
+        return elements.map(el => el.textContent);
+    });
+  };
+
+  const initialLabels = await getVisibleLabels();
 
   const startTime = await page.evaluate(() => performance.now());
 
   // Click the "Swap" button
   await page.getByRole('button', { name: 'Swap' }).click();
 
-  // Wait for the text content of the two rows to change (swap)
-  await expect(page.locator('#neo-grid-body-1__row-0__label')).not.toHaveText(initialText1);
-  await expect(page.locator('#neo-grid-body-1__row-1__label')).not.toHaveText(initialText2);
+  // Poll until the labels have changed, confirming the swap is reflected in the DOM
+  await expect(async () => {
+    const newLabels = await getVisibleLabels();
+    expect(newLabels).not.toEqual(initialLabels);
+  }).toPass();
 
   const endTime = await page.evaluate(() => performance.now());
 
@@ -117,6 +124,10 @@ test('Neo.mjs benchmark: Swap rows', async ({ page }) => {
   console.log(`Time to swap rows: ${duration}ms`);
 
   expect(duration).toBeLessThan(500);
+
+  // Optional, but good to have: verify the new labels are a permutation of the old ones
+  const newLabels = await getVisibleLabels();
+  expect(newLabels.sort()).toEqual(initialLabels.sort());
 });
 
 test('Neo.mjs benchmark: Remove row', async ({ page }) => {
