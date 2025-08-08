@@ -55,13 +55,14 @@ class ViewportController extends Base {
     }
 
     selectRow() {
-        let store   = this.getStore('benchmarkGridStore'),
-            records = store.items,
-            len     = records.length,
-            grid    = this.getReference('benchmark-grid');
+        let store       = this.getStore('benchmarkGridStore'),
+            records     = store.items,
+            len         = records.length,
+            grid        = this.getReference('benchmark-grid'),
+            mountedRows = grid.body.mountedRows;
 
         if (len > 0) {
-            let randomIndex = Math.floor(Math.random() * len);
+            let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0])) + mountedRows[0];
             grid.selectionModel.selectRow(records[randomIndex].id);
         }
     }
