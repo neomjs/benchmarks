@@ -175,3 +175,49 @@ This classic computer science simulation is visually compelling and represents a
 - **[ ] Task:** Implement the Game of Life logic within the App Worker.
 - **[ ] Task:** Create the UI and connect it to the worker's state.
 - **[ ] Task:** Develop a competitor version to highlight the performance difference.
+
+---
+
+### 11. Cross-Cutting: High-Precision Benchmark Measurement
+
+To ensure our benchmark results are scientifically accurate, we must eliminate the "observer effect" introduced by the test harness itself. The time it takes for the Playwright test runner (in Node.js) to communicate with the browser can be significant and variable, and must not be included in the measurement of the framework's performance.
+
+**The Problem: Measuring Test Runner Latency Instead of App Performance**
+
+A naive benchmark implementation suffers from severe measurement pollution:
+
+```javascript
+// INACCURATE: This measures app performance PLUS multiple network round-trips.
+
+// 1. Round-trip to start the timer
+const startTime = await page.evaluate(() => performance.now());
+
+// 2. Round-trip to click the button
+await page.getByRole('button', { name: 'Create 1k rows' }).click();
+
+// 3. Multiple round-trips for polling
+await page.locator(`[role="grid"][aria-rowcount="1002"]`).waitFor();
+
+// 4. Round-trip to stop the timer
+const endTime = await page.evaluate(() => performance.now());
+
+const duration = endTime - startTime; // The result is polluted and inaccurate.
+```
+
+**The Solution: In-Browser Atomic Measurement**
+
+The entire timed operation—capturing the start time, triggering the event, waiting for the DOM to update, and capturing the end time—must occur atomically within a single `page.evaluate()` call. This keeps the entire measurement inside the browser's high-resolution timer context (`performance.now()`), eliminating all test runner and network latency from the result.
+
+**The Implementation Pattern: A Robust `MutationObserver`**
+
+Inside `page.evaluate`, we cannot use Playwright's `waitFor` helpers. We must use the browser's native `MutationObserver` API. The implementation must be robust to avoid two critical pitfalls:
+
+1.  **The Race Condition:** The DOM update may happen faster than the observer can be attached.
+    -   **Solution:** Check the condition synchronously *immediately* after triggering the event. If it's already true, return the duration instantly. Only create the observer if the condition is not yet met.
+
+2.  **The Unstable Element Problem:** The element being observed (e.g., the grid) may be destroyed and replaced by the VDOM during the update, leaving the observer attached to a detached (orphaned) node.
+    -   **Solution:** The observer must be attached to a **stable parent element** (e.g., `document.body`). The observer's callback must then **re-query the DOM** for the target element to check its state, ensuring it is always inspecting the live DOM tree.
+
+- [ ] Task: Refactor the "Create 1k rows" test in `tests/neo.spec.mjs` to use this robust, in-browser measurement pattern.
+- [ ] Task: Validate that the new pattern is stable, accurate, and free of timeouts.
+- [ ] Task: Roll out the validated pattern to all other performance-critical tests in the benchmark suite.
