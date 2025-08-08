@@ -8,13 +8,13 @@ The following table shows the average execution time in milliseconds (ms) for ea
 
 | Benchmark                 | Dev Mode (Avg ms) | Prod Mode (Avg ms) | Improvement |
 |---------------------------|-------------------|--------------------|-------------|
-| Clear rows                | 91.77             | 95.33              | **-3.89%** |
-| Create 10k rows           | 1649.50           | 1284.10            | **+22.15%** |
-| Create 1k rows            | 1160.80           | 1202.93            | **-3.63%** |
-| Remove row                | 74.77             | 94.73              | **-26.71%** |
-| Select row                | 128.00            | 101.07             | **+21.04%** |
-| Swap rows                 | 166.80            | 169.47             | **-1.60%** |
-| Update every 10th row     | 176.93            | 174.07             | **+1.62%** |
+| Clear rows                | 30.27             | 24.90              | **+17.73%** |
+| Create 10k rows           | 267.77            | 76.43              | **+71.46%** |
+| Create 1k rows            | 67.47             | 76.27              | **-13.04%** |
+| Remove row                | 17.23             | 18.87              | **-9.48%** |
+| Select row                | 22.87             | 16.97              | **+25.80%** |
+| Swap rows                 | 93.23             | 85.67              | **+8.12%** |
+| Update every 10th row     | 49.90             | 16.97              | **+66.00%** |
 
 ---
 
