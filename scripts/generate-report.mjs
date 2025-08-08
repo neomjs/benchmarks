@@ -93,8 +93,7 @@ function generateMarkdown(benchmarks) {
 
     for (const key of sortedKeys) {
         const result = benchmarks[key];
-        table += `| **${key}**               |            |               |                |             |
-`;
+        table += `| **${key}**               |            |               |                |             |\n`;
 
         BROWSERS.forEach(browser => {
             const devAvg = result.dev[browser].avg;
@@ -121,11 +120,14 @@ function generateMarkdown(benchmarks) {
 `;
     }
 
+    const devPath = '`/apps/benchmarks/`';
+    const prodPath = '`/dist/production/apps/benchmarks/`';
+
     return `# Benchmark Performance Results
 
 This report compares the performance of the interactive benchmark application running in two different modes:
-- **Development Mode**: Served directly by the webpack dev server (\\\`/apps/benchmarks/\\\\\`).
-- **Production Mode**: Using the optimized build output (\\\`/dist/production/apps/benchmarks/\\\\\`).
+- **Development Mode**: Served directly by the webpack dev server (${devPath}).
+- **Production Mode**: Using the optimized build output (${prodPath}).
 
 The following table shows the execution time in milliseconds (ms) for each test, broken down by browser.
 

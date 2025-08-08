@@ -151,7 +151,18 @@ This sub-epic covers the creation of a credible, transparent, and easy-to-use be
 
 ---
 
-### 9. Future Showcase Idea: Conway's Game of Life
+### 9. Cross-Cutting: Statistical Accuracy and Stability
+
+To ensure our benchmark results are reliable and resistant to temporary system fluctuations, we need to run the test suite multiple times and aggregate the results.
+
+- **[ ] Task:** Create a master script that can execute the Playwright test suite a specified number of times (e.g., `npm run benchmark:accurate -- --runs=5`).
+- **[ ] Task:** For each run, save the `test-results.json` output to a uniquely named file (e.g., `test-results-1.json`, `test-results-2.json`).
+- **[ ] Task:** Modify the `generate-report.mjs` script to read and aggregate data from all generated JSON files.
+- **[ ] Task:** Update the final report to include not just the average, but also the standard deviation to quantify the variance between runs.
+
+---
+
+### 10. Future Showcase Idea: Conway's Game of Life
 
 This classic computer science simulation is visually compelling and represents a pure, CPU-bound algorithmic challenge, contrasting with the I/O and rendering-bound challenges of the other showcases.
 
