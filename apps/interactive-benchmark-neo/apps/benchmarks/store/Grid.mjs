@@ -15,11 +15,7 @@ class GridStore extends Store {
         /**
          * @member {Neo.data.Model} model=GridModel
          */
-        model: GridModel,
-        /**
-         * @member {String} keyProperty='id'
-         */
-        keyProperty: 'id'
+        model: GridModel
     }
 }
 

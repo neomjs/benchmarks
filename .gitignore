@@ -20,3 +20,4 @@ resources/data/deck/EditorConfig.json
 /playwright-report/
 /playwright/.cache/
 /test-results/
+/test-results.json
