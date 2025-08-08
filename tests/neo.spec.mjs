@@ -245,3 +245,79 @@ test('Neo.mjs benchmark: Clear rows', async ({page}) => {
     console.log(`Time to clear rows: ${duration}ms`);
     expect(duration).toBeLessThan(500);
 });
+
+test('Neo.mjs benchmark: Real-time Feed', async ({page}) => {
+    await page.goto('/apps/benchmarks/');
+    await expect(page).toHaveTitle('Benchmarks');
+    await page.getByRole('button', {name: 'Create 1k rows'}).click();
+    await waitForGridReady(page, 1002);
+
+    const duration = await page.evaluate(() => {
+        const action = () => {
+            window.getButtonByText('Start/Stop Real-time Feed').click();
+            // Let the feed run for a few seconds
+            return new Promise(resolve => setTimeout(() => {
+                window.getButtonByText('Start/Stop Real-time Feed').click(); // Stop the feed
+                resolve();
+            }, 5000)); // Run for 5 seconds
+        };
+        const condition = () => {
+            // Check if the spinner is still animating (by checking its class) and input is enabled
+            const spinner = document.querySelector('.spinner');
+            const input = document.querySelector('[reference="main-thread-input"]');
+            return spinner && spinner.classList.contains('spinner') && input && !input.disabled;
+        };
+        return window.measurePerformance('Real-time Feed', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time for Real-time Feed (5s active): ${duration}ms`);
+    expect(duration).toBeGreaterThan(4500); // Should be at least 4.5 seconds
+    expect(duration).toBeLessThan(5500);  // Should not exceed 5.5 seconds significantly
+});
+
+test('Neo.mjs benchmark: Heavy Calculation (App Worker)', async ({page}) => {
+    await page.goto('/apps/benchmarks/');
+    await expect(page).toHaveTitle('Benchmarks');
+
+    const duration = await page.evaluate(() => {
+        const action = () => {
+            window.getButtonByText('Run Heavy Calculation').click();
+        };
+        const condition = () => {
+            // Check if the spinner is still animating and input is enabled
+            const spinner = document.querySelector('.spinner');
+            const input = document.querySelector('[reference="main-thread-input"]');
+            return spinner && spinner.classList.contains('spinner') && input && !input.disabled;
+        };
+        return window.measurePerformance('Heavy Calculation (App Worker)', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time for Heavy Calculation (App Worker): ${duration}ms`);
+    expect(duration).toBeGreaterThan(1000); // Should take at least 1 second
+    expect(duration).toBeLessThan(10000); // Should not exceed 10 seconds (adjust based on expected calculation time)
+});
+
+test('Neo.mjs benchmark: Heavy Calculation (Task Worker)', async ({page}) => {
+    await page.goto('/apps/benchmarks/');
+    await expect(page).toHaveTitle('Benchmarks');
+
+    const duration = await page.evaluate(() => {
+        const action = () => {
+            window.getButtonByText('Run Heavy Calculation (Task Worker)').click();
+        };
+        const condition = () => {
+            // Check if the spinner is still animating and input is enabled
+            const spinner = document.querySelector('.spinner');
+            const input = document.querySelector('[reference="main-thread-input"]');
+            return spinner && spinner.classList.contains('spinner') && input && !input.disabled;
+        };
+        return window.measurePerformance('Heavy Calculation (Task Worker)', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time for Heavy Calculation (Task Worker): ${duration}ms`);
+    expect(duration).toBeGreaterThan(1000); // Should take at least 1 second
+    expect(duration).toBeLessThan(10000); // Should not exceed 10 seconds (adjust based on expected calculation time)
+});
