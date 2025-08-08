@@ -19,6 +19,12 @@ class ViewportController extends Base {
      */
     #counter = 0
 
+    clearRows() {
+        let store = this.getStore('benchmarkGridStore');
+        store.clear();
+        this.#counter = 0;
+    }
+
     /**
      * @param {Object} data
      * @param {Neo.button.Base} data.component
@@ -26,9 +32,9 @@ class ViewportController extends Base {
      */
     createRows(data) {
         let amount = data.component.rows,
-            rows = [],
-            i    = 0,
-            store = this.getStore('benchmarkGridStore');
+            rows   = [],
+            i      = 0,
+            store  = this.getStore('benchmarkGridStore');
 
         for (; i < amount; i++) {
             this.#counter++;
@@ -37,25 +43,22 @@ class ViewportController extends Base {
         store.add(rows);
     }
 
-    updateRows() {
-        let store = this.getStore('benchmarkGridStore'),
+    removeRow() {
+        let store   = this.getStore('benchmarkGridStore'),
             records = store.items,
-            updatedRecords = [],
-            i = 0,
-            len = records.length,
-            grid = this.getReference('benchmark-grid');
+            len     = records.length;
 
-        for (; i < len; i += 10) {
-            updatedRecords.push({id: records[i].id, label: 'updated row ' + records[i].id});
+        if (len > 0) {
+            let randomIndex = Math.floor(Math.random() * len);
+            store.remove(records[randomIndex]);
         }
-        grid.bulkUpdateRecords(updatedRecords);
     }
 
     selectRow() {
-        let store = this.getStore('benchmarkGridStore'),
+        let store   = this.getStore('benchmarkGridStore'),
             records = store.items,
-            len = records.length,
-            grid = this.getReference('benchmark-grid');
+            len     = records.length,
+            grid    = this.getReference('benchmark-grid');
 
         if (len > 0) {
             let randomIndex = Math.floor(Math.random() * len);
@@ -64,9 +67,9 @@ class ViewportController extends Base {
     }
 
     swapRows() {
-        let store = this.getStore('benchmarkGridStore'),
+        let store   = this.getStore('benchmarkGridStore'),
             records = store.items,
-            len = records.length;
+            len     = records.length;
 
         if (len >= 2) {
             let idx1 = Math.floor(Math.random() * len);
@@ -77,27 +80,24 @@ class ViewportController extends Base {
             }
 
             // Swap the content (labels) of the two records
-            let tempLabel = records[idx1].label;
+            let tempLabel       = records[idx1].label;
             records[idx1].label = records[idx2].label;
             records[idx2].label = tempLabel;
         }
     }
 
-    removeRow() {
-        let store = this.getStore('benchmarkGridStore'),
-            records = store.items,
-            len = records.length;
+    updateRows() {
+        let store          = this.getStore('benchmarkGridStore'),
+            records        = store.items,
+            updatedRecords = [],
+            i              = 0,
+            len            = records.length,
+            grid           = this.getReference('benchmark-grid');
 
-        if (len > 0) {
-            let randomIndex = Math.floor(Math.random() * len);
-            store.remove(records[randomIndex]);
+        for (; i < len; i += 10) {
+            updatedRecords.push({id: records[i].id, label: 'updated row ' + records[i].id});
         }
-    }
-
-    clearRows() {
-        let store = this.getStore('benchmarkGridStore');
-        store.clear();
-        this.#counter = 0;
+        grid.bulkUpdateRecords(updatedRecords);
     }
 }
 

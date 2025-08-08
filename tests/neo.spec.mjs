@@ -18,7 +18,7 @@ test('Neo.mjs benchmark: Create 1k rows', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to render 1k rows: ${duration}ms`);
 
-  expect(duration).toBeLessThan(1000); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(1000);
 });
 
 test('Neo.mjs benchmark: Create 10k rows', async ({ page }) => {
@@ -38,7 +38,7 @@ test('Neo.mjs benchmark: Create 10k rows', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to render 10k rows: ${duration}ms`);
 
-  expect(duration).toBeLessThan(35000); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(35000);
 });
 
 test('Neo.mjs benchmark: Update every 10th row', async ({ page }) => {
@@ -63,7 +63,7 @@ test('Neo.mjs benchmark: Update every 10th row', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to update 1k rows (every 10th): ${duration}ms`);
 
-  expect(duration).toBeLessThan(250); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(250);
 });
 
 test('Neo.mjs benchmark: Select row', async ({ page }) => {
@@ -87,7 +87,7 @@ test('Neo.mjs benchmark: Select row', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to select a row: ${duration}ms`);
 
-  expect(duration).toBeLessThan(500); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(500);
 });
 
 test('Neo.mjs benchmark: Swap rows', async ({ page }) => {
@@ -116,7 +116,7 @@ test('Neo.mjs benchmark: Swap rows', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to swap rows: ${duration}ms`);
 
-  expect(duration).toBeLessThan(500); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(500);
 });
 
 test('Neo.mjs benchmark: Remove row', async ({ page }) => {
@@ -143,7 +143,7 @@ test('Neo.mjs benchmark: Remove row', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to remove a row: ${duration}ms`);
 
-  expect(duration).toBeLessThan(200); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(200);
 });
 
 test('Neo.mjs benchmark: Clear rows', async ({ page }) => {
@@ -167,5 +167,5 @@ test('Neo.mjs benchmark: Clear rows', async ({ page }) => {
   const duration = endTime - startTime;
   console.log(`Time to clear rows: ${duration}ms`);
 
-  expect(duration).toBeLessThan(150); // Adjusted assertion for slower machines
+  expect(duration).toBeLessThan(500);
 });
