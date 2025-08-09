@@ -63,7 +63,7 @@ class ViewportController extends Base {
     runHeavyCalculation() {
         console.log('Heavy calculation started in App Worker...');
         let result = 0;
-        const iterations = 100000000; // Adjust as needed for desired duration
+        const iterations = 50000000; // Adjust as needed for desired duration
 
         for (let i = 0; i < iterations; i++) {
             result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
@@ -73,7 +73,7 @@ class ViewportController extends Base {
 
     async runHeavyCalculationInTaskWorker() {
         console.log('Heavy calculation started in Task Worker...');
-        const iterations = 100000000; // Adjust as needed for desired duration
+        const iterations = 50000000; // Adjust as needed for desired duration
 
         // Call the method on the Task Worker
         const result = await Benchmarks.worker.Task.performHeavyCalculation({iterations});
@@ -86,13 +86,18 @@ class ViewportController extends Base {
             grid          = this.getReference('benchmark-grid'),
             {mountedRows} = grid.body;
 
-        if (count > 0 && mountedRows[1] > mountedRows[0]) {
-            // Correctly calculate a random index within the mounted range (inclusive)
-            let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0] + 1)) + mountedRows[0];
+        if (count > 0) {
+            if (mountedRows[1] > mountedRows[0]) {
+                // Default case: select a random row from the visible (mounted) ones
+                let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0] + 1)) + mountedRows[0];
 
-            // Ensure the index is within the bounds of the actual store items
-            if (randomIndex < count) {
-                grid.body.selectionModel.selectRow(store.getAt(randomIndex).id);
+                // Ensure the index is within the bounds of the actual store items
+                if (randomIndex < count) {
+                    grid.body.selectionModel.selectRow(store.getAt(randomIndex).id);
+                }
+            } else {
+                // Fallback for when mountedRows is not ready: select the first row
+                grid.body.selectionModel.selectRow(store.getAt(0).id);
             }
         }
     }
