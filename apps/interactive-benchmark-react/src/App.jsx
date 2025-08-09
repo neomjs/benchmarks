@@ -49,15 +49,23 @@ function App() {
         }
     };
     const swap = () => {
-        if (data.length > 1) {
-            const newData = [...data];
-            const index1 = Math.floor(Math.random() * data.length);
-            let index2 = Math.floor(Math.random() * data.length);
-            while (index1 === index2) {
-                index2 = Math.floor(Math.random() * data.length);
+        if (gridRef.current) {
+            const visibleRows = gridRef.current.getVisibleRows();
+            if (visibleRows.length > 1) {
+                const newData = [...data];
+
+                const visibleIndex1 = Math.floor(Math.random() * visibleRows.length);
+                let visibleIndex2 = Math.floor(Math.random() * visibleRows.length);
+                while (visibleIndex1 === visibleIndex2) {
+                    visibleIndex2 = Math.floor(Math.random() * visibleRows.length);
+                }
+
+                const originalIndex1 = visibleRows[visibleIndex1].index;
+                const originalIndex2 = visibleRows[visibleIndex2].index;
+
+                [newData[originalIndex1], newData[originalIndex2]] = [newData[originalIndex2], newData[originalIndex1]];
+                setData(newData);
             }
-            [newData[index1], newData[index2]] = [newData[index2], newData[index1]];
-            setData(newData);
         }
     };
     const remove = () => {
