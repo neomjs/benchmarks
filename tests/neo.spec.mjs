@@ -72,15 +72,66 @@ const measurePerformanceInBrowser = (testName, action, condition, passThrough) =
     });
 };
 
+/**
+ * Measures UI jank by collecting frame timings over a given duration.
+ * This function will be injected into the browser context.
+ * @param {number} duration - The duration in milliseconds to measure jank.
+ * @returns {Promise<{averageFps: number, frameCount: number, longFrameCount: number, totalTime: number}>}
+ */
+const measureJankInBrowser = (duration) => {
+    return new Promise(resolve => {
+        const frameTimes = [];
+        let longFrameCount = 0;
+        let startTime;
+
+        function frame(time) {
+            if (startTime === undefined) {
+                startTime = time;
+            }
+
+            const elapsed = time - startTime;
+            frameTimes.push(time);
+
+            if (elapsed < duration) {
+                requestAnimationFrame(frame);
+            } else {
+                // Start from the second frame to calculate deltas
+                for (let i = 1; i < frameTimes.length; i++) {
+                    const delta = frameTimes[i] - frameTimes[i - 1];
+                    // A long frame is arbitrarily defined as > 50ms (~20 FPS threshold)
+                    // This indicates significant main-thread blocking.
+                    if (delta > 50) {
+                        longFrameCount++;
+                    }
+                }
+
+                const totalTime = frameTimes[frameTimes.length - 1] - frameTimes[0];
+                // We have frameTimes.length - 1 frame intervals
+                const averageFps = totalTime > 0 ? (frameTimes.length - 1) / (totalTime / 1000) : 0;
+
+                resolve({
+                    averageFps: Math.round(averageFps),
+                    frameCount: frameTimes.length,
+                    longFrameCount,
+                    totalTime: Math.round(totalTime)
+                });
+            }
+        }
+
+        requestAnimationFrame(frame);
+    });
+};
+
 const getButtonByText = (text) => {
     return document.evaluate(`//button[normalize-space(.)='${text}']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
 };
 
 test.beforeEach(async ({page}) => {
-    // Inject the measurePerformance function into the browser context's window object
+    // Inject the measurement functions into the browser context's window object
     await page.addInitScript({
         content: `
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
+            window.measureJank = ${measureJankInBrowser.toString()};
             window.getButtonByText = ${getButtonByText.toString()};
             window.consoleLogs = [];
         `
@@ -257,123 +308,89 @@ test('Neo.mjs benchmark: Clear rows', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('Neo.mjs benchmark: Real-time Feed', async ({page}) => {
+test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 1k rows'}).click();
     await waitForGridReady(page, 1002);
 
-    const duration = await page.evaluate(async () => {
-        const getCellText = (rowIndex) => {
-            const cell = document.querySelector(`#neo-grid-body-1__row-${rowIndex}__label`);
-            return cell ? cell.textContent : null;
-        };
+    // Start the feed
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
-        const initialCellTexts = [];
-        for (let i = 0; i < 10; i++) { // Sample 10 rows
-            initialCellTexts.push(getCellText(i));
-        }
-
-        const action = () => {
-            window.getButtonByText('Start/Stop Real-time Feed').click();
-            // Let the feed run for a few seconds
-            return new Promise(resolve => setTimeout(() => {
-                window.getButtonByText('Start/Stop Real-time Feed').click(); // Stop the feed
-                resolve();
-            }, 5000)); // Run for 5 seconds
-        };
-        const condition = () => {
-            // Check if the spinner is still animating (by checking its class) and input is enabled
-            const spinner = document.querySelector('.spinner');
-            const input   = document.querySelector('[data-ref="main-thread-input"]');
-
-            let cellsUpdated = false;
-            for (let i = 0; i < 10; i++) {
-                if (getCellText(i) !== initialCellTexts[i]) {
-                    cellsUpdated = true;
-                    break;
-                }
-            }
-
-            return spinner && spinner.classList.contains('spinner') && input && !input.disabled && cellsUpdated;
-        };
-        return window.measurePerformance('Real-time Feed', action, condition);
+    // Measure jank for 4 seconds while the feed is running
+    const jankMetrics = await page.evaluate(() => {
+        return window.measureJank(4000);
     });
 
-    test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time for Real-time Feed (5s active): ${duration}ms`);
+    // Stop the feed
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
-    // TODO: resolves after e.g. 236ms => changed cell found
-    expect(duration).toBeGreaterThan(4500); // Should be at least 4.5 seconds
-    expect(duration).toBeLessThan(5500);  // Should not exceed 5.5 seconds significantly
+    test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
+    test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
+
+    console.log(`Real-time Feed (4s active) Jank Metrics:`, jankMetrics);
+
+    // Assert that the UI remained responsive. For Neo.mjs, we expect near-perfect frame rates.
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(55);
+    expect(jankMetrics.longFrameCount).toBeLessThan(5);
 });
 
-test('Neo.mjs benchmark: Heavy Calculation (App Worker)', async ({page}) => {
+test('Neo.mjs benchmark: Heavy Calculation (App Worker) UI Responsiveness', async ({page}) => {
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', { name: 'Run Heavy Calculation', exact: true }).click();
+    await page.getByRole('button', {name: 'Create 1k rows'}).waitFor(); // Ensure page is ready
 
-    const duration = await page.evaluate(async () => {
-        const inputField = document.querySelector('[data-ref="main-thread-input"]');
-        if (inputField) {
-            inputField.value = ''; // Clear the input field
-        }
+    // Start the heavy calculation
+    await page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
 
-        const action = async () => {
-            if (inputField) {
-                inputField.value = 'typing test'; // Type into the input field
-            }
-        };
-        const condition = () => {
-            // Check if the heavy calculation console log is present
-            const calculationFinished = window.consoleLogs.some(log => log.includes('Heavy calculation finished in App Worker.'));
-
-            // Check if the typed text is present in the input field
-            const typedTextPresent = inputField?.value === 'typing test';
-
-            return calculationFinished && typedTextPresent;
-        };
-        return window.measurePerformance('Heavy Calculation (App Worker)', action, condition);
+    // Measure jank for 4 seconds while the calculation is running
+    const jankMetrics = await page.evaluate(() => {
+        return window.measureJank(4000);
     });
 
-    test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time for Heavy Calculation (App Worker): ${duration}ms`);
-    expect(duration).toBeGreaterThan(1000); // Should take at least 1 second
-    expect(duration).toBeLessThan(10000); // Should not exceed 10 seconds (adjust based on expected calculation time)
+    // Wait for the calculation to finish to ensure the test doesn't end prematurely
+    await page.waitForFunction(() => {
+        return window.consoleLogs.some(log => log.includes('Heavy calculation finished in App Worker.'));
+    }, null, {timeout: 10000});
+
+
+    test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
+    test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
+
+    console.log(`Heavy Calculation (App Worker) Jank Metrics:`, jankMetrics);
+
+    // Assert that the UI remained responsive. Since the calculation is in a worker, FPS should be high.
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(55);
+    expect(jankMetrics.longFrameCount).toBeLessThan(5);
 });
 
-test('Neo.mjs benchmark: Heavy Calculation (Task Worker)', async ({page}) => {
+test('Neo.mjs benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async ({page}) => {
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
+    await page.getByRole('button', {name: 'Create 1k rows'}).waitFor();
 
-    const duration = await page.evaluate(async () => {
-        const inputField = document.querySelector('[data-ref="main-thread-input"]');
-        if (inputField) {
-            inputField.value = ''; // Clear the input field
-        }
+    // Start the heavy calculation
+    await page.getByRole('button', {name: 'Run Heavy Calculation (Task Worker)'}).click();
 
-        const action = async () => {
-            let button = window.getButtonByText('Run Heavy Calculation (Task Worker)');
-            button.click();
-
-            if (inputField) {
-                inputField.value = 'typing test'; // Type into the input field
-            }
-        };
-        const condition = () => {
-            // Check if the heavy calculation console log is present
-            const calculationFinished = window.consoleLogs.some(log => log.includes('Heavy calculation finished in Task Worker.'));
-
-            // Check if the typed text is present in the input field
-            const typedTextPresent = inputField?.value === 'typing test';
-
-            return calculationFinished && typedTextPresent;
-        };
-        return window.measurePerformance('Heavy Calculation (Task Worker)', action, condition);
+    // Measure jank for 4 seconds while the calculation is running
+    const jankMetrics = await page.evaluate(() => {
+        return window.measureJank(4000);
     });
 
-    test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time for Heavy Calculation (Task Worker): ${duration}ms`);
-    expect(duration).toBeGreaterThan(1000); // Should take at least 1 second
-    expect(duration).toBeLessThan(10000); // Should not exceed 10 seconds (adjust based on expected calculation time)
+    // Wait for the calculation to finish
+    await page.waitForFunction(() => {
+        return window.consoleLogs.some(log => log.includes('Heavy calculation finished in Task Worker.'));
+    }, null, {timeout: 10000});
+
+    test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
+    test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
+
+    console.log(`Heavy Calculation (Task Worker) Jank Metrics:`, jankMetrics);
+
+    // Assert that the UI remained responsive. Since the calculation is in a worker, FPS should be high.
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(55);
+    expect(jankMetrics.longFrameCount).toBeLessThan(5);
 });

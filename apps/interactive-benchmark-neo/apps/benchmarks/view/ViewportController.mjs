@@ -154,7 +154,7 @@ class ViewportController extends Base {
                     updatedRecords.push({id: record.id, label: `updated ${record.id} at ${new Date().toLocaleTimeString()}`});
                 }
                 grid.bulkUpdateRecords(updatedRecords);
-            }, 100); // Update every 100ms
+            }, 16); // Update every 16ms
             console.log('Real-time feed started.');
         }
     }
