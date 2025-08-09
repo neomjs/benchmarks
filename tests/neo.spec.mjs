@@ -177,7 +177,7 @@ test('Neo.mjs benchmark: Create 10k rows', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 1k rows: ${duration}ms`);
+    console.log(`Time to render 10k rows: ${duration}ms`);
     expect(duration).toBeLessThan(30000);
 });
 
@@ -203,7 +203,7 @@ test('Neo.mjs benchmark: Create 100k rows', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 10k rows: ${duration}ms`);
+    console.log(`Time to render 100k rows: ${duration}ms`);
     expect(duration).toBeLessThan(350000);
 });
 
@@ -225,8 +225,8 @@ test('Neo.mjs benchmark: Update every 10th row', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to update 1k rows (every 10th): ${duration}ms`);
-    expect(duration).toBeLessThan(500);
+    console.log(`Time to update 10k rows (every 10th): ${duration}ms`);
+    expect(duration).toBeLessThan(5000);
 });
 
 test('Neo.mjs benchmark: Select row', async ({page}) => {
@@ -286,7 +286,7 @@ test('Neo.mjs benchmark: Remove row', async ({page}) => {
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '1001';
+            return grid && grid.getAttribute('aria-rowcount') === '10001';
         };
         return window.measurePerformance('Remove row', action, condition);
     });

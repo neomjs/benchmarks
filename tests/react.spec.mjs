@@ -179,7 +179,7 @@ test('React benchmark: Create 10k rows', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 1k rows: ${duration}ms`);
+    console.log(`Time to render 10k rows: ${duration}ms`);
     expect(duration).toBeLessThan(30000);
 });
 
@@ -204,7 +204,7 @@ test('React benchmark: Create 100k rows', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 10k rows: ${duration}ms`);
+    console.log(`Time to render 100k rows: ${duration}ms`);
     expect(duration).toBeLessThan(350000);
 });
 
@@ -226,8 +226,8 @@ test('React benchmark: Update every 10th row', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to update 1k rows (every 10th): ${duration}ms`);
-    expect(duration).toBeLessThan(500);
+    console.log(`Time to update 10k rows (every 10th): ${duration}ms`);
+    expect(duration).toBeLessThan(5000);
 });
 
 test('React benchmark: Select row', async ({page}) => {
@@ -289,7 +289,7 @@ test('React benchmark: Remove row', async ({page}) => {
             const table = document.querySelector('table[role="grid"]');
             if (!table) return false;
             const rowCount = parseInt(table.getAttribute('aria-rowcount'), 10);
-            return rowCount === 999;
+            return rowCount === 9999;
         };
         return window.measurePerformance('Remove row', action, condition);
     });
