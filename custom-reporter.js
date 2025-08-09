@@ -9,8 +9,14 @@ class SystemInfoReporter {
   onBegin(config, suite) {
     const systemInfo = this.getSystemInfo();
 
-    // Store system info that can be accessed by other reporters
-    process.env.PLAYWRIGHT_SYSTEM_INFO = JSON.stringify(systemInfo);
+    // Write system info to a file for the report generator to read
+    const systemInfoFilePath = 'playwright-system-info.json';
+    try {
+      fs.writeFileSync(systemInfoFilePath, JSON.stringify(systemInfo, null, 2));
+      console.log(`System information written to ${systemInfoFilePath}`);
+    } catch (error) {
+      console.error(`Failed to write system information to file: ${error}`);
+    }
 
     console.log('\n=== System Information ===');
     console.log(`OS: ${systemInfo.os} ${systemInfo.osVersion}`);
@@ -46,7 +52,7 @@ class SystemInfoReporter {
       playwrightVersion: fs.readJsonSync('./node_modules/@playwright/test/package.json').version,
       timestamp        : new Date().toISOString(),
       hostname         : os.hostname(),
-      cpuCores         : os.cpus().length,
+      cpuCores         : os.cpus().length, // Number of logical CPU cores (includes hyper-threading)
       platform         : process.platform,
       arch             : process.arch
     };

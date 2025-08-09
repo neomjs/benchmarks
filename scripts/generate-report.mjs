@@ -313,9 +313,7 @@ function generateSystemInfoMarkdown(osInfo, playwrightSystemInfo) {
     if (playwrightSystemInfo.playwrightVersion) {
         table += `| Playwright | ${playwrightSystemInfo.playwrightVersion.padEnd(11)} |\n`;
     }
-    if (playwrightSystemInfo.hostname) {
-        table += `| Hostname   | ${playwrightSystemInfo.hostname.padEnd(11)} |\n`;
-    }
+    
     if (playwrightSystemInfo.platform) {
         table += `| Platform   | ${playwrightSystemInfo.platform.padEnd(11)} |\n`;
     }
@@ -349,11 +347,12 @@ async function main() {
         const allRunsData = await Promise.all(resultFiles.map(file => fs.readJson(file)));
 
         let playwrightSystemInfo = {};
-        if (process.env.PLAYWRIGHT_SYSTEM_INFO) {
+        const systemInfoFilePath = 'playwright-system-info.json';
+        if (fs.existsSync(systemInfoFilePath)) {
             try {
-                playwrightSystemInfo = JSON.parse(process.env.PLAYWRIGHT_SYSTEM_INFO);
+                playwrightSystemInfo = JSON.parse(fs.readFileSync(systemInfoFilePath, 'utf8'));
             } catch (e) {
-                console.warn('Failed to parse PLAYWRIGHT_SYSTEM_INFO from environment variable:', e);
+                console.warn('Failed to parse systemInfo from file:', e);
             }
         }
 

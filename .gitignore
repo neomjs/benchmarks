@@ -23,3 +23,5 @@ resources/data/deck/EditorConfig.json
 /test-results.json
 /test-results-data/
 /test-results-data-react/
+/test-results-data-neo/
+/playwright-system-info.json
