@@ -243,3 +243,14 @@ The `measure` function should be extracted into a single, reusable helper functi
 - [x] Task: Create a new `measurePerformance` helper function in `tests/neo.spec.mjs` that encapsulates the `Promise` and `MutationObserver` logic.
 - [x] Task: Refactor all test cases to use the new `measurePerformance` helper, passing their specific `action` and `condition` logic.
 - [x] Task: Ensure the refactored tests continue to pass and produce the same accurate results.
+
+---
+
+### 13. Cross-Cutting: UI/UX Alignment
+
+**Goal:** To align the UI/UX of the Neo.mjs and React benchmark applications to ensure a more consistent and visually appealing user experience across both showcases. This will help in making more direct and fair comparisons.
+
+- [ ] Task: **Refactor Neo.mjs App Layout:**
+    - [ ] Sub-task: Move the action buttons from the top header toolbar to a left-side container, similar to the React app's layout.
+    - [ ] Sub-task: Adjust the main grid view to accommodate the new layout.
+    - [ ] Sub-task: Ensure the new layout is responsive and works well on different screen sizes.

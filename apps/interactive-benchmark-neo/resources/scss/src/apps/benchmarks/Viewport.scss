@@ -1,12 +1,18 @@
 .benchmarks-viewport.neo-viewport {
     .benchmark-toolbar {
-        padding: 0.5em 1em 1em;
+        padding: 1em;
 
-        .neo-button,
+        .neo-button {
+            margin-bottom: 1em;
+        }
+    }
+
+    .benchmark-controls {
+        padding: 1em;
+
         .neo-textfield,
         .spinner {
             margin-left: 1em;
-            margin-top : 0.5em;
         }
     }
 

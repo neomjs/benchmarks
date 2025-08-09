@@ -30,17 +30,17 @@ class Viewport extends BaseViewport {
          */
         stateProvider: ViewportStateProvider,
         /**
-         * @member {Object} layout={ntype:'vbox',align:'stretch'}
+         * @member {Object} layout={ntype:'hbox',align:'stretch'}
          */
-        layout: {ntype: 'vbox', align: 'stretch'},
+        layout: {ntype: 'hbox', align: 'stretch'},
         /**
          * @member {Object[]} items
          */
         items: [{
             module: Container,
             cls   : 'benchmark-toolbar',
-            flex  : 'none',
-            layout: {ntype: 'hbox', align: 'start', pack: 'start', wrap: 'wrap'},
+            width : 250,
+            layout: {ntype: 'vbox', align: 'stretch', pack: 'start'},
             items : [{
                 module : Button,
                 handler: 'createRows',
@@ -83,20 +83,31 @@ class Viewport extends BaseViewport {
                 module : Button,
                 handler: 'runHeavyCalculationInTaskWorker',
                 text   : 'Run Heavy Calculation (Task Worker)'
-            }, {
-                module         : TextField,
-                hideLabel      : true,
-                placeholderText: 'Type here to test UI responsiveness',
-                reference      : 'main-thread-input',
-                width          : 230
-            }, {
-                ntype: 'component',
-                cls  : 'spinner'
             }]
         }, {
-            module   : BenchmarkGrid,
-            flex     : 1,
-            reference: 'benchmark-grid'
+            module: Container,
+            flex  : 1,
+            layout: {ntype: 'vbox', align: 'stretch'},
+            items : [{
+                module: Container,
+                cls   : 'benchmark-controls',
+                flex  : 'none',
+                layout: {ntype: 'hbox', align: 'center', pack: 'start'},
+                items: [{
+                    module         : TextField,
+                    hideLabel      : true,
+                    placeholderText: 'Type here to test UI responsiveness',
+                    reference      : 'main-thread-input',
+                    width          : 230
+                }, {
+                    ntype: 'component',
+                    cls  : 'spinner'
+                }]
+            }, {
+                module   : BenchmarkGrid,
+                flex     : 1,
+                reference: 'benchmark-grid'
+            }]
         }]
     }
 }

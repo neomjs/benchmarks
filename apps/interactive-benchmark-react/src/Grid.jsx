@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-    useReactTable,
-    getCoreRowModel,
     flexRender,
+    getCoreRowModel,
+    useReactTable,
 } from '@tanstack/react-table';
-import { useVirtual } from '@tanstack/react-virtual';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 const Grid = ({ data }) => {
     const columns = React.useMemo(
@@ -31,17 +31,19 @@ const Grid = ({ data }) => {
     const tableContainerRef = React.useRef(null);
 
     const { rows } = table.getRowModel();
-    const rowVirtualizer = useVirtual({
-        parentRef: tableContainerRef,
-        size: rows.length,
+    const rowVirtualizer = useVirtualizer({
+        count: rows.length,
+        getScrollElement: () => tableContainerRef.current,
+        estimateSize: () => 35,
         overscan: 10,
     });
 
-    const { virtualItems: virtualRows, totalSize } = rowVirtualizer;
+    const virtualRows = rowVirtualizer.getVirtualItems();
+    const totalSize = rowVirtualizer.getTotalSize();
 
     return (
-        <div ref={tableContainerRef} className="table-container">
-            <div style={{ height: `${totalSize}px` }}>
+        <div ref={tableContainerRef} className="table-container" style={{ overflow: 'auto', height: '500px' }}>
+            <div style={{ height: `${totalSize}px`, position: 'relative' }}>
                 <table>
                     <thead>
                         {table.getHeaderGroups().map(headerGroup => (
@@ -63,6 +65,10 @@ const Grid = ({ data }) => {
                             const row = rows[virtualRow.index];
                             return (
                                 <tr key={row.id} style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
                                     height: `${virtualRow.size}px`,
                                     transform: `translateY(${virtualRow.start}px)`,
                                 }}>
