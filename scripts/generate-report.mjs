@@ -46,29 +46,8 @@ function initializeBenchmark(collection, name) {
 function parseResults(allRunsData) {
     const durationBenchmarks = {};
     const responsivenessBenchmarks = {};
-    const browserVersions = {};
-    const osInfo = {}; // New object to store OS information
 
     allRunsData.forEach(runData => {
-        // Extract browser versions from runData.config
-        if (runData.config && runData.config.projects) {
-            runData.config.projects.forEach(project => {
-                const browserName = project.use && project.use.browserName;
-                // Playwright 1.27+ stores browser version in project.metadata.browserVersion
-                // Older versions might have it in project.use.channel or require parsing userAgent
-                const browserVersion = project.metadata && project.metadata.browserVersion;
-                if (browserName && browserVersion && !browserVersions[browserName]) {
-                    browserVersions[browserName] = browserVersion;
-                }
-            });
-        }
-
-        // Extract OS information (assuming it's consistent across runs)
-        if (runData.config && runData.config.metadata && runData.config.metadata.testMetadata && !osInfo.name) {
-            osInfo.name = runData.config.metadata.testMetadata.os;
-            osInfo.version = runData.config.metadata.testMetadata.osVersion;
-        }
-
         const processSuite = (suite) => {
             if (suite.specs) {
                 suite.specs.forEach(spec => {
@@ -149,7 +128,7 @@ function parseResults(allRunsData) {
         }
     });
 
-    return { durationBenchmarks, responsivenessBenchmarks, browserVersions, osInfo };
+    return { durationBenchmarks, responsivenessBenchmarks };
 }
 
 /**
@@ -275,31 +254,46 @@ function generateResponsivenessMarkdown(benchmarks) {
 
 /**
  * Generates the markdown for the browser versions.
- * @param {Object} browserVersions The collected browser versions.
+ * @param {Object} browserInfo The collected browser information from custom reporter.
  * @returns {String} The markdown table as a string.
  */
-function generateBrowserVersionsMarkdown(browserVersions) {
-    let table = `## Browser Versions\n\n| Browser    | Version     |\n|------------|-------------|\n`;
-    BROWSERS.forEach(browser => {
-        const version = browserVersions[browser] || 'N/A';
-        table += `| ${browser.padEnd(10)} | ${version.padEnd(11)} |\n`;
-    });
+function generateBrowserVersionsMarkdown(browserInfo) {
+    let table = `## Browser Versions
+
+| Browser    | Version     |
+|------------|-------------|
+`;
+    if (browserInfo.chrome) {
+        table += `| Chrome     | ${browserInfo.chrome.padEnd(11)} |
+`;
+    }
+    if (browserInfo.firefox) {
+        table += `| Firefox    | ${browserInfo.firefox.padEnd(11)} |
+`;
+    }
+    if (browserInfo.safari) {
+        table += `| Safari     | ${browserInfo.safari.padEnd(11)} |
+`;
+    }
+    // Add other browsers if needed
     return table;
 }
 
 /**
- * Generates the markdown for the system information. 
+ * Generates the markdown for the system information.
  * @param {Object} osInfo The collected OS information from Playwright report.
  * @param {Object} playwrightSystemInfo The system information collected by custom reporter.
  * @returns {String} The markdown table as a string.
  */
-function generateSystemInfoMarkdown(osInfo, playwrightSystemInfo) {
+function generateSystemInfoMarkdown(playwrightSystemInfo) {
     let table = `## System Information\n\n| Property   | Value       |\n|------------|-------------|\n`;
-    if (osInfo.name) {
-        table += `| OS Name    | ${osInfo.name.padEnd(11)} |\n`;
+    if (playwrightSystemInfo.os) {
+        table += `| OS Name    | ${playwrightSystemInfo.os.padEnd(11)} |
+`;
     }
-    if (osInfo.version) {
-        table += `| OS Version | ${osInfo.version.padEnd(11)} |\n`;
+    if (playwrightSystemInfo.osVersion) {
+        table += `| OS Version | ${playwrightSystemInfo.osVersion.padEnd(11)} |
+`;
     }
     if (playwrightSystemInfo.totalMemory) {
         table += `| Total RAM  | ${playwrightSystemInfo.totalMemory}GB |\n`;
@@ -313,7 +307,7 @@ function generateSystemInfoMarkdown(osInfo, playwrightSystemInfo) {
     if (playwrightSystemInfo.playwrightVersion) {
         table += `| Playwright | ${playwrightSystemInfo.playwrightVersion.padEnd(11)} |\n`;
     }
-    
+
     if (playwrightSystemInfo.platform) {
         table += `| Platform   | ${playwrightSystemInfo.platform.padEnd(11)} |\n`;
     }
@@ -347,7 +341,7 @@ async function main() {
         const allRunsData = await Promise.all(resultFiles.map(file => fs.readJson(file)));
 
         let playwrightSystemInfo = {};
-        const systemInfoFilePath = 'playwright-system-info.json';
+        const systemInfoFilePath = 'benchmark-system-info.json';
         if (fs.existsSync(systemInfoFilePath)) {
             try {
                 playwrightSystemInfo = JSON.parse(fs.readFileSync(systemInfoFilePath, 'utf8'));
@@ -356,12 +350,12 @@ async function main() {
             }
         }
 
-        const { durationBenchmarks, responsivenessBenchmarks, browserVersions, osInfo } = parseResults(allRunsData);
+        const { durationBenchmarks, responsivenessBenchmarks } = parseResults(allRunsData);
 
         const durationTable = generateDurationMarkdown(durationBenchmarks, resultFiles.length);
         const responsivenessTable = generateResponsivenessMarkdown(responsivenessBenchmarks);
-        const browserVersionsTable = generateBrowserVersionsMarkdown(browserVersions);
-        const systemInfoTable = generateSystemInfoMarkdown(osInfo, playwrightSystemInfo);
+        const browserVersionsTable = generateBrowserVersionsMarkdown(playwrightSystemInfo.browsers); // Pass playwrightSystemInfo.browsers
+        const systemInfoTable = generateSystemInfoMarkdown(playwrightSystemInfo.osInfo, playwrightSystemInfo); // Pass playwrightSystemInfo.osInfo
         const knownIssuesMarkdown = generateKnownIssuesMarkdown();
 
         const devPath = '`/apps/benchmarks/`';
