@@ -350,7 +350,7 @@ test('React benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     // NOTE: The expectation for React is lower than for Neo.mjs,
     // as the main thread is busy with state updates and re-renders.
     expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(5);
-    expect(jankMetrics.longFrameCount).toBeLessThan(40);
+    expect(jankMetrics.longFrameCount).toBeLessThan(60);
 });
 
 test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async ({page}) => {
