@@ -49,6 +49,10 @@ function parseResults(allRunsData) {
                 suite.specs.forEach(spec => {
                     const benchmarkName = spec.title.replace('Neo.mjs benchmark: ', '');
 
+                    if (!benchmarkName) {
+                        return;
+                    }
+
                     if (benchmarkName.endsWith(RESPONSIVENESS_TEST_SUFFIX)) {
                         initializeBenchmark(responsivenessBenchmarks, benchmarkName);
                     } else {
@@ -145,16 +149,12 @@ function generateDurationMarkdown(benchmarks, runCount) {
             totalDevAvg += devResult.avg;
             totalProdAvg += prodResult.avg;
 
-            const devAvg = 
-`${devResult.avg.toFixed(2)} (±${devResult.stdDev.toFixed(2)})`;
-            const prodAvg = 
-`${prodResult.avg.toFixed(2)} (±${prodResult.stdDev.toFixed(2)})`;
+            const devAvg = `${devResult.avg.toFixed(2)} (±${devResult.stdDev.toFixed(2)})`;
+            const prodAvg = `${prodResult.avg.toFixed(2)} (±${prodResult.stdDev.toFixed(2)})`;
             let improvement = 'N/A';
             if (devResult.avg > 0 && prodResult.avg > 0) {
                 const percentage = ((devResult.avg - prodResult.avg) / devResult.avg) * 100;
-                improvement = 
-`${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%
-`;
+                improvement = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
             }
             table += `|                           | ${browser.padEnd(10)} | ${devAvg.padEnd(13)} | ${prodAvg.padEnd(14)} | ${improvement.padEnd(11)} |
 `;
@@ -166,9 +166,7 @@ function generateDurationMarkdown(benchmarks, runCount) {
             let improvementAll = 'N/A';
             if (devAvgAll > 0 && prodAvgAll > 0) {
                 const percentage = ((devAvgAll - prodAvgAll) / devAvgAll) * 100;
-                improvementAll = 
-`${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%
-`;
+                improvementAll = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
             }
             table += `|                           | **Average**| **${devAvgAll.toFixed(2)}**        | **${prodAvgAll.toFixed(2)}**         | **${improvementAll}**    |
 `;

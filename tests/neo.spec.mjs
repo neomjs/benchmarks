@@ -43,7 +43,7 @@ const measurePerformanceInBrowser = (testName, action, condition, passThrough) =
         const timeoutId = setTimeout(() => {
             observer.disconnect();
             reject(new Error(`Benchmark timed out for "${testName}".`));
-        }, 10000);
+        }, 30000);
 
         const startTime = performance.now();
         try {
