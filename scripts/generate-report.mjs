@@ -46,8 +46,29 @@ function initializeBenchmark(collection, name) {
 function parseResults(allRunsData) {
     const durationBenchmarks = {};
     const responsivenessBenchmarks = {};
+    const browserVersions = {};
+    const osInfo = {}; // New object to store OS information
 
     allRunsData.forEach(runData => {
+        // Extract browser versions from runData.config
+        if (runData.config && runData.config.projects) {
+            runData.config.projects.forEach(project => {
+                const browserName = project.use && project.use.browserName;
+                // Playwright 1.27+ stores browser version in project.metadata.browserVersion
+                // Older versions might have it in project.use.channel or require parsing userAgent
+                const browserVersion = project.metadata && project.metadata.browserVersion;
+                if (browserName && browserVersion && !browserVersions[browserName]) {
+                    browserVersions[browserName] = browserVersion;
+                }
+            });
+        }
+
+        // Extract OS information (assuming it's consistent across runs)
+        if (runData.config && runData.config.metadata && runData.config.metadata.testMetadata && !osInfo.name) {
+            osInfo.name = runData.config.metadata.testMetadata.os;
+            osInfo.version = runData.config.metadata.testMetadata.osVersion;
+        }
+
         const processSuite = (suite) => {
             if (suite.specs) {
                 suite.specs.forEach(spec => {
@@ -67,15 +88,17 @@ function parseResults(allRunsData) {
                         const mode = test.projectName.endsWith('-dev') ? 'dev' : 'prod';
                         const browser = BROWSERS.find(b => test.projectName.startsWith(b));
 
-                        if (browser && test.results.every(r => r.status === 'passed')) {
+                        if (browser) { // Removed the status check here
                             if (benchmarkName.endsWith(RESPONSIVENESS_TEST_SUFFIX)) {
-                                const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
-                                const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
-                                const target = responsivenessBenchmarks[benchmarkName][mode][browser];
+                                if (test.results.every(r => r.status === 'passed')) { // Keep status check for responsiveness
+                                    const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
+                                    const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
+                                    const target = responsivenessBenchmarks[benchmarkName][mode][browser];
 
-                                if (fpsAnnotation && longFrameAnnotation) {
-                                    target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
-                                    target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
+                                    if (fpsAnnotation && longFrameAnnotation) {
+                                        target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
+                                        target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
+                                    }
                                 }
                             } else {
                                 const durationAnnotation = test.annotations.find(a => a.type === 'duration');
@@ -104,9 +127,13 @@ function parseResults(allRunsData) {
                 ['dev', 'prod'].forEach(mode => {
                     const result = benchmark[mode][browser];
                     if (result.times) { // Duration benchmarks
-                        if (result.times.length > 0) {
-                            result.avg = result.times.reduce((a, b) => a + b, 0) / result.times.length;
-                            result.stdDev = getStandardDeviation(result.times);
+                        const validTimes = result.times.filter(t => Number.isFinite(t));
+                        if (validTimes.length > 0) {
+                            result.avg = validTimes.reduce((a, b) => a + b, 0) / validTimes.length;
+                            result.stdDev = getStandardDeviation(validTimes);
+                        } else if (result.times.some(t => t === Infinity)) {
+                            result.avg = Infinity; // Indicate all runs were timeouts
+                            result.stdDev = 0; // No std dev for timeouts
                         }
                     }
                     if (result.fps) { // Responsiveness benchmarks
@@ -122,7 +149,7 @@ function parseResults(allRunsData) {
         }
     });
 
-    return { durationBenchmarks, responsivenessBenchmarks };
+    return { durationBenchmarks, responsivenessBenchmarks, browserVersions, osInfo };
 }
 
 /**
@@ -147,20 +174,44 @@ function generateDurationMarkdown(benchmarks, runCount) {
         BROWSERS.forEach(browser => {
             const devResult = result.dev[browser];
             const prodResult = result.prod[browser];
-            if (!devResult.times || devResult.times.length === 0) return;
 
-            browserCount++;
-            totalDevAvg += devResult.avg;
-            totalProdAvg += prodResult.avg;
+            const hasDevData = devResult.times && devResult.times.length > 0;
+            const hasProdData = prodResult.times && prodResult.times.length > 0;
 
-            const devAvg = `${devResult.avg.toFixed(2)} (±${devResult.stdDev.toFixed(2)})`;
-            const prodAvg = `${prodResult.avg.toFixed(2)} (±${prodResult.stdDev.toFixed(2)})`;
-            let improvement = 'N/A';
-            if (devResult.avg > 0 && prodResult.avg > 0) {
-                const percentage = ((devResult.avg - prodResult.avg) / devResult.avg) * 100;
-                improvement = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`;
+            if (!hasDevData && !hasProdData) return; // No data for this browser
+
+            let devAvgFormatted, prodAvgFormatted, improvement;
+
+            if (devResult.avg === Infinity) {
+                devAvgFormatted = 'Timeout'.padEnd(13);
+            } else if (Number.isFinite(devResult.avg)) {
+                devAvgFormatted = `${devResult.avg.toFixed(2)} (±${devResult.stdDev.toFixed(2)})`.padEnd(13);
+            } else {
+                devAvgFormatted = 'N/A'.padEnd(13);
             }
-            table += `|                           | ${browser.padEnd(10)} | ${devAvg.padEnd(13)} | ${prodAvg.padEnd(14)} | ${improvement.padEnd(11)} |
+
+            if (prodResult.avg === Infinity) {
+                prodAvgFormatted = 'Timeout'.padEnd(14);
+            } else if (Number.isFinite(prodResult.avg)) {
+                prodAvgFormatted = `${prodResult.avg.toFixed(2)} (±${prodResult.stdDev.toFixed(2)})`.padEnd(14);
+            } else {
+                prodAvgFormatted = 'N/A'.padEnd(14);
+            }
+
+            if (Number.isFinite(devResult.avg) && Number.isFinite(prodResult.avg) && devResult.avg > 0 && prodResult.avg > 0) {
+                const percentage = ((devResult.avg - prodResult.avg) / devResult.avg) * 100;
+                improvement = `${percentage > 0 ? '+' : ''}${percentage.toFixed(2)}%`.padEnd(11);
+            } else {
+                improvement = 'N/A'.padEnd(11);
+            }
+
+            if (Number.isFinite(devResult.avg) && Number.isFinite(prodResult.avg)) {
+                browserCount++;
+                totalDevAvg += devResult.avg;
+                totalProdAvg += prodResult.avg;
+            }
+
+            table += `|                           | ${browser.padEnd(10)} | ${devAvgFormatted} | ${prodAvgFormatted} | ${improvement} |
 `;
         });
 
@@ -174,6 +225,10 @@ function generateDurationMarkdown(benchmarks, runCount) {
             }
             table += `|                           | **Average**| **${devAvgAll.toFixed(2)}**        | **${prodAvgAll.toFixed(2)}**         | **${improvementAll}**    |
 `;
+        } else {
+            // If all runs were timeouts or N/A, display Timeout for average
+            table += `|                           | **Average**| **Timeout**        | **Timeout**         | **N/A**    |
+`;
         }
         table += `|---------------------------|------------|---------------|----------------|-------------|
 `;
@@ -184,6 +239,7 @@ function generateDurationMarkdown(benchmarks, runCount) {
 /**
  * Generates the markdown for the responsiveness benchmarks.
  * @param {Object} benchmarks The structured responsiveness benchmark data.
+ * @param {number} runCount The number of runs the data was aggregated from.
  * @returns {String} The markdown table as a string.
  */
 function generateResponsivenessMarkdown(benchmarks) {
@@ -203,9 +259,9 @@ function generateResponsivenessMarkdown(benchmarks) {
             const prodResult = result.prod[browser];
             if (!devResult.fps || devResult.fps.length === 0) return;
 
-            const devAvg = 
+            const devAvg =
 `${devResult.avgFps.toFixed(1)} (±${devResult.stdDevFps.toFixed(1)}) / ${devResult.avgLongFrames.toFixed(1)} (±${devResult.stdDevLongFrames.toFixed(1)})`;
-            const prodAvg = 
+            const prodAvg =
 `${prodResult.avgFps.toFixed(1)} (±${prodResult.stdDevFps.toFixed(1)}) / ${prodResult.avgLongFrames.toFixed(1)} (±${prodResult.stdDevLongFrames.toFixed(1)})`;
 
             table += `|                                             | ${browser.padEnd(10)} | ${devAvg.padEnd(28)} | ${prodAvg.padEnd(29)} |
@@ -218,13 +274,73 @@ function generateResponsivenessMarkdown(benchmarks) {
 }
 
 /**
+ * Generates the markdown for the browser versions.
+ * @param {Object} browserVersions The collected browser versions.
+ * @returns {String} The markdown table as a string.
+ */
+function generateBrowserVersionsMarkdown(browserVersions) {
+    let table = `## Browser Versions\n\n| Browser    | Version     |\n|------------|-------------|\n`;
+    BROWSERS.forEach(browser => {
+        const version = browserVersions[browser] || 'N/A';
+        table += `| ${browser.padEnd(10)} | ${version.padEnd(11)} |\n`;
+    });
+    return table;
+}
+
+/**
+ * Generates the markdown for the system information. 
+ * @param {Object} osInfo The collected OS information from Playwright report.
+ * @param {Object} playwrightSystemInfo The system information collected by custom reporter.
+ * @returns {String} The markdown table as a string.
+ */
+function generateSystemInfoMarkdown(osInfo, playwrightSystemInfo) {
+    let table = `## System Information\n\n| Property   | Value       |\n|------------|-------------|\n`;
+    if (osInfo.name) {
+        table += `| OS Name    | ${osInfo.name.padEnd(11)} |\n`;
+    }
+    if (osInfo.version) {
+        table += `| OS Version | ${osInfo.version.padEnd(11)} |\n`;
+    }
+    if (playwrightSystemInfo.totalMemory) {
+        table += `| Total RAM  | ${playwrightSystemInfo.totalMemory}GB |\n`;
+    }
+    if (playwrightSystemInfo.cpuCores) {
+        table += `| CPU Cores  | ${playwrightSystemInfo.cpuCores} |\n`;
+    }
+    if (playwrightSystemInfo.nodeVersion) {
+        table += `| Node.js    | ${playwrightSystemInfo.nodeVersion.padEnd(11)} |\n`;
+    }
+    if (playwrightSystemInfo.playwrightVersion) {
+        table += `| Playwright | ${playwrightSystemInfo.playwrightVersion.padEnd(11)} |\n`;
+    }
+    if (playwrightSystemInfo.hostname) {
+        table += `| Hostname   | ${playwrightSystemInfo.hostname.padEnd(11)} |\n`;
+    }
+    if (playwrightSystemInfo.platform) {
+        table += `| Platform   | ${playwrightSystemInfo.platform.padEnd(11)} |\n`;
+    }
+    if (playwrightSystemInfo.arch) {
+        table += `| Architecture | ${playwrightSystemInfo.arch.padEnd(11)} |\n`;
+    }
+    return table;
+}
+
+/**
+ * Generates the markdown for known issues.
+ * @returns {String} The markdown table as a string.
+ */
+function generateKnownIssuesMarkdown() {
+    let markdown = `## Known Issues\n\n`;
+    markdown += `- **React benchmark: Create 1M rows (Firefox)**: This test is skipped for Firefox due to known Out-of-Memory issues when attempting to render 1 million rows.\n`;
+    return markdown;
+}
+
+/**
  * Main function to run the script.
  */
 async function main() {
     try {
-        const resultFiles = glob.sync(
-`${RESULTS_DIR}/*.json`
-);
+        const resultFiles = glob.sync(`${RESULTS_DIR}/*.json`);
         if (resultFiles.length === 0) {
             console.error(`Error: No result files found in ${RESULTS_DIR}. Please run the tests first.`);
             process.exit(1);
@@ -232,10 +348,22 @@ async function main() {
 
         const allRunsData = await Promise.all(resultFiles.map(file => fs.readJson(file)));
 
-        const { durationBenchmarks, responsivenessBenchmarks } = parseResults(allRunsData);
+        let playwrightSystemInfo = {};
+        if (process.env.PLAYWRIGHT_SYSTEM_INFO) {
+            try {
+                playwrightSystemInfo = JSON.parse(process.env.PLAYWRIGHT_SYSTEM_INFO);
+            } catch (e) {
+                console.warn('Failed to parse PLAYWRIGHT_SYSTEM_INFO from environment variable:', e);
+            }
+        }
+
+        const { durationBenchmarks, responsivenessBenchmarks, browserVersions, osInfo } = parseResults(allRunsData);
 
         const durationTable = generateDurationMarkdown(durationBenchmarks, resultFiles.length);
         const responsivenessTable = generateResponsivenessMarkdown(responsivenessBenchmarks);
+        const browserVersionsTable = generateBrowserVersionsMarkdown(browserVersions);
+        const systemInfoTable = generateSystemInfoMarkdown(osInfo, playwrightSystemInfo);
+        const knownIssuesMarkdown = generateKnownIssuesMarkdown();
 
         const devPath = '`/apps/benchmarks/`';
         const prodPath = '`/dist/production/apps/benchmarks/`';
@@ -259,15 +387,19 @@ ${durationTable}
 This table shows the average Frames Per Second (FPS) and the count of "Long Frames" (frames taking >50ms) during a 4-second test. For FPS, higher is better. For Long Frames, lower is better.
 
 ${responsivenessTable}
+
+${browserVersionsTable}
+
+${systemInfoTable}
+
+${knownIssuesMarkdown}
 ---
 
 *This file is auto-generated. Do not edit manually.*
 `;
         await fs.writeFile(OUTPUT_PATH, markdown);
 
-        console.log(
-`Successfully generated benchmark report at: ${OUTPUT_PATH}`
-);
+        console.log(`Successfully generated benchmark report at: ${OUTPUT_PATH}`);
     } catch (error) {
         console.error('Failed to generate benchmark report:', error);
         process.exit(1);

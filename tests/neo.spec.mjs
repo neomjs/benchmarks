@@ -207,6 +207,32 @@ test('Neo.mjs benchmark: Create 100k rows', async ({page}) => {
     expect(duration).toBeLessThan(350000);
 });
 
+test('Neo.mjs benchmark: Create 1M rows', async ({page}) => {
+    await page.goto('/apps/benchmarks/');
+    await expect(page).toHaveTitle('Benchmarks');
+    await page.getByRole('button', {name: 'Create 1M rows'}).waitFor();
+
+    const duration = await page.evaluate(() => {
+        const action    = () => {
+            window.getButtonByText('Create 1M rows').click();
+        };
+        const condition = () => {
+            const grid = document.querySelector('[role="grid"]');
+            if (!grid) return false;
+            const rowCount = grid.getAttribute('aria-rowcount');
+            if (rowCount !== '1000002') return false;
+
+            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
+            return firstRowIdCell && firstRowIdCell.textContent === '1';
+        };
+        return window.measurePerformance('Create 1M rows', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to render 100k rows: ${duration}ms`);
+    expect(duration).toBeLessThan(350000);
+});
+
 test('Neo.mjs benchmark: Update every 10th row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');

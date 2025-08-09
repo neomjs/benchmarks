@@ -7,11 +7,11 @@ import path       from 'path';
  */
 async function main() {
     // 1. Parse command-line arguments
-    const args = process.argv.slice(2);
-    const runsArg = args.find(arg => arg.startsWith('--runs='));
-    const runs = runsArg ? parseInt(runsArg.split('=')[1], 10) : 5;
+    const args         = process.argv.slice(2);
+    const runsArg      = args.find(arg => arg.startsWith('--runs='));
+    const runs         = runsArg ? parseInt(runsArg.split('=')[1], 10) : 5;
     const frameworkArg = args.find(arg => arg.startsWith('--framework='));
-    const framework = frameworkArg ? frameworkArg.split('=')[1] : 'all';
+    const framework    = frameworkArg ? frameworkArg.split('=')[1] : 'all';
 
     if (isNaN(runs) || runs < 1) {
         console.error('Error: --runs must be a positive number.');

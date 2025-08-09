@@ -53,6 +53,11 @@ class Viewport extends BaseViewport {
                 text   : 'Create 100k rows'
             }, {
                 module : Button,
+                handler: 'createRows',
+                rows   : 1000000,
+                text   : 'Create 1M rows'
+            }, {
+                module : Button,
                 handler: 'updateRows',
                 text   : 'Update every 10th row'
             }, {
