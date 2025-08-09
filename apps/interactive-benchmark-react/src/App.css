@@ -1,0 +1,81 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    margin: 0;
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+}
+
+.button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    border-right: 1px solid #444;
+    background-color: #2a2a2a;
+}
+
+button {
+    padding: 10px 15px;
+    border: 1px solid #555;
+    background-color: #3c3c3c;
+    color: #e0e0e0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #4a4a4a;
+}
+
+.right-pane {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    padding: 20px;
+}
+
+.input-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 4px solid #444;
+    border-top-color: #61dafbaa; /* React blue */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+input[type="text"] {
+    padding: 8px 12px;
+    border: 1px solid #555;
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    border-radius: 4px;
+    flex-grow: 1;
+}
+
+.grid-container {
+    flex-grow: 1;
+    border: 1px solid #444;
+    background-color: #2a2a2a;
+    overflow: hidden; /* Important for virtualized list */
+    display: flex;
+    flex-direction: column;
+}
