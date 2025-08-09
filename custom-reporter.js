@@ -91,7 +91,7 @@ class BenchmarkSystemReporter {
     try {
       // Chrome version
       if (process.platform === 'darwin') {
-        browsers.chrome = execSync('/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version 2>/dev/null || echo "Not found"', { encoding: 'utf8' }).trim();
+        browsers.chrome = execSync('"/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome" --version 2>/dev/null || echo "Not found"', { encoding: 'utf8' }).trim();
       } else if (process.platform === 'linux') {
         browsers.chrome = execSync('google-chrome --version 2>/dev/null || chromium-browser --version 2>/dev/null || echo "Not found"', { encoding: 'utf8' }).trim();
       } else if (process.platform === 'win32') {
@@ -109,7 +109,7 @@ class BenchmarkSystemReporter {
 
       // Safari (macOS only)
       if (process.platform === 'darwin') {
-        browsers.safari = execSync('mdls -name kMDItemVersion /Applications/Safari.app 2>/dev/null | cut -d\" -f2 || echo "Not found"', { encoding: 'utf8' }).trim();
+        browsers.safari = execSync('mdls -name kMDItemVersion /Applications/Safari.app 2>/dev/null || echo "Not found"', { encoding: 'utf8' }).trim();
         if (browsers.safari !== 'Not found') {
           browsers.safari = `Safari ${browsers.safari}`;
         }

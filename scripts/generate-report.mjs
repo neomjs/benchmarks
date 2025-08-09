@@ -281,38 +281,37 @@ function generateBrowserVersionsMarkdown(browserInfo) {
 
 /**
  * Generates the markdown for the system information.
- * @param {Object} osInfo The collected OS information from Playwright report.
- * @param {Object} playwrightSystemInfo The system information collected by custom reporter.
+ * @param {Object} benchmarkSystemInfo The system information collected by custom reporter.
  * @returns {String} The markdown table as a string.
  */
-function generateSystemInfoMarkdown(playwrightSystemInfo) {
+function generateSystemInfoMarkdown(benchmarkSystemInfo) {
     let table = `## System Information\n\n| Property   | Value       |\n|------------|-------------|\n`;
-    if (playwrightSystemInfo.os) {
-        table += `| OS Name    | ${playwrightSystemInfo.os.padEnd(11)} |
+    if (benchmarkSystemInfo.os) {
+        table += `| OS Name    | ${benchmarkSystemInfo.os.padEnd(11)} |
 `;
     }
-    if (playwrightSystemInfo.osVersion) {
-        table += `| OS Version | ${playwrightSystemInfo.osVersion.padEnd(11)} |
+    if (benchmarkSystemInfo.osVersion) {
+        table += `| OS Version | ${benchmarkSystemInfo.osVersion.padEnd(11)} |
 `;
     }
-    if (playwrightSystemInfo.totalMemory) {
-        table += `| Total RAM  | ${playwrightSystemInfo.totalMemory}GB |\n`;
+    if (benchmarkSystemInfo.totalMemory) {
+        table += `| Total RAM  | ${benchmarkSystemInfo.totalMemory}GB |\n`;
     }
-    if (playwrightSystemInfo.cpuCores) {
-        table += `| CPU Cores  | ${playwrightSystemInfo.cpuCores} |\n`;
+    if (benchmarkSystemInfo.cpuCores) {
+        table += `| CPU Cores  | ${benchmarkSystemInfo.cpuCores} |\n`;
     }
-    if (playwrightSystemInfo.nodeVersion) {
-        table += `| Node.js    | ${playwrightSystemInfo.nodeVersion.padEnd(11)} |\n`;
+    if (benchmarkSystemInfo.nodeVersion) {
+        table += `| Node.js    | ${benchmarkSystemInfo.nodeVersion.padEnd(11)} |\n`;
     }
-    if (playwrightSystemInfo.playwrightVersion) {
-        table += `| Playwright | ${playwrightSystemInfo.playwrightVersion.padEnd(11)} |\n`;
+    if (benchmarkSystemInfo.playwrightVersion) {
+        table += `| Playwright | ${benchmarkSystemInfo.playwrightVersion.padEnd(11)} |\n`;
     }
 
-    if (playwrightSystemInfo.platform) {
-        table += `| Platform   | ${playwrightSystemInfo.platform.padEnd(11)} |\n`;
+    if (benchmarkSystemInfo.platform) {
+        table += `| Platform   | ${benchmarkSystemInfo.platform.padEnd(11)} |\n`;
     }
-    if (playwrightSystemInfo.arch) {
-        table += `| Architecture | ${playwrightSystemInfo.arch.padEnd(11)} |\n`;
+    if (benchmarkSystemInfo.arch) {
+        table += `| Architecture | ${benchmarkSystemInfo.arch.padEnd(11)} |\n`;
     }
     return table;
 }
@@ -340,11 +339,11 @@ async function main() {
 
         const allRunsData = await Promise.all(resultFiles.map(file => fs.readJson(file)));
 
-        let playwrightSystemInfo = {};
+        let benchmarkSystemInfo = {};
         const systemInfoFilePath = 'benchmark-system-info.json';
         if (fs.existsSync(systemInfoFilePath)) {
             try {
-                playwrightSystemInfo = JSON.parse(fs.readFileSync(systemInfoFilePath, 'utf8'));
+                benchmarkSystemInfo = JSON.parse(fs.readFileSync(systemInfoFilePath, 'utf8'));
             } catch (e) {
                 console.warn('Failed to parse systemInfo from file:', e);
             }
@@ -352,14 +351,13 @@ async function main() {
 
         const { durationBenchmarks, responsivenessBenchmarks } = parseResults(allRunsData);
 
-        const durationTable = generateDurationMarkdown(durationBenchmarks, resultFiles.length);
-        const responsivenessTable = generateResponsivenessMarkdown(responsivenessBenchmarks);
-        const browserVersionsTable = generateBrowserVersionsMarkdown(playwrightSystemInfo.browsers); // Pass playwrightSystemInfo.browsers
-        const systemInfoTable = generateSystemInfoMarkdown(playwrightSystemInfo.osInfo, playwrightSystemInfo); // Pass playwrightSystemInfo.osInfo
-        const knownIssuesMarkdown = generateKnownIssuesMarkdown();
-
-        const devPath = '`/apps/benchmarks/`';
-        const prodPath = '`/dist/production/apps/benchmarks/`';
+        const durationTable        = generateDurationMarkdown(durationBenchmarks, resultFiles.length);
+        const responsivenessTable  = generateResponsivenessMarkdown(responsivenessBenchmarks);
+        const browserVersionsTable = generateBrowserVersionsMarkdown(benchmarkSystemInfo.browsers);
+        const systemInfoTable      = generateSystemInfoMarkdown(benchmarkSystemInfo);
+        const knownIssuesMarkdown  = generateKnownIssuesMarkdown();
+        const devPath              = '`/apps/benchmarks/`';
+        const prodPath             = '`/dist/production/apps/benchmarks/`';
 
         const markdown = `# Benchmark Performance Results
 
