@@ -42,50 +42,58 @@ const Grid = ({ data }) => {
     const totalSize = rowVirtualizer.getTotalSize();
 
     return (
-        <div ref={tableContainerRef} className="table-container" style={{ overflow: 'auto', height: '500px' }}>
-            <div style={{ height: `${totalSize}px`, position: 'relative' }}>
-                <table>
-                    <thead>
-                        {table.getHeaderGroups().map(headerGroup => (
-                            <tr key={headerGroup.id}>
-                                {headerGroup.headers.map(header => (
-                                    <th key={header.id} style={{ width: header.getSize() }}>
+        <div ref={tableContainerRef} style={{ overflow: 'auto', height: '100%', width: '100%' }}>
+            <table style={{ display: 'grid', width: '100%' }}>
+                <thead style={{ display: 'grid', position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#2a2a2a' }}>
+                    {table.getHeaderGroups().map(headerGroup => (
+                        <tr key={headerGroup.id} style={{ display: 'flex' }}>
+                            {headerGroup.headers.map(header => (
+                                <th key={header.id} style={{
+                                    display: 'flex',
+                                    width: header.column.id === 'label' ? '100%' : header.getSize(),
+                                    flex: header.column.id === 'label' ? '1 1 0' : undefined,
+                                    padding: '8px',
+                                    borderBottom: '1px solid #444',
+                                    textAlign: 'left'
+                                }}>
+                                    {flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                    )}
+                                </th>
+                            ))}
+                        </tr>
+                    ))}
+                </thead>
+                <tbody style={{ display: 'grid', height: `${totalSize}px`, position: 'relative' }}>
+                    {virtualRows.map(virtualRow => {
+                        const row = rows[virtualRow.index];
+                        return (
+                            <tr key={row.id} style={{
+                                display: 'flex',
+                                position: 'absolute',
+                                transform: `translateY(${virtualRow.start}px)`,
+                                width: '100%',
+                                height: `${virtualRow.size}px`,
+                            }}>
+                                {row.getVisibleCells().map(cell => (
+                                    <td key={cell.id} style={{
+                                        display: 'flex',
+                                        width: cell.column.id === 'label' ? '100%' : cell.column.getSize(),
+                                        flex: cell.column.id === 'label' ? '1 1 0' : undefined,
+                                        padding: '8px',
+                                    }}>
                                         {flexRender(
-                                            header.column.columnDef.header,
-                                            header.getContext()
+                                            cell.column.columnDef.cell,
+                                            cell.getContext()
                                         )}
-                                    </th>
-
+                                    </td>
                                 ))}
                             </tr>
-                        ))}
-                    </thead>
-                    <tbody>
-                        {virtualRows.map(virtualRow => {
-                            const row = rows[virtualRow.index];
-                            return (
-                                <tr key={row.id} style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: `${virtualRow.size}px`,
-                                    transform: `translateY(${virtualRow.start}px)`,
-                                }}>
-                                    {row.getVisibleCells().map(cell => (
-                                        <td key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            )}
-                                        </td>
-                                    ))}
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 };
