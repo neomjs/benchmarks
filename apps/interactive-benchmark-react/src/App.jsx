@@ -195,7 +195,7 @@ function App() {
             <div className="right-pane">
                 <div className="input-container">
                     <div className="spinner"></div>
-                    <input type="text" placeholder="Typing test..." />
+                    <input type="text" placeholder="Type here to test UI responsiveness" />
                     <div ref={heavyCalcOutputRef} style={{ marginLeft: '10px' }}></div>
                     <div style={{ marginLeft: '10px', fontWeight: 'bold', minWidth: '8.2em' }}>Counter: {mainThreadCounter}</div>
                 </div>

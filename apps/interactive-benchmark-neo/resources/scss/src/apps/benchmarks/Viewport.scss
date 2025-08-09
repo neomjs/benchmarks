@@ -17,12 +17,12 @@
     }
 
     .spinner {
-        animation    : spin 2s linear infinite;
-        border       : 4px solid #f3f3f3;
-        border-top   : 4px solid #3498db;
+        animation    : spin 1s linear infinite;
+        border       : 4px solid #444;
+        border-top   : 4px solid #61dafbaa;
         border-radius: 50%;
-        width        : 30px;
-        height       : 30px;
+        width        : 24px;
+        height       : 24px;
     }
 
     .heavy-calc-output {
