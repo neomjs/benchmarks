@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-const Grid = ({ data }) => {
+const Grid = React.forwardRef(({ data, selected }, ref) => {
     const columns = React.useMemo(
         () => [
             {
@@ -37,6 +37,10 @@ const Grid = ({ data }) => {
         estimateSize: () => 35,
         overscan: 10,
     });
+
+    React.useImperativeHandle(ref, () => ({
+        getVisibleRows: () => rowVirtualizer.getVirtualItems(),
+    }));
 
     const virtualRows = rowVirtualizer.getVirtualItems();
     const totalSize = rowVirtualizer.getTotalSize();
@@ -69,13 +73,16 @@ const Grid = ({ data }) => {
                     {virtualRows.map(virtualRow => {
                         const row = rows[virtualRow.index];
                         return (
-                            <tr key={row.id} style={{
-                                display: 'flex',
-                                position: 'absolute',
-                                transform: `translateY(${virtualRow.start}px)`,
-                                width: '100%',
-                                height: `${virtualRow.size}px`,
-                            }}>
+                            <tr
+                                key={row.id}
+                                className={row.original.id === selected ? 'selected' : ''}
+                                style={{
+                                    display: 'flex',
+                                    position: 'absolute',
+                                    transform: `translateY(${virtualRow.start}px)`,
+                                    width: '100%',
+                                    height: `${virtualRow.size}px`,
+                                }}>
                                 {row.getVisibleCells().map(cell => (
                                     <td key={cell.id} style={{
                                         display: 'flex',
@@ -96,6 +103,6 @@ const Grid = ({ data }) => {
             </table>
         </div>
     );
-};
+});
 
 export default Grid;

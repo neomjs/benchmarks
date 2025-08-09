@@ -80,3 +80,7 @@ input[type="text"] {
     display: flex;
     flex-direction: column;
 }
+
+.grid-container tr.selected {
+    background-color: #3a5f8a;
+}

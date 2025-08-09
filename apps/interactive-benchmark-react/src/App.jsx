@@ -7,9 +7,10 @@ let idCounter = 1;
 const buildData = (count) => {
     const data = [];
     for (let i = 0; i < count; i++) {
+        const newId = idCounter++;
         data.push({
-            id: idCounter++,
-            label: `row ${idCounter}`,
+            id: newId,
+            label: `row ${newId}`,
         });
     }
     return data;
@@ -19,6 +20,7 @@ function App() {
     const [data, setData] = useState([]);
     const [selected, setSelected] = useState(null);
     const feedInterval = useRef(null);
+    const gridRef = useRef(null);
 
     const create1k = () => {
         idCounter = 1;
@@ -36,9 +38,14 @@ function App() {
         setData(newData);
     };
     const select = () => {
-        if (data.length > 0) {
-            const randomIndex = Math.floor(Math.random() * data.length);
-            setSelected(data[randomIndex].id);
+        if (gridRef.current) {
+            const visibleRows = gridRef.current.getVisibleRows();
+            if (visibleRows.length > 0) {
+                const randomVisibleIndex = Math.floor(Math.random() * visibleRows.length);
+                const randomRow = visibleRows[randomVisibleIndex];
+                const originalRowIndex = randomRow.index;
+                setSelected(data[originalRowIndex].id);
+            }
         }
     };
     const swap = () => {
@@ -137,7 +144,7 @@ function App() {
                     <input type="text" placeholder="Typing test..." />
                 </div>
                 <div className="grid-container">
-                    <Grid data={data} selected={selected} />
+                    <Grid ref={gridRef} data={data} selected={selected} />
                 </div>
             </div>
         </div>
