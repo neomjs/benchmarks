@@ -63,12 +63,17 @@ class ViewportController extends Base {
     runHeavyCalculation() {
         console.log('Heavy calculation started in App Worker...');
         let result = 0;
-        const iterations = 50000000; // Adjust as needed for desired duration
+        const iterations = 50000000;
+        const updateInterval = iterations / 100; // Update 100 times during the loop
 
         for (let i = 0; i < iterations; i++) {
             result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
+            if (i % updateInterval === 0) {
+                this.getStateProvider().data.heavyCalcProgress = `Progress: ${((i / iterations) * 100).toFixed(0)}%`;
+            }
         }
         console.log('Heavy calculation finished in App Worker. Result:', result);
+        this.getStateProvider().data.heavyCalcProgress = 'Finished!';
     }
 
     async runHeavyCalculationInTaskWorker() {

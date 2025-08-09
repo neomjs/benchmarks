@@ -13,6 +13,15 @@ class ViewportStateProvider extends StateProvider {
          */
         className: 'Benchmarks.view.ViewportStateProvider',
         /**
+         * @member {Object} data
+         */
+        data: {
+            /**
+             * @member {String} data.heavyCalcProgress='Progress: 0%'
+             */
+            heavyCalcProgress: 'Progress: 0%'
+        },
+        /**
          * @member {Object} stores
          */
         stores: {

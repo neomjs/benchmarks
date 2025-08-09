@@ -102,6 +102,12 @@ class Viewport extends BaseViewport {
                 }, {
                     ntype: 'component',
                     cls  : 'spinner'
+                }, {
+                    ntype    : 'component',
+                    bind     : {text: 'heavyCalcProgress'},
+                    cls      : 'heavy-calc-output',
+                    reference: 'heavy-calc-output',
+                    style    : {marginLeft: '10px'}
                 }]
             }, {
                 module   : BenchmarkGrid,

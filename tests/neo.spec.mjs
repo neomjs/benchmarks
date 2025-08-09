@@ -165,11 +165,13 @@ test('Neo.mjs benchmark: Create 1k rows', async ({page}) => {
             window.getButtonByText('Create 1k rows').click();
         };
         const condition = () => {
-            const grid           = document.querySelector('[role="grid"]');
-            const rowCount       = grid ? grid.getAttribute('aria-rowcount') : 'null';
-            const firstRowExists = !!document.querySelector('#neo-grid-body-1__row-0');
+            const grid = document.querySelector('[role="grid"]');
+            if (!grid) return false;
+            const rowCount = grid.getAttribute('aria-rowcount');
+            if (rowCount !== '1002') return false;
 
-            return grid && rowCount === '1002' && firstRowExists;
+            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
+            return firstRowIdCell && firstRowIdCell.textContent === '1';
         };
         return window.measurePerformance('Create 1k rows', action, condition);
     });
@@ -190,7 +192,12 @@ test('Neo.mjs benchmark: Create 10k rows', async ({page}) => {
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '10002' && document.querySelector('#neo-grid-body-1__row-0');
+            if (!grid) return false;
+            const rowCount = grid.getAttribute('aria-rowcount');
+            if (rowCount !== '10002') return false;
+
+            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
+            return firstRowIdCell && firstRowIdCell.textContent === '1';
         };
         return window.measurePerformance('Create 10k rows', action, condition);
     });

@@ -81,14 +81,24 @@ function App() {
         idCounter = 1;
     };
 
+    const heavyCalcOutputRef = useRef(null);
+
     const runHeavy = () => {
         console.log('Heavy calculation started in Main Thread...');
         let result = 0;
         const iterations = 50000000;
+        const updateInterval = iterations / 100; // Update 100 times during the loop
+
         for (let i = 0; i < iterations; i++) {
             result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
+            if (i % updateInterval === 0 && heavyCalcOutputRef.current) {
+                heavyCalcOutputRef.current.textContent = `Progress: ${((i / iterations) * 100).toFixed(0)}%`;
+            }
         }
         console.log('Heavy calculation finished in Main Thread. Result:', result);
+        if (heavyCalcOutputRef.current) {
+            heavyCalcOutputRef.current.textContent = 'Finished!';
+        }
     };
 
     const runHeavyTask = () => {
@@ -150,6 +160,7 @@ function App() {
                 <div className="input-container">
                     <div className="spinner"></div>
                     <input type="text" placeholder="Typing test..." />
+                    <div ref={heavyCalcOutputRef} style={{ marginLeft: '10px' }}></div>
                 </div>
                 <div className="grid-container">
                     <Grid ref={gridRef} data={data} selected={selected} />

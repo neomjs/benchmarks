@@ -171,7 +171,9 @@ test('React benchmark: Create 1k rows', async ({page}) => {
             const table = document.querySelector('table[role="grid"]');
             if (!table) return false;
             const rowCount = parseInt(table.getAttribute('aria-rowcount'), 10);
-            return rowCount === 1000;
+            if (rowCount !== 1000) return false;
+            const firstRow = table.querySelector('tbody tr:first-child td:first-child');
+            return firstRow && firstRow.textContent === '1';
         };
         return window.measurePerformance('Create 1k rows', action, condition);
     });
@@ -194,7 +196,9 @@ test('React benchmark: Create 10k rows', async ({page}) => {
             const table = document.querySelector('table[role="grid"]');
             if (!table) return false;
             const rowCount = parseInt(table.getAttribute('aria-rowcount'), 10);
-            return rowCount === 10000;
+            if (rowCount !== 10000) return false;
+            const firstRow = table.querySelector('tbody tr:first-child td:first-child');
+            return firstRow && firstRow.textContent === '1';
         };
         return window.measurePerformance('Create 10k rows', action, condition);
     });
@@ -355,8 +359,8 @@ test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 1k rows'}).waitFor(); // Ensure page is ready
 
-    // Start the heavy calculation
-    await page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
+    // Start the heavy calculation (don't await, so we can measure jank during execution)
+    page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
 
     // Measure jank for 4 seconds while the calculation is running
     const jankMetrics = await page.evaluate(() => {
@@ -374,9 +378,9 @@ test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async
 
     console.log(`Heavy Calculation (Main Thread) Jank Metrics:`, jankMetrics);
 
-    // Assert that the UI remained responsive.
-    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(45);
-    expect(jankMetrics.longFrameCount).toBeLessThan(10);
+    // Assert that the UI was NOT responsive, as the main thread was blocked by the heavy calculation.
+    expect(jankMetrics.averageFps).toBeLessThan(40);
+    expect(jankMetrics.longFrameCount).toBeGreaterThan(50);
 });
 
 test('React benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async ({page}) => {
