@@ -47,7 +47,7 @@ const Grid = React.forwardRef(({ data, selected }, ref) => {
 
     return (
         <div ref={tableContainerRef} style={{ overflow: 'auto', height: '100%', width: '100%' }}>
-            <table style={{ display: 'grid', width: '100%' }}>
+            <table style={{ display: 'grid', width: '100%' }} role="grid" aria-rowcount={data.length}>
                 <thead style={{ display: 'grid', position: 'sticky', top: 0, zIndex: 1, backgroundColor: '#2a2a2a' }}>
                     {table.getHeaderGroups().map(headerGroup => (
                         <tr key={headerGroup.id} style={{ display: 'flex' }}>

@@ -2,8 +2,12 @@ import fs     from 'fs-extra';
 import path   from 'path';
 import {glob} from 'glob';
 
-const RESULTS_DIR = path.resolve(process.cwd(), 'test-results-data');
-const OUTPUT_PATH = path.resolve(process.cwd(), 'BENCHMARK_RESULTS.md');
+const args = process.argv.slice(2);
+const frameworkArg = args.find(arg => arg.startsWith('--framework='));
+const framework = frameworkArg ? frameworkArg.split('=')[1] : 'all';
+
+const RESULTS_DIR = path.resolve(process.cwd(), `test-results-data-${framework}`);
+const OUTPUT_PATH = path.resolve(process.cwd(), framework === 'all' ? 'BENCHMARK_RESULTS.md' : `BENCHMARK_RESULTS_${framework.toUpperCase()}.md`);
 const BROWSERS = ['chromium', 'firefox', 'webkit'];
 const RESPONSIVENESS_TEST_SUFFIX = 'UI Responsiveness';
 
@@ -47,7 +51,7 @@ function parseResults(allRunsData) {
         const processSuite = (suite) => {
             if (suite.specs) {
                 suite.specs.forEach(spec => {
-                    const benchmarkName = spec.title.replace('Neo.mjs benchmark: ', '');
+                    const benchmarkName = spec.title.replace(/^(Neo\.mjs|React) benchmark: /, '');
 
                     if (!benchmarkName) {
                         return;
