@@ -102,13 +102,39 @@ function App() {
     };
 
     const runHeavyTask = () => {
-        const worker = new Worker(new URL('./heavy-task.js', import.meta.url));
         console.log('Heavy calculation started in Task Worker...');
-        worker.onmessage = (e) => {
-            console.log('Heavy calculation finished in Task Worker. Result:', e.data);
+        const totalIterations = 50000000;
+        const numSteps = 100;
+        const singleOpIterations = totalIterations / numSteps;
+
+        const worker = new Worker(new URL('./heavy-task.js', import.meta.url));
+        let overallResult = 0;
+
+        const runStep = (step) => {
+            return new Promise(resolve => {
+                worker.onmessage = (e) => {
+                    resolve(e.data);
+                };
+                worker.postMessage(singleOpIterations);
+            });
+        };
+
+        const runAllSteps = async () => {
+            for (let step = 0; step < numSteps; step++) {
+                const stepResult = await runStep(step);
+                overallResult += stepResult;
+                if (heavyCalcOutputRef.current) {
+                    heavyCalcOutputRef.current.textContent = `Progress: ${((step + 1) / numSteps * 100).toFixed(0)}%`;
+                }
+            }
+            console.log('Heavy calculation finished in Task Worker. Result:', overallResult);
+            if (heavyCalcOutputRef.current) {
+                heavyCalcOutputRef.current.textContent = 'Finished!';
+            }
             worker.terminate();
         };
-        worker.postMessage(50000000);
+
+        runAllSteps();
     };
 
     const toggleFeed = () => {
@@ -130,7 +156,7 @@ function App() {
                     }
                     return newData;
                 });
-            }, 16);
+            }, 5);
         }
     };
 
@@ -140,6 +166,16 @@ function App() {
                 clearInterval(feedInterval.current);
             }
         };
+    }, []);
+
+    const [mainThreadCounter, setMainThreadCounter] = useState(0);
+
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            setMainThreadCounter(prev => prev + 1);
+        }, 100); // Update every 100ms
+
+        return () => clearInterval(intervalId);
     }, []);
 
     return (
@@ -161,6 +197,7 @@ function App() {
                     <div className="spinner"></div>
                     <input type="text" placeholder="Typing test..." />
                     <div ref={heavyCalcOutputRef} style={{ marginLeft: '10px' }}></div>
+                    <div style={{ marginLeft: '10px', fontWeight: 'bold', minWidth: '8.2em' }}>Counter: {mainThreadCounter}</div>
                 </div>
                 <div className="grid-container">
                     <Grid ref={gridRef} data={data} selected={selected} />

@@ -24,12 +24,10 @@ class Task extends Base {
      * @returns {Number} The result of the calculation.
      */
     performHeavyCalculation(data) {
-        console.log('TaskWorker: Starting heavy calculation with', data.iterations, 'iterations...');
         let result = 0;
         for (let i = 0; i < data.iterations; i++) {
             result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
         }
-        console.log('TaskWorker: Heavy calculation finished.');
         return result;
     }
 }

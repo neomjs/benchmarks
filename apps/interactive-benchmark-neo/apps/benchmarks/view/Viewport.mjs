@@ -108,6 +108,13 @@ class Viewport extends BaseViewport {
                     cls      : 'heavy-calc-output',
                     reference: 'heavy-calc-output',
                     style    : {marginLeft: '10px'}
+                }, { // New component for main thread counter
+                    ntype: 'component',
+                    bind: {
+                        html: 'mainThreadCounter'
+                    },
+                    cls: 'main-thread-counter',
+                    style: { marginLeft: '10px', fontWeight: 'bold' }
                 }]
             }, {
                 module   : BenchmarkGrid,

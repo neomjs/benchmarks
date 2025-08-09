@@ -19,7 +19,11 @@ class ViewportStateProvider extends StateProvider {
             /**
              * @member {String} data.heavyCalcProgress='Progress: 0%'
              */
-            heavyCalcProgress: 'Progress: 0%'
+            heavyCalcProgress: 'Progress: 0%',
+            /**
+             * @member {Number} data.mainThreadCounter=0
+             */
+            mainThreadCounter: 0
         },
         /**
          * @member {Object} stores

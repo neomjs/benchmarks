@@ -25,6 +25,19 @@ class ViewportController extends Base {
      */
     realtimeFeedInterval = null
 
+    onConstructed() {
+        super.onConstructed();
+
+        this.mainThreadCounterInterval = setInterval(() => {
+            this.getStateProvider().data.mainThreadCounter++;
+        }, 100);
+    }
+
+    destroy(...args) {
+        clearInterval(this.mainThreadCounterInterval);
+        super.destroy(...args);
+    }
+
     clearRows() {
         let store = this.getStore('benchmarkGridStore');
         store.clear();
@@ -78,11 +91,18 @@ class ViewportController extends Base {
 
     async runHeavyCalculationInTaskWorker() {
         console.log('Heavy calculation started in Task Worker...');
-        const iterations = 50000000; // Adjust as needed for desired duration
+        const totalIterations = 50000000;
+        const numSteps = 100;
+        const singleOpIterations = totalIterations / numSteps;
 
-        // Call the method on the Task Worker
-        const result = await Benchmarks.worker.Task.performHeavyCalculation({iterations});
-        console.log('Heavy calculation finished in Task Worker. Result:', result);
+        let overallResult = 0;
+        for (let step = 0; step < numSteps; step++) {
+            const stepResult = await Benchmarks.worker.Task.performHeavyCalculation({iterations: singleOpIterations});
+            overallResult += stepResult; // Accumulate result if needed
+            this.getStateProvider().data.heavyCalcProgress = `Progress: ${((step + 1) / numSteps * 100).toFixed(0)}%`;
+        }
+        console.log('Heavy calculation finished in Task Worker. Result:', overallResult);
+        this.getStateProvider().data.heavyCalcProgress = 'Finished!';
     }
 
     selectRow() {
@@ -164,7 +184,7 @@ class ViewportController extends Base {
                     updatedRecords.push({id: record.id, label: `updated ${record.id} at ${new Date().toLocaleTimeString()}`});
                 }
                 grid.bulkUpdateRecords(updatedRecords);
-            }, 16); // Update every 16ms
+            }, 5); // Update every 5ms
             console.log('Real-time feed started.');
         }
     }
