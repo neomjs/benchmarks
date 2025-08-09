@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Grid from './Grid';
 import './App.css';
 
@@ -17,17 +17,105 @@ const buildData = (count) => {
 
 function App() {
     const [data, setData] = useState([]);
+    const [selected, setSelected] = useState(null);
+    const feedInterval = useRef(null);
 
-    const create1k = () => setData(buildData(1000));
-    const create10k = () => console.log('Create 10k rows');
-    const update = () => console.log('Update every 10th row');
-    const select = () => console.log('Select row');
-    const swap = () => console.log('Swap rows');
-    const remove = () => console.log('Remove row');
-    const clear = () => console.log('Clear rows');
-    const runHeavy = () => console.log('Run Heavy Calculation');
-    const runHeavyTask = () => console.log('Run Heavy Calculation (Task Worker)');
-    const toggleFeed = () => console.log('Start/Stop Real-time Feed');
+    const create1k = () => {
+        idCounter = 1;
+        setData(buildData(1000));
+    };
+    const create10k = () => {
+        idCounter = 1;
+        setData(buildData(10000));
+    };
+    const update = () => {
+        const newData = [...data];
+        for (let i = 0; i < newData.length; i += 10) {
+            newData[i] = { ...newData[i], label: newData[i].label + ' updated' };
+        }
+        setData(newData);
+    };
+    const select = () => {
+        if (data.length > 0) {
+            const randomIndex = Math.floor(Math.random() * data.length);
+            setSelected(data[randomIndex].id);
+        }
+    };
+    const swap = () => {
+        if (data.length > 1) {
+            const newData = [...data];
+            const index1 = Math.floor(Math.random() * data.length);
+            let index2 = Math.floor(Math.random() * data.length);
+            while (index1 === index2) {
+                index2 = Math.floor(Math.random() * data.length);
+            }
+            [newData[index1], newData[index2]] = [newData[index2], newData[index1]];
+            setData(newData);
+        }
+    };
+    const remove = () => {
+        if (data.length > 0) {
+            const newData = [...data];
+            const index = Math.floor(Math.random() * data.length);
+            newData.splice(index, 1);
+            setData(newData);
+        }
+    };
+    const clear = () => {
+        setData([]);
+        idCounter = 1;
+    };
+
+    const runHeavy = () => {
+        console.log('Heavy calculation started in Main Thread...');
+        let result = 0;
+        const iterations = 50000000;
+        for (let i = 0; i < iterations; i++) {
+            result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
+        }
+        console.log('Heavy calculation finished in Main Thread. Result:', result);
+    };
+
+    const runHeavyTask = () => {
+        const worker = new Worker(new URL('./heavy-task.js', import.meta.url));
+        console.log('Heavy calculation started in Task Worker...');
+        worker.onmessage = (e) => {
+            console.log('Heavy calculation finished in Task Worker. Result:', e.data);
+            worker.terminate();
+        };
+        worker.postMessage(50000000);
+    };
+
+    const toggleFeed = () => {
+        if (feedInterval.current) {
+            clearInterval(feedInterval.current);
+            feedInterval.current = null;
+            console.log('Real-time feed stopped.');
+        } else {
+            console.log('Real-time feed started.');
+            feedInterval.current = setInterval(() => {
+                setData(currentData => {
+                    const newData = [...currentData];
+                    const updateCount = 100;
+                    for (let i = 0; i < updateCount; i++) {
+                        const randomIndex = Math.floor(Math.random() * newData.length);
+                        if (newData[randomIndex]) {
+                            newData[randomIndex] = { ...newData[randomIndex], label: `updated ${newData[randomIndex].id} at ${new Date().toLocaleTimeString()}` };
+                        }
+                    }
+                    return newData;
+                });
+            }, 16);
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (feedInterval.current) {
+                clearInterval(feedInterval.current);
+            }
+        };
+    }, []);
 
     return (
         <div className="app-container">
@@ -49,7 +137,7 @@ function App() {
                     <input type="text" placeholder="Typing test..." />
                 </div>
                 <div className="grid-container">
-                    <Grid data={data} />
+                    <Grid data={data} selected={selected} />
                 </div>
             </div>
         </div>
