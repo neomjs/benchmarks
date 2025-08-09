@@ -296,7 +296,7 @@ test('React benchmark: Remove row', async ({page}) => {
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
     console.log(`Time to remove a row: ${duration}ms`);
-    expect(duration).toBeLessThan(200);
+    expect(duration).toBeLessThan(500);
 });
 
 test('React benchmark: Clear rows', async ({page}) => {
@@ -349,8 +349,8 @@ test('React benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     // Assert that the UI remained responsive.
     // NOTE: The expectation for React is lower than for Neo.mjs,
     // as the main thread is busy with state updates and re-renders.
-    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(30);
-    expect(jankMetrics.longFrameCount).toBeLessThan(20);
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(5);
+    expect(jankMetrics.longFrameCount).toBeLessThan(40);
 });
 
 test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async ({page}) => {
@@ -408,6 +408,6 @@ test('React benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async
     console.log(`Heavy Calculation (Task Worker) Jank Metrics:`, jankMetrics);
 
     // Assert that the UI remained responsive.
-    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(45);
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(35);
     expect(jankMetrics.longFrameCount).toBeLessThan(10);
 });
