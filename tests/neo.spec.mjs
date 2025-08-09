@@ -79,11 +79,22 @@ const getButtonByText = (text) => {
 test.beforeEach(async ({page}) => {
     // Inject the measurePerformance function into the browser context's window object
     await page.addInitScript({
-        content: `window.measurePerformance = ${measurePerformanceInBrowser.toString()}; window.getButtonByText = ${getButtonByText.toString()}`
+        content: `
+            window.measurePerformance = ${measurePerformanceInBrowser.toString()};
+            window.getButtonByText = ${getButtonByText.toString()};
+            window.consoleLogs = [];
+        `
     });
 
     // Listen for console messages from the browser and print them to Node.js console
     page.on('console', msg => {
+        // Also push to an array in the browser context for later inspection
+        page.evaluate(log => {
+            if (window.consoleLogs) {
+                window.consoleLogs.push(log);
+            }
+        }, msg.text());
+
         if (msg.type() !== 'warning') {
             console.log(`Browser console [${msg.type()}]: ${msg.text()}`);
         }
@@ -252,7 +263,17 @@ test('Neo.mjs benchmark: Real-time Feed', async ({page}) => {
     await page.getByRole('button', {name: 'Create 1k rows'}).click();
     await waitForGridReady(page, 1002);
 
-    const duration = await page.evaluate(() => {
+    const duration = await page.evaluate(async () => {
+        const getCellText = (rowIndex) => {
+            const cell = document.querySelector(`#neo-grid-body-1__row-${rowIndex}__label`);
+            return cell ? cell.textContent : null;
+        };
+
+        const initialCellTexts = [];
+        for (let i = 0; i < 10; i++) { // Sample 10 rows
+            initialCellTexts.push(getCellText(i));
+        }
+
         const action = () => {
             window.getButtonByText('Start/Stop Real-time Feed').click();
             // Let the feed run for a few seconds
@@ -264,14 +285,25 @@ test('Neo.mjs benchmark: Real-time Feed', async ({page}) => {
         const condition = () => {
             // Check if the spinner is still animating (by checking its class) and input is enabled
             const spinner = document.querySelector('.spinner');
-            const input = document.querySelector('[reference="main-thread-input"]');
-            return spinner && spinner.classList.contains('spinner') && input && !input.disabled;
+            const input   = document.querySelector('[data-ref="main-thread-input"]');
+
+            let cellsUpdated = false;
+            for (let i = 0; i < 10; i++) {
+                if (getCellText(i) !== initialCellTexts[i]) {
+                    cellsUpdated = true;
+                    break;
+                }
+            }
+
+            return spinner && spinner.classList.contains('spinner') && input && !input.disabled && cellsUpdated;
         };
         return window.measurePerformance('Real-time Feed', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
     console.log(`Time for Real-time Feed (5s active): ${duration}ms`);
+
+    // TODO: resolves after e.g. 236ms => changed cell found
     expect(duration).toBeGreaterThan(4500); // Should be at least 4.5 seconds
     expect(duration).toBeLessThan(5500);  // Should not exceed 5.5 seconds significantly
 });
@@ -279,16 +311,27 @@ test('Neo.mjs benchmark: Real-time Feed', async ({page}) => {
 test('Neo.mjs benchmark: Heavy Calculation (App Worker)', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
+    await page.getByRole('button', { name: 'Run Heavy Calculation', exact: true }).click();
 
-    const duration = await page.evaluate(() => {
-        const action = () => {
-            window.getButtonByText('Run Heavy Calculation').click();
+    const duration = await page.evaluate(async () => {
+        const inputField = document.querySelector('[data-ref="main-thread-input"]');
+        if (inputField) {
+            inputField.value = ''; // Clear the input field
+        }
+
+        const action = async () => {
+            if (inputField) {
+                inputField.value = 'typing test'; // Type into the input field
+            }
         };
         const condition = () => {
-            // Check if the spinner is still animating and input is enabled
-            const spinner = document.querySelector('.spinner');
-            const input = document.querySelector('[reference="main-thread-input"]');
-            return spinner && spinner.classList.contains('spinner') && input && !input.disabled;
+            // Check if the heavy calculation console log is present
+            const calculationFinished = window.consoleLogs.some(log => log.includes('Heavy calculation finished in App Worker.'));
+
+            // Check if the typed text is present in the input field
+            const typedTextPresent = inputField?.value === 'typing test';
+
+            return calculationFinished && typedTextPresent;
         };
         return window.measurePerformance('Heavy Calculation (App Worker)', action, condition);
     });
@@ -303,15 +346,28 @@ test('Neo.mjs benchmark: Heavy Calculation (Task Worker)', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
 
-    const duration = await page.evaluate(() => {
-        const action = () => {
-            window.getButtonByText('Run Heavy Calculation (Task Worker)').click();
+    const duration = await page.evaluate(async () => {
+        const inputField = document.querySelector('[data-ref="main-thread-input"]');
+        if (inputField) {
+            inputField.value = ''; // Clear the input field
+        }
+
+        const action = async () => {
+            let button = window.getButtonByText('Run Heavy Calculation (Task Worker)');
+            button.click();
+
+            if (inputField) {
+                inputField.value = 'typing test'; // Type into the input field
+            }
         };
         const condition = () => {
-            // Check if the spinner is still animating and input is enabled
-            const spinner = document.querySelector('.spinner');
-            const input = document.querySelector('[reference="main-thread-input"]');
-            return spinner && spinner.classList.contains('spinner') && input && !input.disabled;
+            // Check if the heavy calculation console log is present
+            const calculationFinished = window.consoleLogs.some(log => log.includes('Heavy calculation finished in Task Worker.'));
+
+            // Check if the typed text is present in the input field
+            const typedTextPresent = inputField?.value === 'typing test';
+
+            return calculationFinished && typedTextPresent;
         };
         return window.measurePerformance('Heavy Calculation (Task Worker)', action, condition);
     });
