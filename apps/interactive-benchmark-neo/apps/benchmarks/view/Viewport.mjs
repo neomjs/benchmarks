@@ -44,13 +44,13 @@ class Viewport extends BaseViewport {
             items : [{
                 module : Button,
                 handler: 'createRows',
-                rows   : 1000,
-                text   : 'Create 1k rows'
+                rows   : 10000,
+                text   : 'Create 10k rows'
             }, {
                 module : Button,
                 handler: 'createRows',
-                rows   : 10000,
-                text   : 'Create 10k rows'
+                rows   : 100000,
+                text   : 'Create 100k rows'
             }, {
                 module : Button,
                 handler: 'updateRows',

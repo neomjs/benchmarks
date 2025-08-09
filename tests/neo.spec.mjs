@@ -131,9 +131,9 @@ test.beforeEach(async ({page}) => {
     await page.addInitScript({
         content: `
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
-            window.measureJank = ${measureJankInBrowser.toString()};
-            window.getButtonByText = ${getButtonByText.toString()};
-            window.consoleLogs = [];
+            window.measureJank        = ${measureJankInBrowser.toString()};
+            window.getButtonByText    = ${getButtonByText.toString()};
+            window.consoleLogs        = [];
         `
     });
 
@@ -153,32 +153,6 @@ test.beforeEach(async ({page}) => {
             console.log(`Browser console [${msg.type()}]: ${msg.text()}`);
         }
     });
-});
-
-test('Neo.mjs benchmark: Create 1k rows', async ({page}) => {
-    await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).waitFor();
-
-    const duration = await page.evaluate(() => {
-        const action    = () => {
-            window.getButtonByText('Create 1k rows').click();
-        };
-        const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            if (!grid) return false;
-            const rowCount = grid.getAttribute('aria-rowcount');
-            if (rowCount !== '1002') return false;
-
-            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
-            return firstRowIdCell && firstRowIdCell.textContent === '1';
-        };
-        return window.measurePerformance('Create 1k rows', action, condition);
-    });
-
-    test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 1k rows: ${duration}ms`);
-    expect(duration).toBeLessThan(3000);
 });
 
 test('Neo.mjs benchmark: Create 10k rows', async ({page}) => {
@@ -203,15 +177,41 @@ test('Neo.mjs benchmark: Create 10k rows', async ({page}) => {
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to render 1k rows: ${duration}ms`);
+    expect(duration).toBeLessThan(30000);
+});
+
+test('Neo.mjs benchmark: Create 100k rows', async ({page}) => {
+    await page.goto('/apps/benchmarks/');
+    await expect(page).toHaveTitle('Benchmarks');
+    await page.getByRole('button', {name: 'Create 100k rows'}).waitFor();
+
+    const duration = await page.evaluate(() => {
+        const action    = () => {
+            window.getButtonByText('Create 100k rows').click();
+        };
+        const condition = () => {
+            const grid = document.querySelector('[role="grid"]');
+            if (!grid) return false;
+            const rowCount = grid.getAttribute('aria-rowcount');
+            if (rowCount !== '100002') return false;
+
+            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
+            return firstRowIdCell && firstRowIdCell.textContent === '1';
+        };
+        return window.measurePerformance('Create 100k rows', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
     console.log(`Time to render 10k rows: ${duration}ms`);
-    expect(duration).toBeLessThan(35000);
+    expect(duration).toBeLessThan(350000);
 });
 
 test('Neo.mjs benchmark: Update every 10th row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).click();
-    await waitForGridReady(page, 1002);
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10002);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -232,8 +232,8 @@ test('Neo.mjs benchmark: Update every 10th row', async ({page}) => {
 test('Neo.mjs benchmark: Select row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).click();
-    await waitForGridReady(page, 1002);
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10002);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -253,8 +253,8 @@ test('Neo.mjs benchmark: Select row', async ({page}) => {
 test('Neo.mjs benchmark: Swap rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).click();
-    await waitForGridReady(page, 1002);
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10002);
 
     const initialLabels = await page.locator('[role="gridcell"][aria-colindex="2"]').evaluateAll(elements => elements.map(el => el.textContent));
 
@@ -277,8 +277,8 @@ test('Neo.mjs benchmark: Swap rows', async ({page}) => {
 test('Neo.mjs benchmark: Remove row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).click();
-    await waitForGridReady(page, 1002);
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10002);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -299,8 +299,8 @@ test('Neo.mjs benchmark: Remove row', async ({page}) => {
 test('Neo.mjs benchmark: Clear rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).click();
-    await waitForGridReady(page, 1002);
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10002);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -322,8 +322,8 @@ test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).click();
-    await waitForGridReady(page, 1002);
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10002);
 
     // Start the feed
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
@@ -350,7 +350,7 @@ test('Neo.mjs benchmark: Heavy Calculation (App Worker) UI Responsiveness', asyn
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).waitFor(); // Ensure page is ready
+    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor(); // Ensure page is ready
 
     // Start the heavy calculation
     await page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
@@ -380,7 +380,7 @@ test('Neo.mjs benchmark: Heavy Calculation (Task Worker) UI Responsiveness', asy
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor();
 
     // Start the heavy calculation
     await page.getByRole('button', {name: 'Run Heavy Calculation (Task Worker)'}).click();

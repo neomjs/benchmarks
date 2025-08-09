@@ -24,11 +24,11 @@ function App() {
 
     const create1k = () => {
         idCounter = 1;
-        setData(buildData(1000));
+        setData(buildData(10000));
     };
     const create10k = () => {
         idCounter = 1;
-        setData(buildData(10000));
+        setData(buildData(100000));
     };
     const update = () => {
         const newData = [...data];
@@ -181,8 +181,8 @@ function App() {
     return (
         <div className="app-container">
             <div className="button-container">
-                <button onClick={create1k}>Create 1k rows</button>
-                <button onClick={create10k}>Create 10k rows</button>
+                <button onClick={create1k}>Create 10k rows</button>
+                <button onClick={create10k}>Create 100k rows</button>
                 <button onClick={update}>Update every 10th row</button>
                 <button onClick={select}>Select</button>
                 <button onClick={swap}>Swap</button>
