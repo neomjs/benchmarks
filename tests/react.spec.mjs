@@ -152,7 +152,7 @@ test.beforeEach(async ({page}) => {
             // before the console message is processed. It's safe to ignore.
         });
 
-        if (msg.type() !== 'warning') {
+        if (msg.type() !== 'debug' && msg.type() !== 'info' && msg.type() !== 'warning') {
             console.log(`Browser console [${msg.type()}]: ${msg.text()}`);
         }
     });
