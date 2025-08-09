@@ -35,7 +35,7 @@ This showcase directly challenges the limitations of the popular `js-framework-b
 
 The `examples/grid/bigData` example will be the foundation. Our strategy is to leverage the grid's advanced, performance-oriented architectural features to create a showcase that is impossible for main-thread bound frameworks to replicate.
 
-- **Exploit Virtual Rendering (Fairness Doctrine):** The `Neo.grid.Body` uses a "buffered" or "virtual" rendering system controlled by `bufferRowRange` and `bufferColumnRange`. This is the baseline. For a fair comparison, all competitor implementations (React, Vue, etc.) **must** use an equivalent best-in-class virtualization library (e.g., `react-window`). This focuses the benchmark on architectural differences under load, not on a naive comparison against non-virtualized lists.
+- **Exploit Virtual Rendering (Fairness Doctrine):** The `Neo.grid.Body` uses a "buffered" or "virtual" rendering system controlled by `bufferRowRange` and `bufferColumnRange`. This is the baseline. For a fair comparison, all competitor implementations (React, Vue, etc.) **must** use an equivalent best-in-class virtualization library (e.g., TanStack Table with `react-virtual`). This focuses the benchmark on architectural differences under load, not on a naive comparison against non-virtualized lists.
 
 - **Benchmark Scrolling Performance:** With virtualization as the baseline, scrolling performance becomes a primary metric. We will programmatically scroll the grid and measure frame rates (FPS) and jank, especially while the "Real-time Feed" or "Heavy Calculation" is active. This will directly expose main-thread contention in competing frameworks.
 
@@ -49,14 +49,14 @@ The `examples/grid/bigData` example will be the foundation. Our strategy is to l
     - [x] Sub-task: Create a UI with a large table and standard benchmark buttons (`Create 1k rows`, `Create 10k rows`, `Update every 10th row`, `Select`, `Swap`, `Remove`, `Clear`).
     - [x] Sub-task: Implement the logic for these basic operations to establish a recognizable performance baseline.
 
-- [ ] Task: **Phase 2 (The Neo.mjs Advantage):**
-    - [ ] Sub-task: Add a `Start/Stop Real-time Feed` button that simulates high-frequency WebSocket updates to hundreds of rows per second.
-    - [ ] Sub-task: Add a `Run Heavy Calculation` button that triggers a multi-second, computationally expensive task in the app worker.
-    - [ ] Sub-task: Add a continuously running CSS animation (e.g., a spinner) and a text input field to serve as visual indicators of main-thread responsiveness.
-- [x] Sub-task: Investigate and implement moving the "Heavy Calculation" to a dedicated Task Worker to ensure the App Worker remains responsive.
+- [x] Task: **Phase 2 (The Neo.mjs Advantage):**
+    - [x] Sub-task: Add a `Start/Stop Real-time Feed` button that simulates high-frequency WebSocket updates to hundreds of rows per second.
+    - [x] Sub-task: Add a `Run Heavy Calculation` button that triggers a multi-second, computationally expensive task in the app worker.
+    - [x] Sub-task: Add a continuously running CSS animation (e.g., a spinner) and a text input field to serve as visual indicators of main-thread responsiveness.
+    - [x] Sub-task: Investigate and implement moving the "Heavy Calculation" to a dedicated Task Worker to ensure the App Worker remains responsive.
 
 - [ ] Task: **Phase 3 (Benchmarking & Promotion):**
-    - [ ] Sub-task: Build comparable versions in mainstream frameworks (e.g., React with `react-window`), ensuring they use best-practice virtualization for a fair comparison.
+    - [ ] Sub-task: Build comparable versions in mainstream frameworks (e.g., React with TanStack Table and `react-virtual`), ensuring they use best-practice virtualization for a fair comparison.
     - [ ] Sub-task: Conduct rigorous performance testing, capturing videos and metrics (FPS, CPU, blocking time) that clearly show the competitor's UI freezing or stuttering during stress tests while the Neo.mjs version remains fluid.
     - [ ] Sub-task: Implement automated scrolling tests to capture FPS and jank metrics under various load conditions.
     - [x] Sub-task: Generate a `BENCHMARK_RESULTS.md` file to compare dev vs. prod performance.
@@ -240,6 +240,6 @@ The current implementation of `tests/neo.spec.mjs` repeats the entire `measure` 
 
 The `measure` function should be extracted into a single, reusable helper function. This function will accept the `action` and `condition` callbacks as parameters and be called from each test.
 
-- [ ] Task: Create a new `measurePerformance` helper function in `tests/neo.spec.mjs` that encapsulates the `Promise` and `MutationObserver` logic.
-- [ ] Task: Refactor all test cases to use the new `measurePerformance` helper, passing their specific `action` and `condition` logic.
-- [ ] Task: Ensure the refactored tests continue to pass and produce the same accurate results.
+- [x] Task: Create a new `measurePerformance` helper function in `tests/neo.spec.mjs` that encapsulates the `Promise` and `MutationObserver` logic.
+- [x] Task: Refactor all test cases to use the new `measurePerformance` helper, passing their specific `action` and `condition` logic.
+- [x] Task: Ensure the refactored tests continue to pass and produce the same accurate results.
