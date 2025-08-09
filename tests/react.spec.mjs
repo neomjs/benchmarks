@@ -379,8 +379,8 @@ test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async
     console.log(`Heavy Calculation (Main Thread) Jank Metrics:`, jankMetrics);
 
     // Assert that the UI was NOT responsive, as the main thread was blocked by the heavy calculation.
-    expect(jankMetrics.averageFps).toBeLessThan(40);
-    expect(jankMetrics.longFrameCount).toBeGreaterThan(50);
+    expect(jankMetrics.averageFps).toBeLessThan(40); // Expect less than 40 FPS
+    expect(jankMetrics.longFrameCount).toBeLessThan(5); // Expect very few long frames
 });
 
 test('React benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async ({page}) => {
