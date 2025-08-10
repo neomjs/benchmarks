@@ -39,14 +39,4 @@ export class DataService {
     this.nextId = 1;
     return this.data;
   }
-
-  heavyCalculation() {
-    console.log('Heavy calculation started in Main Thread...');
-    let result = 0;
-    const iterations = 50000000;
-    for (let i = 0; i < iterations; i++) {
-        result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
-    }
-    console.log('Heavy calculation finished in Main Thread. Result:', result);
-  }
 }

@@ -18,7 +18,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       { field: 'id', valueGetter: params => params.data.id, flex: 1 },
       { field: 'label', valueGetter: params => params.data.label, flex: 2 }
     ],
-    rowSelection: {mode: 'singleRow'},
+    rowSelection: 'single',
     getRowId: (params) => params.data.id,
     onGridReady: (params) => {
       this.gridApi = params.api;
@@ -100,11 +100,26 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   runHeavyCalculation() {
-    this.dataService.heavyCalculation();
+    // This will now be handled by the worker, but we can keep a main-thread version for comparison
+    console.log('Heavy calculation started in Main Thread...');
+    let result = 0;
+    const iterations = 50000000;
+    for (let i = 0; i < iterations; i++) {
+        result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
+    }
+    console.log('Heavy calculation finished in Main Thread. Result:', result);
+    this.heavyCalcOutput.nativeElement.textContent = 'Finished!';
   }
 
   runHeavyTask() {
-    console.log('Heavy Task Worker not implemented yet.');
+    console.log('Heavy calculation started in Task Worker...');
+    const worker = new Worker(new URL('./heavy-computation.worker', import.meta.url), { type: 'module' });
+    worker.onmessage = ({ data }) => {
+      console.log('Heavy calculation finished in Task Worker. Result:', data);
+      this.heavyCalcOutput.nativeElement.textContent = 'Finished!';
+      worker.terminate();
+    };
+    worker.postMessage('start');
   }
 
   toggleFeed() {
