@@ -1,42 +1,22 @@
-.container {
-  display: flex;
-  flex-direction: column;
+:host {
+  display: block;
   height: 100vh;
-  padding: 1rem;
+  width: 100vw;
 }
 
-header {
-  flex-shrink: 0;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #ccc;
-}
-
-.main-content {
+.app-container {
   display: flex;
-  flex-grow: 1;
-  margin-top: 1rem;
+  height: 100%;
+  padding: 1rem;
   gap: 1rem;
-  overflow: hidden;
 }
 
-.sidebar {
-  width: 250px;
-  flex-shrink: 0;
-  border: 1px solid #eee;
-  padding: 1rem;
-}
-
-.grid-container {
-  flex-grow: 1;
-  border: 1px solid #eee;
-  padding: 1rem;
-}
-
-.button-group {
+.button-container {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  width: 250px;
+  flex-shrink: 0;
 }
 
 button {
@@ -52,10 +32,18 @@ button:hover {
   background-color: #e0e0e0;
 }
 
-.indicator-group {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #eee;
+.right-pane {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .spinner {
@@ -65,7 +53,7 @@ button:hover {
   width: 30px;
   height: 30px;
   animation: spin 2s linear infinite;
-  margin-bottom: 1rem;
+  margin-right: 1rem;
 }
 
 @keyframes spin {
@@ -74,6 +62,10 @@ button:hover {
 }
 
 input[type="text"] {
-  width: 100%;
   padding: 0.5rem;
+}
+
+.grid-container {
+  flex-grow: 1;
+  height: 100%;
 }

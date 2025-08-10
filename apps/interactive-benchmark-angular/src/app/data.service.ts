@@ -11,40 +11,42 @@ export interface RowData {
 })
 export class DataService {
   private data: RowData[] = [];
-  private adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
-  private colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
-  private nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger", "pizza", "mouse", "keyboard"];
   private nextId = 1;
 
   buildData(count = 1000): RowData[] {
     const data = [];
     for (let i = 0; i < count; i++) {
-      data.push(this.buildRow());
+      data.push({
+        id: this.nextId++,
+        label: 'row ' + this.nextId,
+      });
     }
     this.data = data;
     return this.data;
   }
 
   updateData(): RowData[] {
-    for (let i=0; i<this.data.length; i+=10) {
-        this.data[i] = this.buildRow();
+    const newData = [...this.data];
+    for (let i = 0; i < newData.length; i += 10) {
+        newData[i] = { ...newData[i], label: newData[i].label + ' updated' };
     }
+    this.data = newData;
     return this.data;
-  }
-
-  private buildRow(): RowData {
-    return {
-      id: this.nextId++,
-      label: `${this.adjectives[this.random(this.adjectives.length)]} ${this.colours[this.random(this.colours.length)]} ${this.nouns[this.random(this.nouns.length)]}`
-    };
-  }
-
-  private random(max: number): number {
-    return Math.round(Math.random() * 1000) % max;
   }
 
   clearData() {
     this.data = [];
+    this.nextId = 1;
     return this.data;
+  }
+
+  heavyCalculation() {
+    console.log('Heavy calculation started in Main Thread...');
+    let result = 0;
+    const iterations = 50000000;
+    for (let i = 0; i < iterations; i++) {
+        result += Math.sqrt(i) * Math.sin(i) / Math.cos(i) + Math.log(i + 1);
+    }
+    console.log('Heavy calculation finished in Main Thread. Result:', result);
   }
 }
