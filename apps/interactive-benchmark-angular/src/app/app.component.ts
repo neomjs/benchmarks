@@ -22,6 +22,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     getRowId: (params) => params.data.id,
     onGridReady: (params) => {
       this.gridApi = params.api;
+      (window as any).gridApi = params.api;
     }
   };
 
