@@ -41,51 +41,44 @@ class Viewport extends BaseViewport {
             cls   : 'benchmark-toolbar',
             width : 250,
             layout: {ntype: 'vbox', align: 'stretch', pack: 'start'},
+            itemDefaults: {
+                module: Button,
+                flex  : 'none'
+            },
             items : [{
-                module : Button,
                 handler: 'createRows',
                 rows   : 10000,
                 text   : 'Create 10k rows'
             }, {
-                module : Button,
                 handler: 'createRows',
                 rows   : 100000,
                 text   : 'Create 100k rows'
             }, {
-                module : Button,
                 handler: 'createRows',
                 rows   : 1000000,
                 text   : 'Create 1M rows'
             }, {
-                module : Button,
                 handler: 'updateRows',
                 text   : 'Update every 10th row'
             }, {
-                module : Button,
                 handler: 'selectRow',
                 text   : 'Select'
             }, {
-                module : Button,
                 handler: 'swapRows',
                 text   : 'Swap'
             }, {
-                module : Button,
                 handler: 'removeRow',
                 text   : 'Remove'
             }, {
-                module : Button,
                 handler: 'clearRows',
                 text   : 'Clear'
             }, {
-                module : Button,
                 handler: 'toggleRealtimeFeed',
                 text   : 'Start/Stop Real-time Feed'
             }, {
-                module : Button,
                 handler: 'runHeavyCalculation',
                 text   : 'Run Heavy Calculation'
             }, {
-                module : Button,
                 handler: 'runHeavyCalculationInTaskWorker',
                 text   : 'Run Heavy Calculation (Task Worker)'
             }]
