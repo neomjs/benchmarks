@@ -1,0 +1,79 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 1rem;
+}
+
+header {
+  flex-shrink: 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ccc;
+}
+
+.main-content {
+  display: flex;
+  flex-grow: 1;
+  margin-top: 1rem;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  border: 1px solid #eee;
+  padding: 1rem;
+}
+
+.grid-container {
+  flex-grow: 1;
+  border: 1px solid #eee;
+  padding: 1rem;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+button {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  text-align: left;
+}
+
+button:hover {
+  background-color: #e0e0e0;
+}
+
+.indicator-group {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 0.5rem;
+}

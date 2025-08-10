@@ -57,6 +57,7 @@ The `examples/grid/bigData` example will be the foundation. Our strategy is to l
 
 - [ ] Task: **Phase 3 (Benchmarking & Promotion):**
     - [ ] Sub-task: Build comparable versions in mainstream frameworks (e.g., React with TanStack Table and `react-virtual`), ensuring they use best-practice virtualization for a fair comparison.
+    - [ ] Sub-task: **Angular:** Build the Angular version of the benchmark app.
     - [ ] Sub-task: Conduct rigorous performance testing, capturing videos and metrics (FPS, CPU, blocking time) that clearly show the competitor's UI freezing or stuttering during stress tests while the Neo.mjs version remains fluid.
     - [ ] Sub-task: Implement automated scrolling tests to capture FPS and jank metrics under various load conditions.
     - [x] Sub-task: Generate a `BENCHMARK_RESULTS.md` file to compare dev vs. prod performance.
