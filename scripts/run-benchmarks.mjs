@@ -32,6 +32,8 @@ async function main() {
         testCommand += ' tests/neo.spec.mjs';
     } else if (framework === 'react') {
         testCommand += ' tests/react.spec.mjs';
+    } else if (framework === 'angular') {
+        testCommand += ' tests/angular.spec.mjs';
     }
 
     // 4. Loop through the specified number of runs.

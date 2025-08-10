@@ -51,7 +51,7 @@ function parseResults(allRunsData) {
         const processSuite = (suite) => {
             if (suite.specs) {
                 suite.specs.forEach(spec => {
-                    const benchmarkName = spec.title.replace(/^(Neo\.mjs|React) benchmark: /, '');
+                    const benchmarkName = spec.title.replace(/^(Neo\.mjs|React|Angular) benchmark: /, '');
 
                     if (!benchmarkName) {
                         return;

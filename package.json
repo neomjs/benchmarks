@@ -7,9 +7,11 @@
         "test:all": "npx playwright test",
         "test:neo": "npx playwright test tests/neo.spec.mjs",
         "test:react": "npx playwright test tests/react.spec.mjs",
+        "test:angular": "npx playwright test tests/angular.spec.mjs",
         "benchmark:accurate:all": "node ./scripts/run-benchmarks.mjs --framework=all",
         "benchmark:accurate:neo": "node ./scripts/run-benchmarks.mjs --framework=neo",
         "benchmark:accurate:react": "node ./scripts/run-benchmarks.mjs --framework=react",
+        "benchmark:accurate:angular": "node ./scripts/run-benchmarks.mjs --framework=angular",
         "build:benchmark-app": "npm --prefix apps/interactive-benchmark-neo run build-all"
     },
     "repository": {

@@ -75,6 +75,22 @@ export default defineConfig({
         baseURL: 'http://localhost:8080/dist/production/',
       },
     },
+    {
+      name: 'angular',
+      testMatch: /angular\.spec\.mjs/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:4200',
+      },
+    },
+    {
+      name: 'react',
+      testMatch: /react\.spec\.mjs/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:5174',
+      },
+    },
 
     /* Test against mobile viewports. */
     // {
@@ -107,6 +123,11 @@ export default defineConfig({
     {
       command: 'npm --prefix apps/interactive-benchmark-react run dev',
       url: 'http://localhost:5174',
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'npm --prefix apps/interactive-benchmark-angular run start',
+      url: 'http://localhost:4200',
       reuseExistingServer: !process.env.CI,
     }
   ],
