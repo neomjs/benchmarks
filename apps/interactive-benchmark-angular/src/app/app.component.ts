@@ -18,8 +18,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       { field: 'id', valueGetter: params => params.data.id, flex: 1 },
       { field: 'label', valueGetter: params => params.data.label, flex: 2 }
     ],
-    rowSelection: 'single',
-    getRowId: (params) => params.data.id,
+    animateRows: false,
+    rowSelection: {mode: 'singleRow'},
+    getRowId: (params) => String(params.data.id),
     onGridReady: (params) => {
       this.gridApi = params.api;
       (window as any).gridApi = params.api;

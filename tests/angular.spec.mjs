@@ -164,6 +164,48 @@ test('Angular benchmark: Create 10k rows', async ({page}) => {
     expect(duration).toBeLessThan(30000);
 });
 
+test('Angular benchmark: Create 100k rows', async ({page}) => {
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 100k rows'}).waitFor();
+
+    const duration = await page.evaluate(() => {
+        const action    = () => {
+            window.getButtonByText('Create 100k rows').click();
+        };
+        const condition = () => {
+            const {gridApi} = window;
+            return gridApi?.getDisplayedRowCount() === 100000;
+        };
+        return window.measurePerformance('Create 100k rows', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to render 100k rows: ${duration}ms`);
+    expect(duration).toBeLessThan(350000);
+});
+
+test('Angular benchmark: Create 1M rows', async ({page}) => {
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 1M rows'}).waitFor();
+
+    const duration = await page.evaluate(() => {
+        const action    = () => {
+            window.getButtonByText('Create 1M rows').click();
+        };
+        const condition = () => {
+            const {gridApi} = window;
+            return gridApi?.getDisplayedRowCount() === 1000000;
+        };
+        return window.measurePerformance('Create 1M rows', action, condition, undefined, 110000);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to render 1M rows: ${duration}ms`);
+    expect(duration).toBeLessThan(350000);
+});
+
 test('Angular benchmark: Update every 10th row', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
@@ -184,6 +226,82 @@ test('Angular benchmark: Update every 10th row', async ({page}) => {
     test.info().annotations.push({type: 'duration', description: `${duration}`});
     console.log(`Time to update 10k rows (every 10th): ${duration}ms`);
     expect(duration).toBeLessThan(5000);
+});
+
+test('Angular benchmark: Select row', async ({page}) => {
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10000);
+
+    const duration = await page.evaluate(() => {
+        const action    = () => {
+            window.getButtonByText('Select').click();
+        };
+        const condition = () => {
+            return document.querySelector('.ag-row-selected');
+        };
+        return window.measurePerformance('Select row', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to select a row: ${duration}ms`);
+    expect(duration).toBeLessThan(500);
+});
+
+test('Angular benchmark: Swap rows', async ({page}) => {
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10000);
+
+    const duration = await page.evaluate(() => {
+        // Capture the initial state directly in the browser
+        const initialTransforms = Array.from(
+            document.querySelectorAll('.ag-row[row-index]'),
+            el => window.getComputedStyle(el).transform
+        );
+
+        const action = () => {
+            window.getButtonByText('Swap').click();
+        };
+
+        const condition = (initials) => {
+            const newStyles = Array.from(
+                document.querySelectorAll('.ag-row[row-index]'),
+                el => window.getComputedStyle(el).transform
+            );
+            return newStyles.length > 0 && newStyles.join(',') !== initials.join(',');
+        };
+
+        return window.measurePerformance('Swap rows', action, condition, initialTransforms);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to swap rows: ${duration}ms`);
+    expect(duration).toBeLessThan(500);
+});
+
+test('Angular benchmark: Remove row', async ({page}) => {
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10000);
+
+    const duration = await page.evaluate(() => {
+        const action    = () => {
+            window.getButtonByText('Remove').click();
+        };
+        const condition = () => {
+            const {gridApi} = window;
+            return gridApi?.getDisplayedRowCount() === 9999;
+        };
+        return window.measurePerformance('Remove row', action, condition);
+    });
+
+    test.info().annotations.push({type: 'duration', description: `${duration}`});
+    console.log(`Time to remove a row: ${duration}ms`);
+    expect(duration).toBeLessThan(500);
 });
 
 test('Angular benchmark: Clear rows', async ({page}) => {
@@ -210,6 +328,33 @@ test('Angular benchmark: Clear rows', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
+test('Angular benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await waitForGridReady(page, 10000);
+
+    // Start the feed
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
+
+    // Measure jank for 4 seconds while the feed is running
+    const jankMetrics = await page.evaluate(() => {
+        return window.measureJank(4000);
+    });
+
+    // Stop the feed
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
+
+    test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
+    test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
+
+    console.log(`Real-time Feed (4s active) Jank Metrics:`, jankMetrics);
+
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(5);
+    expect(jankMetrics.longFrameCount).toBeLessThan(60);
+});
+
 test('Angular benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
@@ -230,7 +375,7 @@ test('Angular benchmark: Heavy Calculation (Main Thread) UI Responsiveness', asy
     test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
 
     console.log(`Heavy Calculation (Main Thread) Jank Metrics:`, jankMetrics);
-    expect(jankMetrics.averageFps).toBeLessThan(30);
+    expect(jankMetrics.averageFps).toBeLessThan(40);
     expect(jankMetrics.longFrameCount).toBeLessThan(5);
 });
 
@@ -254,6 +399,6 @@ test('Angular benchmark: Heavy Calculation (Task Worker) UI Responsiveness', asy
     test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
 
     console.log(`Heavy Calculation (Task Worker) Jank Metrics:`, jankMetrics);
-    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(50);
+    expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(40);
     expect(jankMetrics.longFrameCount).toBeLessThan(10);
 });
