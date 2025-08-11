@@ -238,7 +238,7 @@ test('Neo.mjs benchmark: Update every 10th row', async ({page}) => {
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10002);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -261,7 +261,7 @@ test('Neo.mjs benchmark: Select row', async ({page}) => {
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10002);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -283,7 +283,7 @@ test('Neo.mjs benchmark: Swap rows', async ({page}) => {
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10002);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const initialLabels = await page.locator('[role="gridcell"][aria-colindex="2"]').evaluateAll(elements => elements.map(el => el.textContent));
 
@@ -308,7 +308,7 @@ test('Neo.mjs benchmark: Remove row', async ({page}) => {
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10002);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -331,7 +331,7 @@ test('Neo.mjs benchmark: Clear rows', async ({page}) => {
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10002);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -355,7 +355,7 @@ test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     await expect(page).toHaveTitle('Benchmarks');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10002);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     // Start the feed
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();

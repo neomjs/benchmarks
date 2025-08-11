@@ -12,6 +12,7 @@
         "benchmark:accurate:neo": "node ./scripts/run-benchmarks.mjs --framework=neo",
         "benchmark:accurate:react": "node ./scripts/run-benchmarks.mjs --framework=react",
         "benchmark:accurate:angular": "node ./scripts/run-benchmarks.mjs --framework=angular",
+        "benchmark:combine-reports": "node ./scripts/generate-combined-report.mjs",
         "build:benchmark-app": "npm --prefix apps/interactive-benchmark-neo run build-all"
     },
     "repository": {
