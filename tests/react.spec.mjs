@@ -258,7 +258,7 @@ test('React benchmark: Update every 10th row', async ({page}) => {
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -281,7 +281,7 @@ test('React benchmark: Select row', async ({page}) => {
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -303,7 +303,7 @@ test('React benchmark: Swap rows', async ({page}) => {
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const initialLabels = await page.locator('tbody tr td:last-child').evaluateAll(elements => elements.map(el => el.textContent));
 
@@ -328,7 +328,7 @@ test('React benchmark: Remove row', async ({page}) => {
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -353,7 +353,7 @@ test('React benchmark: Clear rows', async ({page}) => {
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -379,7 +379,7 @@ test('React benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     await expect(page).toHaveTitle('Vite + React');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
-    await page.waitForTimeout(25);
+    await page.waitForTimeout(100);
 
     // Start the feed
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
