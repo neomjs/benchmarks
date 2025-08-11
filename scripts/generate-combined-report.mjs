@@ -1,7 +1,7 @@
 import { writeFileSync } from 'fs';
 import path from 'path';
 import { glob } from 'glob';
-import fsExtra from 'fs-extra'; // Use a distinct name for fs-extra
+import fsExtra from 'fs-extra';
 
 // Constants from generate-report.mjs
 const BROWSERS = ['chromium', 'firefox', 'webkit'];
@@ -48,7 +48,7 @@ function parseResults(allRunsData) {
         const processSuite = (suite) => {
             if (suite.specs) {
                 suite.specs.forEach(spec => {
-                    const benchmarkName = spec.title.replace(/^(Neo\.mjs|React|Angular) benchmark: /, '');
+                    const benchmarkName = spec.title.replace(/^(Neo.mjs|React|Angular) benchmark: /, '');
 
                     if (!benchmarkName) {
                         return;
@@ -147,42 +147,53 @@ async function generateReport() {
         allFrameworkResults[framework] = parseResults(allRunsData);
     }
 
-    let outputMarkdown = '# Combined Benchmark Report\n\n';
-    outputMarkdown += '| Benchmark | Browser | Neo Dev (ms) | Neo Prod (ms) | Angular Dev (ms) | Angular Prod (ms) | React Dev (ms) | React Prod (ms) |\n';
-    outputMarkdown += '|---|---|---|---|---|---|---|---|\n';
-
-    const allBenchmarkNames = new Set();
+    // Combine "Heavy Calculation" benchmarks under a single name
     frameworks.forEach(f => {
-        Object.keys(allFrameworkResults[f].durationBenchmarks).forEach(name => allBenchmarkNames.add(name));
+        const responsivenessBenchmarks = allFrameworkResults[f].responsivenessBenchmarks;
+        const appWorkerBenchName = 'Heavy Calculation (App Worker) UI Responsiveness';
+        const mainThreadBenchName = 'Heavy Calculation (Main Thread) UI Responsiveness';
+        const combinedBenchName = 'Heavy Calculation UI Responsiveness';
+
+        if (f === 'neo' && responsivenessBenchmarks[appWorkerBenchName]) {
+            responsivenessBenchmarks[combinedBenchName] = responsivenessBenchmarks[appWorkerBenchName];
+            delete responsivenessBenchmarks[appWorkerBenchName];
+        } else if ((f === 'angular' || f === 'react') && responsivenessBenchmarks[mainThreadBenchName]) {
+            responsivenessBenchmarks[combinedBenchName] = responsivenessBenchmarks[mainThreadBenchName];
+            delete responsivenessBenchmarks[mainThreadBenchName];
+        }
     });
 
-    const sortedBenchmarkNames = Array.from(allBenchmarkNames).sort();
+    let outputMarkdown = '# Combined Benchmark Report\n\n';
 
-    for (const benchmarkName of sortedBenchmarkNames) {
-        outputMarkdown += `| **${benchmarkName}** | | | | | | | |`; // Benchmark header row
+    // --- Duration Benchmarks Table ---
+    outputMarkdown += '## Duration Benchmarks\n\n';
+    outputMarkdown += '| Benchmark | Browser | Neo (ms) | Angular (ms) | React (ms) |\n';
+    outputMarkdown += '|---|---|---|---|---|\n';
+
+    const allDurationBenchmarkNames = new Set();
+    frameworks.forEach(f => {
+        Object.keys(allFrameworkResults[f].durationBenchmarks).forEach(name => allDurationBenchmarkNames.add(name));
+    });
+    const sortedDurationBenchmarkNames = Array.from(allDurationBenchmarkNames).sort();
+
+    for (const benchmarkName of sortedDurationBenchmarkNames) {
+        outputMarkdown += `| **${benchmarkName}** | | | | |\n`; // Benchmark header row
 
         for (const browser of BROWSERS) {
-            const devResults = {};
-            const prodResults = {};
+            const prodResults = {}; // Only consider Prod Mode for duration benchmarks
 
             frameworks.forEach(f => {
                 const durationData = allFrameworkResults[f].durationBenchmarks[benchmarkName];
                 if (durationData) {
-                    devResults[f] = durationData.dev[browser]?.avg;
                     prodResults[f] = durationData.prod[browser]?.avg;
                 }
             });
 
-            // Filter out undefined/null values for min/max calculation
-            const validDevResults = Object.values(devResults).filter(v => typeof v === 'number' && Number.isFinite(v));
             const validProdResults = Object.values(prodResults).filter(v => typeof v === 'number' && Number.isFinite(v));
-
-            const bestDev = validDevResults.length > 0 ? Math.min(...validDevResults) : undefined;
-            const worstDev = validDevResults.length > 0 ? Math.max(...validDevResults) : undefined;
             const bestProd = validProdResults.length > 0 ? Math.min(...validProdResults) : undefined;
             const worstProd = validProdResults.length > 0 ? Math.max(...validProdResults) : undefined;
 
-            const formatValue = (value, best, worst) => {
+            const formatDurationValue = (value, best, worst) => {
                 if (value === undefined) return 'N/A';
                 if (value === Infinity) return 'Timeout';
                 if (value === best) return `✅ ${value.toFixed(2)}`;
@@ -191,14 +202,73 @@ async function generateReport() {
             };
 
             outputMarkdown += `| | ${browser} | `;
-            outputMarkdown += `${formatValue(devResults.neo, bestDev, worstDev)} | `;
-            outputMarkdown += `${formatValue(prodResults.neo, bestProd, worstProd)} | `;
-            outputMarkdown += `${formatValue(devResults.angular, bestDev, worstDev)} | `;
-            outputMarkdown += `${formatValue(prodResults.angular, bestProd, worstProd)} | `;
-            outputMarkdown += `${formatValue(devResults.react, bestDev, worstDev)} | `;
-            outputMarkdown += `${formatValue(prodResults.react, bestProd, worstProd)} |\n`;
+            outputMarkdown += `${formatDurationValue(prodResults.neo, bestProd, worstProd)} | `;
+            outputMarkdown += `${formatDurationValue(prodResults.angular, bestProd, worstProd)} | `;
+            outputMarkdown += `${formatDurationValue(prodResults.react, bestProd, worstProd)} |
+`;
         }
-        outputMarkdown += `|---|---|---|---|---|---|---|---|\n`; // Separator after each benchmark group
+        outputMarkdown += `|---|---|---|---|---|\n`; // Separator after each benchmark group
+    }
+
+    // --- UI Responsiveness Benchmarks Table ---
+    outputMarkdown += '\n## UI Responsiveness Benchmarks\n\n';
+    outputMarkdown += '| Benchmark | Browser | Neo (FPS / Long Frames) | Angular (FPS / Long Frames) | React (FPS / Long Frames) |\n';
+    outputMarkdown += '|---|---|---|---|---|';
+
+    const allResponsivenessBenchmarkNames = new Set();
+    frameworks.forEach(f => {
+        Object.keys(allFrameworkResults[f].responsivenessBenchmarks).forEach(name => {
+            allResponsivenessBenchmarkNames.add(name);
+        });
+    });
+    const sortedResponsivenessBenchmarkNames = Array.from(allResponsivenessBenchmarkNames).sort();
+
+    for (const benchmarkName of sortedResponsivenessBenchmarkNames) {
+        outputMarkdown += `\n| **${benchmarkName}** | | | | |\n`; // Benchmark header row
+
+        for (const browser of BROWSERS) {
+            const fpsResults = {};
+            const longFrameResults = {};
+
+            frameworks.forEach(f => {
+                const responsivenessData = allFrameworkResults[f].responsivenessBenchmarks[benchmarkName];
+                if (responsivenessData) {
+                    fpsResults[f] = responsivenessData.prod[browser]?.avgFps; // Use prod mode for responsiveness
+                    longFrameResults[f] = responsivenessData.prod[browser]?.avgLongFrames;
+                }
+            });
+
+            const validFpsResults = Object.values(fpsResults).filter(v => typeof v === 'number' && Number.isFinite(v));
+            const validLongFrameResults = Object.values(longFrameResults).filter(v => typeof v === 'number' && Number.isFinite(v));
+
+            // FPS: higher is better (best = max, worst = min)
+            const bestFps = validFpsResults.length > 0 ? Math.max(...validFpsResults) : undefined;
+            const worstFps = validFpsResults.length > 0 ? Math.min(...validFpsResults) : undefined;
+
+            // Long Frames: lower is better (best = min, worst = max)
+            const bestLongFrames = validLongFrameResults.length > 0 ? Math.min(...validLongFrameResults) : undefined;
+            const worstLongFrames = validLongFrameResults.length > 0 ? Math.max(...validLongFrameResults) : undefined;
+
+            const formatResponsivenessValue = (fpsValue, lfValue, bestFps, worstFps, bestLf, worstLf) => {
+                if (fpsValue === undefined || lfValue === undefined) return 'N/A';
+
+                let fpsFormatted = fpsValue.toFixed(1);
+                if (fpsValue === bestFps) fpsFormatted = `✅ ${fpsFormatted}`;
+                else if (fpsValue === worstFps) fpsFormatted = `❌ ${fpsFormatted}`;
+
+                let lfFormatted = lfValue.toFixed(1);
+                if (lfValue === bestLf) lfFormatted = `✅ ${lfFormatted}`;
+                else if (lfValue === worstLf) lfFormatted = `❌ ${lfFormatted}`;
+
+                return `${fpsFormatted} / ${lfFormatted}`;
+            };
+
+            outputMarkdown += `| | ${browser} | `;
+            outputMarkdown += `${formatResponsivenessValue(fpsResults.neo, longFrameResults.neo, bestFps, worstFps, bestLongFrames, worstLongFrames)} | `;
+            outputMarkdown += `${formatResponsivenessValue(fpsResults.angular, longFrameResults.angular, bestFps, worstFps, bestLongFrames, worstLongFrames)} | `;
+            outputMarkdown += `${formatResponsivenessValue(fpsResults.react, longFrameResults.react, bestFps, worstFps, bestLongFrames, worstLongFrames)} |\n`;
+        }
+        outputMarkdown += `|---|---|---|---|---|`; // Separator after each benchmark group
     }
 
     writeFileSync(path.join(process.cwd(), 'COMBINED_BENCHMARK_REPORT.md'), outputMarkdown, 'utf8');
