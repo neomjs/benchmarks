@@ -211,6 +211,7 @@ test('Angular benchmark: Update every 10th row', async ({page}) => {
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
+    await page.waitForTimeout(25);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -233,6 +234,7 @@ test('Angular benchmark: Select row', async ({page}) => {
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
+    await page.waitForTimeout(25);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -254,6 +256,7 @@ test('Angular benchmark: Swap rows', async ({page}) => {
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
+    await page.waitForTimeout(25);
 
     const duration = await page.evaluate(() => {
         // Capture the initial state directly in the browser
@@ -287,6 +290,7 @@ test('Angular benchmark: Remove row', async ({page}) => {
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
+    await page.waitForTimeout(25);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -309,6 +313,7 @@ test('Angular benchmark: Clear rows', async ({page}) => {
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
+    await page.waitForTimeout(25);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -334,6 +339,7 @@ test('Angular benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
     await waitForGridReady(page, 10000);
+    await page.waitForTimeout(25);
 
     // Start the feed
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
