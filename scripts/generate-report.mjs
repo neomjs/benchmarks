@@ -71,11 +71,20 @@ function parseResults(allRunsData) {
                                 if (test.results.every(r => r.status === 'passed')) { // Keep status check for responsiveness
                                     const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
                                     const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
+                                    const avgLagAnnotation = test.annotations.find(a => a.type === 'averageRowLag');
+                                    const maxLagAnnotation = test.annotations.find(a => a.type === 'maxRowLag');
+                                    const staleFrameAnnotation = test.annotations.find(a => a.type === 'staleFrameCount');
+
                                     const target = responsivenessBenchmarks[benchmarkName][mode][browser];
 
                                     if (fpsAnnotation && longFrameAnnotation) {
                                         target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
                                         target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
+                                    }
+                                    if (avgLagAnnotation && maxLagAnnotation && staleFrameAnnotation) {
+                                        target.avgLag = (target.avgLag || []).concat(parseFloat(avgLagAnnotation.description));
+                                        target.maxLag = (target.maxLag || []).concat(parseFloat(maxLagAnnotation.description));
+                                        target.staleFrames = (target.staleFrames || []).concat(parseFloat(staleFrameAnnotation.description));
                                     }
                                 }
                             } else {
@@ -120,6 +129,14 @@ function parseResults(allRunsData) {
                             result.stdDevFps = getStandardDeviation(result.fps);
                             result.avgLongFrames = result.longFrames.reduce((a, b) => a + b, 0) / result.longFrames.length;
                             result.stdDevLongFrames = getStandardDeviation(result.longFrames);
+                        }
+                        if (result.avgLag) {
+                            result.avgRowLag = result.avgLag.reduce((a, b) => a + b, 0) / result.avgLag.length;
+                            result.stdDevRowLag = getStandardDeviation(result.avgLag);
+                            result.avgMaxRowLag = result.maxLag.reduce((a, b) => a + b, 0) / result.maxLag.length;
+                            result.stdDevMaxRowLag = getStandardDeviation(result.maxLag);
+                            result.avgStaleFrames = result.staleFrames.reduce((a, b) => a + b, 0) / result.staleFrames.length;
+                            result.stdDevStaleFrames = getStandardDeviation(result.staleFrames);
                         }
                     }
                 });

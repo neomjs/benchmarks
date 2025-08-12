@@ -141,3 +141,25 @@ While not designed to highlight Neo.mjs's core strengths, this popular benchmark
 - **High-Performance Offscreen Charting (WebGL):** A demo rendering over 1 million data points in a Canvas Worker.
 - **Conway's Game of Life:** A classic CPU-bound simulation running in the App Worker with a perfectly fluid UI.
 - **Instant Subsequent Loads (Service Worker):** A showcase demonstrating near-native load times for returning users.
+
+---
+
+### 10. Cross-Cutting: High-Fidelity Scroll Measurement
+
+**Goal:** To evolve beyond simple FPS counters and measure the true perceived user experience of scrolling by detecting "content lag"—the delay between the scrollbar's position and the rendered content.
+
+**The Problem:** A high FPS score only proves that the main thread is not blocked. It does not prove that the content being displayed is correct. In a worker-based architecture, it's possible for the main thread to be painting frames at 60 FPS while the worker is too busy to send updated VDOM, resulting in a fluid scroll of stale content. This test will measure and quantify that specific type of visual jank.
+
+**The Solution: Visual Row Position Verification**
+- In each animation frame during a programmatic scroll, we will calculate the row that *should* be at the top of the viewport based on the `scrollTop` position.
+- In the same frame, we will query the DOM to find the row that is *actually* rendered at the top.
+- The difference between the "expected" and "actual" row index is the "content lag."
+
+**New Metrics:**
+- **`averageRowLag`:** The average number of rows the rendered content was behind the scrollbar position.
+- **`maxRowLag`:** The worst-case content lag observed during the scroll.
+- **`staleFrameCount`:** The total number of frames rendered with out-of-sync content.
+
+- **[ ] Task:** Create a new `measureAdvancedScrollingFluidity` helper function that implements this logic.
+- **[ ] Task:** Refactor the "Scrolling Performance Under Duress" tests to use this new, more accurate helper.
+- **[ ] Task:** Update the reporting scripts to include these new, more meaningful metrics in a dedicated table.

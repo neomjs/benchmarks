@@ -10,6 +10,8 @@ async function main() {
     const args         = process.argv.slice(2);
     const runsArg      = args.find(arg => arg.startsWith('--runs='));
     const runs         = runsArg ? parseInt(runsArg.split('=')[1], 10) : 5;
+    const frameworkArg = args.find(arg => arg.startsWith('--framework='));
+    const framework    = frameworkArg ? frameworkArg.split('=')[1] : 'all';
     const suiteArg     = args.find(arg => arg.startsWith('--suite='));
     const suite        = suiteArg ? suiteArg.split('=')[1] : 'all';
 

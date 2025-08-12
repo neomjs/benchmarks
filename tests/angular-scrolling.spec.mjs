@@ -17,27 +17,38 @@ async function waitForGridReady(page, expectedRowCount, timeout = 10000) {
 }
 
 /**
- * Measures UI jank by collecting frame timings while scrolling a target element.
- * @returns {Promise<{averageFps: number, frameCount: number, longFrameCount: number, totalTime: number}>}
+ * Measures UI jank and content lag by collecting frame timings and row positions
+ * while scrolling a target element.
+ * @returns {Promise<{
+ *   averageFps: number,
+ *   frameCount: number,
+ *   longFrameCount: number,
+ *   totalTime: number,
+ *   averageRowLag: number,
+ *   maxRowLag: number,
+ *   staleFrameCount: number
+ * }>}
  */
-const measureScrollingJankInBrowser = () => {
+const measureAdvancedScrollingFluidity = () => {
     return new Promise((resolve, reject) => {
-        // AG-Grid uses the .ag-body-viewport for scrolling
         const scrollableElement = document.querySelector('.ag-body-viewport');
         if (!scrollableElement) {
             reject(new Error('Scrollable element .ag-body-viewport not found for AG-Grid.'));
             return;
         }
 
+        const rowHeight = 35; // Approximate row height for calculation
         const frameTimes = [];
+        const rowLags = [];
         let longFrameCount = 0;
+        let staleFrameCount = 0;
         let startTime;
         let animationFrameId;
 
         const scrollHeight = scrollableElement.scrollHeight;
         const clientHeight = scrollableElement.clientHeight;
         const maxScrollTop = scrollHeight - clientHeight;
-        const scrollDuration = 4000; // 4 seconds to scroll from top to bottom
+        const scrollDuration = 4000;
         let scrollStartTime;
 
         function frame(time) {
@@ -46,33 +57,48 @@ const measureScrollingJankInBrowser = () => {
                 scrollStartTime = time;
             }
 
-            const elapsed = time - startTime;
             frameTimes.push(time);
 
-            // Animate scroll
             const scrollElapsed = time - scrollStartTime;
             const scrollFraction = Math.min(scrollElapsed / scrollDuration, 1);
-            scrollableElement.scrollTop = maxScrollTop * scrollFraction;
+            const currentScrollTop = maxScrollTop * scrollFraction;
+            scrollableElement.scrollTop = currentScrollTop;
+
+            const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
+            const firstVisibleRow = document.querySelector('.ag-row[row-index]');
+            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('row-index'), 10) : -1;
+
+            if (actualTopRowIndex !== -1) {
+                const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);
+                rowLags.push(lag);
+                if (lag > 1) {
+                    staleFrameCount++;
+                }
+            }
 
             if (scrollFraction < 1) {
                 animationFrameId = requestAnimationFrame(frame);
             } else {
-                // Scrolling finished, now process results
                 for (let i = 1; i < frameTimes.length; i++) {
                     const delta = frameTimes[i] - frameTimes[i - 1];
-                    if (delta > 50) { // Long frame threshold
+                    if (delta > 50) {
                         longFrameCount++;
                     }
                 }
 
                 const totalTime = frameTimes[frameTimes.length - 1] - frameTimes[0];
                 const averageFps = totalTime > 0 ? (frameTimes.length - 1) / (totalTime / 1000) : 0;
+                const averageRowLag = rowLags.length > 0 ? rowLags.reduce((a, b) => a + b, 0) / rowLags.length : 0;
+                const maxRowLag = rowLags.length > 0 ? Math.max(...rowLags) : 0;
 
                 resolve({
                     averageFps: Math.round(averageFps),
                     frameCount: frameTimes.length,
                     longFrameCount,
-                    totalTime: Math.round(totalTime)
+                    totalTime: Math.round(totalTime),
+                    averageRowLag: parseFloat(averageRowLag.toFixed(2)),
+                    maxRowLag,
+                    staleFrameCount
                 });
             }
         }
@@ -85,7 +111,7 @@ const measureScrollingJankInBrowser = () => {
 test.beforeEach(async ({page}) => {
     await page.addInitScript({
         content: `
-            window.measureScrollingJank = ${measureScrollingJankInBrowser.toString()};
+            window.measureScrollingJank = ${measureAdvancedScrollingFluidity.toString()};
         `
     });
 
@@ -118,11 +144,15 @@ test('Angular benchmark: Scrolling Performance Under Duress', async ({page}) => 
 
     test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
     test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
+    test.info().annotations.push({type: 'averageRowLag', description: `${jankMetrics.averageRowLag}`});
+    test.info().annotations.push({type: 'maxRowLag', description: `${jankMetrics.maxRowLag}`});
+    test.info().annotations.push({type: 'staleFrameCount', description: `${jankMetrics.staleFrameCount}`});
 
     console.log(`Scrolling Under Duress Jank Metrics:`, jankMetrics);
 
-    // For Angular with AG-Grid, we expect the main thread to be heavily impacted by the
-    // real-time feed's updates, leading to significant jank and low FPS during the scroll.
+    // For Angular with AG-Grid, we expect significant main thread impact, leading to low FPS and high content lag.
     expect(jankMetrics.averageFps).toBeLessThan(45);
     expect(jankMetrics.longFrameCount).toBeGreaterThanOrEqual(10);
+    expect(jankMetrics.maxRowLag).toBeGreaterThan(10);
+    expect(jankMetrics.staleFrameCount).toBeGreaterThan(20);
 });
