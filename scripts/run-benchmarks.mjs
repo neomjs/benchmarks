@@ -12,28 +12,57 @@ async function main() {
     const runs         = runsArg ? parseInt(runsArg.split('=')[1], 10) : 5;
     const frameworkArg = args.find(arg => arg.startsWith('--framework='));
     const framework    = frameworkArg ? frameworkArg.split('=')[1] : 'all';
+    const suiteArg     = args.find(arg => arg.startsWith('--suite='));
+    const suite        = suiteArg ? suiteArg.split('=')[1] : 'all';
 
     if (isNaN(runs) || runs < 1) {
         console.error('Error: --runs must be a positive number.');
         process.exit(1);
     }
 
-    const RESULTS_DIR = path.resolve(process.cwd(), `test-results-data-${framework}`);
+    const frameworkIdentifier = suite === 'all' ? framework : `${framework}-${suite}`;
+    const RESULTS_DIR = path.resolve(process.cwd(), `test-results-data-${frameworkIdentifier}`);
     const PLAYWRIGHT_RESULTS_FILE = path.resolve(process.cwd(), 'test-results.json');
 
-    console.log(`Starting benchmark suite for ${framework}. Executing tests ${runs} time(s)...`);
+    console.log(`Starting benchmark suite for framework(s): ${framework} and suite(s): ${suite}. Executing tests ${runs} time(s)...`);
 
     // 2. Ensure a clean state by removing old run data.
     await fs.emptyDir(RESULTS_DIR);
 
     // 3. Determine the test command
     let testCommand = 'CI=true npx playwright test';
-    if (framework === 'neo') {
-        testCommand += ' tests/neo.spec.mjs';
-    } else if (framework === 'react') {
-        testCommand += ' tests/react.spec.mjs';
-    } else if (framework === 'angular') {
-        testCommand += ' tests/angular.spec.mjs';
+    const specFiles = {
+        neo: {
+            duration: 'tests/neo.spec.mjs',
+            scrolling: 'tests/neo-scrolling.spec.mjs'
+        },
+        react: {
+            duration: 'tests/react.spec.mjs',
+            scrolling: 'tests/react-scrolling.spec.mjs'
+        },
+        angular: {
+            duration: 'tests/angular.spec.mjs',
+            scrolling: 'tests/angular-scrolling.spec.mjs'
+        }
+    };
+
+    const frameworksToRun = framework === 'all' ? ['neo', 'react', 'angular'] : [framework];
+    const suitesToRun = suite === 'all' ? ['duration', 'scrolling'] : [suite];
+
+    let filesToTest = [];
+    for (const fw of frameworksToRun) {
+        for (const s of suitesToRun) {
+            if (specFiles[fw] && specFiles[fw][s]) {
+                filesToTest.push(specFiles[fw][s]);
+            }
+        }
+    }
+
+    if (filesToTest.length > 0) {
+        testCommand += ' ' + filesToTest.join(' ');
+    } else {
+        console.error('No test files found for the specified framework and suite.');
+        process.exit(1);
     }
 
     // 4. Loop through the specified number of runs.
