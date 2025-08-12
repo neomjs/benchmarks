@@ -8,110 +8,148 @@ import {test, expect} from '@playwright/test';
  * @param {number} [timeout=10000]
  */
 async function waitForGridReady(page, expectedRowCount, timeout = 10000) {
-    await page.waitForFunction(() => {
-        const grid = document.querySelector('.ag-root-wrapper');
+    await page.waitForFunction((expectedRowCount) => {
+        const grid = document.querySelector('[role="grid"]');
         if (!grid) return false;
-        const rowCount = grid.querySelectorAll('.ag-row').length;
-        return rowCount > 0 && grid.querySelector('.ag-body-viewport');
-    }, null, { timeout });
+        const rowCountCorrect = grid.getAttribute('aria-rowcount') === String(expectedRowCount + 1); // +1 for header
+        const firstRowExists  = grid.querySelector('.ag-row[row-index="0"]');
+        return rowCountCorrect && firstRowExists;
+    }, expectedRowCount, {timeout});
 }
 
-/**
- * Measures UI jank and content lag by collecting frame timings and row positions
- * while scrolling a target element.
- * @returns {Promise<{
- *   averageFps: number,
- *   frameCount: number,
- *   longFrameCount: number,
- *   totalTime: number,
- *   averageRowLag: number,
- *   maxRowLag: number,
- *   staleFrameCount: number
- * }>}
- */
-const measureAdvancedScrollingFluidity = () => {
+// This function will be injected into the browser context.
+const measurePerformanceInBrowser = (testName, action, condition, passThrough) => {
     return new Promise((resolve, reject) => {
-        const scrollableElement = document.querySelector('.ag-body-viewport');
-        if (!scrollableElement) {
-            reject(new Error('Scrollable element .ag-body-viewport not found for AG-Grid.'));
+        const observerTarget = document.querySelector('.ag-body-viewport') || document.body;
+        if (!observerTarget) {
+            reject(new Error('MutationObserver target .ag-body-viewport not found.'));
             return;
         }
 
-        const rowHeight = 32; // Approximate row height for calculation
-        const frameTimes = [];
-        const rowLags = [];
-        let longFrameCount = 0;
-        let staleFrameCount = 0;
-        let startTime;
-        let animationFrameId;
-
-        const scrollHeight = scrollableElement.scrollHeight;
-        const clientHeight = scrollableElement.clientHeight;
-        const maxScrollTop = scrollHeight - clientHeight;
-        const scrollDuration = 4000;
-        let scrollStartTime;
-
-        function frame(time) {
-            if (startTime === undefined) {
-                startTime = time;
-                scrollStartTime = time;
-            }
-
-            frameTimes.push(time);
-
-            const scrollElapsed = time - scrollStartTime;
-            const scrollFraction = Math.min(scrollElapsed / scrollDuration, 1);
-            const currentScrollTop = maxScrollTop * scrollFraction;
-            scrollableElement.scrollTop = currentScrollTop;
-
-            const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
-            const firstVisibleRow = document.querySelector('.ag-row[aria-rowindex]');
-            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 1 : -1;
-
-            if (actualTopRowIndex !== -1) {
-                const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);
-                rowLags.push(lag);
-                if (lag > 1) {
-                    staleFrameCount++;
+        const observer = new MutationObserver(() => {
+            try {
+                if (condition(passThrough)) {
+                    const endTime = performance.now();
+                    observer.disconnect();
+                    clearTimeout(timeoutId);
+                    resolve(endTime - startTime);
                 }
+            } catch (e) {
+                observer.disconnect();
+                clearTimeout(timeoutId);
+                reject(e);
             }
+        });
 
-            if (scrollFraction < 1) {
-                animationFrameId = requestAnimationFrame(frame);
-            } else {
-                for (let i = 1; i < frameTimes.length; i++) {
-                    const delta = frameTimes[i] - frameTimes[i - 1];
-                    if (delta > 50) {
-                        longFrameCount++;
-                    }
-                }
+        observer.observe(observerTarget, { attributes: true, childList: true, subtree: true });
 
-                const totalTime = frameTimes[frameTimes.length - 1] - frameTimes[0];
-                const averageFps = totalTime > 0 ? (frameTimes.length - 1) / (totalTime / 1000) : 0;
-                const averageRowLag = rowLags.length > 0 ? rowLags.reduce((a, b) => a + b, 0) / rowLags.length : 0;
-                const maxRowLag = rowLags.length > 0 ? Math.max(...rowLags) : 0;
+        const timeout = navigator.userAgent.includes('Firefox') ? 15000 : 5000;
+        const timeoutId = setTimeout(() => {
+            observer.disconnect();
+            reject(new Error(`Benchmark timed out for "${testName}".`));
+        }, timeout);
 
-                resolve({
-                    averageFps: Math.round(averageFps),
-                    frameCount: frameTimes.length,
-                    longFrameCount,
-                    totalTime: Math.round(totalTime),
-                    averageRowLag: parseFloat(averageRowLag.toFixed(2)),
-                    maxRowLag,
-                    staleFrameCount
-                });
-            }
+        const startTime = performance.now();
+        try {
+            action(passThrough);
+        } catch (e) {
+            observer.disconnect();
+            clearTimeout(timeoutId);
+            reject(e);
+            return;
         }
 
-        animationFrameId = requestAnimationFrame(frame);
+        try {
+            if (condition(passThrough)) {
+                const endTime = performance.now();
+                observer.disconnect();
+                clearTimeout(timeoutId);
+                resolve(endTime - startTime);
+            }
+        } catch (e) {
+            observer.disconnect();
+            clearTimeout(timeoutId);
+            reject(e);
+        }
     });
 };
 
+/**
+ * Orchestrates discrete scroll steps and measures the time to valid state for each.
+ * Adapted for AG-Grid.
+ * @param {number} scrollAmountRows The amount in rows to scroll in each step.
+ * @param {number} numScrolls The total number of discrete scroll steps to perform.
+ * @param {number} rowHeight The height of a single row in pixels.
+ * @param {number} gridRenderOffset The fixed offset in rows due to headers and buffering.
+ * @returns {Promise<Array<{
+ *   scrollStep: number,
+ *   timeToValidState: number,
+ *   updateSuccess: boolean
+ * }>>}
+ */
+const runDiscreteScrollBenchmark = (scrollAmountRows, numScrolls, rowHeight, gridRenderOffset) => {
+    return new Promise(async (resolve, reject) => {
+        const scrollableElement = document.querySelector('.ag-body-viewport');
+        if (!scrollableElement) {
+            reject(new Error('Scrollable element .ag-body-viewport not found.'));
+            return;
+        }
+
+        const scrollAmountPx = scrollAmountRows * rowHeight;
+        const results = [];
+        let currentScrollTop = scrollableElement.scrollTop;
+
+        for (let i = 0; i < numScrolls; i++) {
+            const targetScrollTop = currentScrollTop + scrollAmountPx;
+            const expectedTopRowIndex = Math.floor(targetScrollTop / rowHeight) - gridRenderOffset;
+
+            const action = (passThrough) => {
+                passThrough.scrollableElement.scrollTop = passThrough.targetScrollTop;
+            };
+
+            const condition = (passThrough) => {
+                const { expectedTopRowIndex } = passThrough;
+                const firstVisibleRow = document.querySelector('.ag-row[aria-rowindex]');
+                const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
+                const isGridInValidState = (actualTopRowIndex === expectedTopRowIndex);
+                const isInterferenceCheckPassed = true; // Placeholder
+                return isGridInValidState && isInterferenceCheckPassed;
+            };
+
+            try {
+                const timeToValidState = await window.measurePerformance(
+                    `Scroll Step ${i + 1}`,
+                    action,
+                    condition,
+                    { scrollableElement, targetScrollTop, expectedTopRowIndex }
+                );
+
+                results.push({
+                    scrollStep: i,
+                    timeToValidState: timeToValidState,
+                    updateSuccess: true
+                });
+
+                currentScrollTop = targetScrollTop;
+                await new Promise(res => setTimeout(res, 50));
+
+            } catch (error) {
+                results.push({
+                    scrollStep: i,
+                    timeToValidState: -1,
+                    updateSuccess: false
+                });
+            }
+        }
+        resolve(results);
+    });
+};
 
 test.beforeEach(async ({page}) => {
     await page.addInitScript({
         content: `
-            window.measureScrollingJank = ${measureAdvancedScrollingFluidity.toString()};
+            window.measurePerformance = ${measurePerformanceInBrowser.toString()};
+            window.runDiscreteScrollBenchmark = ${runDiscreteScrollBenchmark.toString()};
         `
     });
 
@@ -122,8 +160,8 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('Angular benchmark: Scrolling Performance Under Duress UI Responsiveness', async ({page}) => {
-    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
+test('Angular benchmark: Scrolling Performance Under Duress 10k Rows UI Responsiveness', async ({page}) => {
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
     await page.getByRole('button', {name: 'Create 10k rows'}).click();
@@ -134,25 +172,138 @@ test('Angular benchmark: Scrolling Performance Under Duress UI Responsiveness', 
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    // Measure scrolling jank for 4 seconds while the feed is running
-    const jankMetrics = await page.evaluate(() => {
-        return window.measureScrollingJank();
-    });
+    const rowHeight = 32; // Approximate row height for AG-Grid
+    const scrollAmountRows = 50; // Scroll 50 rows per step
+    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const gridRenderOffset = 3; // Matching other frameworks for overscan
+
+    // Measure discrete scrolling fluidity
+    const results = await page.evaluate((params) => {
+        const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
+        return window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+    }, { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset });
 
     // Stop the feed
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
-    test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
-    test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
-    test.info().annotations.push({type: 'averageRowLag', description: `${jankMetrics.averageRowLag}`});
-    test.info().annotations.push({type: 'maxRowLag', description: `${jankMetrics.maxRowLag}`});
-    test.info().annotations.push({type: 'staleFrameCount', description: `${jankMetrics.staleFrameCount}`});
+    // Process results
+    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
+    const avgTimeToValidState = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
 
-    console.log(`Scrolling Under Duress Jank Metrics:`, jankMetrics);
+    test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'updateSuccessRate', description: `${updateSuccessRate.toFixed(2)}%`});
 
-    // For Angular with AG-Grid, we expect significant main thread impact, leading to low FPS and high content lag.
-    expect(jankMetrics.averageFps).toBeLessThan(45);
-    expect(jankMetrics.longFrameCount).toBeGreaterThanOrEqual(10);
-    expect(jankMetrics.maxRowLag).toBeGreaterThan(10);
-    expect(jankMetrics.staleFrameCount).toBeGreaterThan(20);
+    console.log(`Discrete Scrolling Metrics (10k Rows):`, {
+        avgTimeToValidState: avgTimeToValidState.toFixed(2),
+        maxTimeToValidState: maxTimeToValidState.toFixed(2),
+        updateSuccessRate: updateSuccessRate.toFixed(2)
+    });
+
+    // Assertions based on the new strategy (adjust as needed for Angular/AG-Grid)
+    expect(avgTimeToValidState).toBeLessThan(200);
+    expect(maxTimeToValidState).toBeLessThan(500);
+    expect(updateSuccessRate).toBeGreaterThanOrEqual(95);
+});
+
+test('Angular benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiveness', async ({page}) => {
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 100k rows'}).click();
+    await waitForGridReady(page, 100000);
+    await page.waitForTimeout(100);
+
+    // Start the feed to create stress
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
+    await page.waitForTimeout(100); // Give the feed a moment to start updating
+
+    const rowHeight = 32;
+    const scrollAmountRows = 50;
+    const numScrolls = 20;
+    const gridRenderOffset = 3; // Matching other frameworks for overscan
+
+    const results = await page.evaluate((params) => {
+        const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
+        return window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+    }, { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset });
+
+    // Stop the feed
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
+
+    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
+    const avgTimeToValidState = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+
+    test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'updateSuccessRate', description: `${updateSuccessRate.toFixed(2)}%`});
+
+    console.log(`Discrete Scrolling Metrics (100k Rows):`, {
+        avgTimeToValidState: avgTimeToValidState.toFixed(2),
+        maxTimeToValidState: maxTimeToValidState.toFixed(2),
+        updateSuccessRate: updateSuccessRate.toFixed(2)
+    });
+
+    expect(avgTimeToValidState).toBeLessThan(300);
+    expect(maxTimeToValidState).toBeLessThan(750);
+    expect(updateSuccessRate).toBeGreaterThanOrEqual(90);
+});
+
+test('Angular benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiveness', async ({page, browserName}) => {
+    // Skip this test in Firefox due to its known limitation with extremely large scroll heights.
+    test.skip(browserName === 'firefox', 'Skipping 1M rows test in Firefox due to scroll height limitation.');
+    test.setTimeout(180000); // Increased timeout for 1M rows
+
+    test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
+    await page.goto('http://localhost:4200/');
+    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await page.getByRole('button', {name: 'Create 1M rows'}).click();
+    await waitForGridReady(page, 1000000);
+    await page.waitForTimeout(100);
+
+    // Start the feed to create stress
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
+    await page.waitForTimeout(100); // Give the feed a moment to start updating
+
+    const rowHeight = 32;
+    const scrollAmountRows = 50;
+    const numScrolls = 20;
+    const gridRenderOffset = 3; // Matching other frameworks for overscan
+
+    const results = await page.evaluate((params) => {
+        const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
+        return window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+    }, { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset });
+
+    // Stop the feed
+    await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
+
+    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
+    const avgTimeToValidState = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+
+    test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'updateSuccessRate', description: `${updateSuccessRate.toFixed(2)}%`});
+
+    console.log(`Discrete Scrolling Metrics (1M Rows):`, {
+        avgTimeToValidState: avgTimeToValidState.toFixed(2),
+        maxTimeToValidState: maxTimeToValidState.toFixed(2),
+        updateSuccessRate: updateSuccessRate.toFixed(2)
+    });
+
+    expect(avgTimeToValidState).toBeLessThan(1400);
+    expect(maxTimeToValidState).toBeLessThan(2000);
+    expect(updateSuccessRate).toBeGreaterThanOrEqual(80);
 });

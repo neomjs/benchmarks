@@ -69,11 +69,21 @@ function parseResults(allRunsData) {
                                 if (test.results.every(r => r.status === 'passed')) {
                                     const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
                                     const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
+                                    const avgTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'avgTimeToValidState');
+                                    const maxTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'maxTimeToValidState');
+                                    const updateSuccessRateAnnotation = test.annotations.find(a => a.type === 'updateSuccessRate');
+
                                     const target = responsivenessBenchmarks[benchmarkName][mode][browser];
 
                                     if (fpsAnnotation && longFrameAnnotation) {
                                         target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
                                         target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
+                                    }
+
+                                    if (avgTimeToValidStateAnnotation && maxTimeToValidStateAnnotation && updateSuccessRateAnnotation) {
+                                        target.avgTimeToValidState = (target.avgTimeToValidState || []).concat(parseFloat(avgTimeToValidStateAnnotation.description));
+                                        target.maxTimeToValidState = (target.maxTimeToValidState || []).concat(parseFloat(maxTimeToValidStateAnnotation.description));
+                                        target.updateSuccessRate = (target.updateSuccessRate || []).concat(parseFloat(updateSuccessRateAnnotation.description));
                                     }
                                 }
                             } else {
@@ -120,12 +130,116 @@ function parseResults(allRunsData) {
                             result.stdDevLongFrames = getStandardDeviation(result.longFrames);
                         }
                     }
+                    if (result.avgTimeToValidState && result.avgTimeToValidState.length > 0) {
+                        result.avgTimeToValidStateAvg = result.avgTimeToValidState.reduce((a, b) => a + b, 0) / result.avgTimeToValidState.length;
+                        result.avgTimeToValidStateStdDev = getStandardDeviation(result.avgTimeToValidState);
+                    }
+                    if (result.maxTimeToValidState && result.maxTimeToValidState.length > 0) {
+                        result.maxTimeToValidStateAvg = result.maxTimeToValidState.reduce((a, b) => a + b, 0) / result.maxTimeToValidState.length;
+                        result.maxTimeToValidStateStdDev = getStandardDeviation(result.maxTimeToValidState);
+                    }
+                    if (result.updateSuccessRate && result.updateSuccessRate.length > 0) {
+                        result.updateSuccessRateAvg = result.updateSuccessRate.reduce((a, b) => a + b, 0) / result.updateSuccessRate.length;
+                        result.updateSuccessRateStdDev = getStandardDeviation(result.updateSuccessRate);
+                    }
                 });
             });
         }
     });
 
     return { durationBenchmarks, responsivenessBenchmarks };
+}
+
+function generateScrollingFluidityMarkdown(allFrameworkResults) {
+    const frameworks = ['neo', 'angular', 'react'];
+    const allBenchmarkNames = new Set();
+    frameworks.forEach(f => {
+        const benchmarks = allFrameworkResults[f].responsivenessBenchmarks;
+        Object.keys(benchmarks).forEach(name => {
+            if (BROWSERS.some(browser => benchmarks[name].prod[browser]?.avgTimeToValidStateAvg !== undefined)) {
+                allBenchmarkNames.add(name);
+            }
+        });
+    });
+    const sortedBenchmarkNames = Array.from(allBenchmarkNames).sort();
+
+    // --- Time to Valid State Table ---
+    let timeTable = '\n## Scrolling Fluidity Benchmarks (Time to Valid State)\n\nLower is better.\n\n';
+    timeTable += '| Benchmark | Browser | Neo (ms) | Angular (ms) | React (ms) |\n';
+    timeTable += '|---|---|---|---|---|\n';
+
+    for (const benchmarkName of sortedBenchmarkNames) {
+        timeTable += `| **${benchmarkName.replace(RESPONSIVENESS_TEST_SUFFIX, '').trim()}** | | | | |\n`;
+        for (const browser of BROWSERS) {
+            const results = {};
+            frameworks.forEach(f => {
+                const data = allFrameworkResults[f].responsivenessBenchmarks[benchmarkName]?.prod[browser];
+                if (data && data.avgTimeToValidStateAvg !== undefined) {
+                    results[f] = { avg: data.avgTimeToValidStateAvg, max: data.maxTimeToValidStateAvg };
+                }
+            });
+
+            const validAvgs = Object.values(results).map(v => v.avg).filter(v => typeof v === 'number');
+            const bestAvg = validAvgs.length > 0 ? Math.min(...validAvgs) : undefined;
+            const worstAvg = validAvgs.length > 0 ? Math.max(...validAvgs) : undefined;
+
+            const formatValue = (value, best, worst) => {
+                if (value === undefined) return 'N/A';
+                const display = `${value.avg.toFixed(2)} / ${value.max.toFixed(2)}`;
+                if (value.avg === best) return `✅ ${display}`;
+                if (value.avg === worst) return `❌ ${display}`;
+                return display;
+            };
+
+            let reactTimeValue = formatValue(results.react, bestAvg, worstAvg);
+            if (benchmarkName.includes('1M Rows') && results.react === undefined) {
+                reactTimeValue = browser === 'firefox' ? 'N/A' : 'Browser Crash';
+            }
+
+            timeTable += `| | ${browser} | ${formatValue(results.neo, bestAvg, worstAvg)} | ${formatValue(results.angular, bestAvg, worstAvg)} | ${reactTimeValue} |\n`;
+        }
+        timeTable += '|---|---|---|---|---|\n';
+    }
+
+    // --- Update Success Rate Table ---
+    let rateTable = '\n\n## Scrolling Fluidity Benchmarks (Update Success Rate)\n\nHigher is better.\n\n';
+    rateTable += '| Benchmark | Browser | Neo (%) | Angular (%) | React (%) |\n';
+    rateTable += '|---|---|---|---|---|\n';
+
+    for (const benchmarkName of sortedBenchmarkNames) {
+        rateTable += `| **${benchmarkName.replace(RESPONSIVENESS_TEST_SUFFIX, '').trim()}** | | | | |\n`;
+        for (const browser of BROWSERS) {
+            const results = {};
+            frameworks.forEach(f => {
+                const data = allFrameworkResults[f].responsivenessBenchmarks[benchmarkName]?.prod[browser];
+                if (data && data.updateSuccessRateAvg !== undefined) {
+                    results[f] = data.updateSuccessRateAvg;
+                }
+            });
+
+            const validRates = Object.values(results).filter(v => typeof v === 'number');
+            const bestRate = validRates.length > 0 ? Math.max(...validRates) : undefined;
+            const worstRate = validRates.length > 0 ? Math.min(...validRates) : undefined;
+
+            const formatValue = (value, best, worst) => {
+                if (value === undefined) return 'N/A';
+                const display = value.toFixed(2);
+                if (value === best) return `✅ ${display}`;
+                if (value === worst) return `❌ ${display}`;
+                return display;
+            };
+
+            let reactRateValue = formatValue(results.react, bestRate, worstRate);
+            if (benchmarkName.includes('1M Rows') && results.react === undefined) {
+                reactRateValue = browser === 'firefox' ? 'N/A' : 'Browser Crash';
+            }
+
+            rateTable += `| | ${browser} | ${formatValue(results.neo, bestRate, worstRate)} | ${formatValue(results.angular, bestRate, worstRate)} | ${reactRateValue} |\n`;
+        }
+        rateTable += '|---|---|---|---|---|\n';
+    }
+
+    return timeTable + rateTable;
 }
 
 // Main script logic
@@ -211,11 +325,15 @@ async function generateReport() {
                 return value.toFixed(2);
             };
 
+            let reactDurationValue = formatDurationValue(prodResults.react, bestProd, worstProd);
+            if (benchmarkName.includes('1M rows') && prodResults.react === undefined) {
+                reactDurationValue = 'Browser Crash';
+            }
+
             outputMarkdown += `| | ${browser} | `;
             outputMarkdown += `${formatDurationValue(prodResults.neo, bestProd, worstProd)} | `;
             outputMarkdown += `${formatDurationValue(prodResults.angular, bestProd, worstProd)} | `;
-            outputMarkdown += `${formatDurationValue(prodResults.react, bestProd, worstProd)} |
-`;
+            outputMarkdown += `${reactDurationValue} |\n`;
         }
         outputMarkdown += `|---|---|---|---|---|\n`; // Separator after each benchmark group
     }
@@ -223,7 +341,7 @@ async function generateReport() {
     // --- UI Responsiveness Benchmarks Table ---
     outputMarkdown += '\n## UI Responsiveness Benchmarks\n\n';
     outputMarkdown += '| Benchmark | Browser | Neo (FPS / Long Frames) | Angular (FPS / Long Frames) | React (FPS / Long Frames) |\n';
-    outputMarkdown += '|---|---|---|---|---|';
+    outputMarkdown += '|---|---|---|---|---|\n';
 
     const allResponsivenessBenchmarkNames = new Set();
     frameworks.forEach(f => {
@@ -234,7 +352,7 @@ async function generateReport() {
     const sortedResponsivenessBenchmarkNames = Array.from(allResponsivenessBenchmarkNames).sort();
 
     for (const benchmarkName of sortedResponsivenessBenchmarkNames) {
-        outputMarkdown += `\n| **${benchmarkName}** | | | | |\n`; // Benchmark header row
+        outputMarkdown += `| **${benchmarkName}** | | | | |\n`; // Benchmark header row
 
         for (const browser of BROWSERS) {
             const fpsResults = {};
@@ -273,13 +391,20 @@ async function generateReport() {
                 return `${fpsFormatted} / ${lfFormatted}`;
             };
 
+            let reactResponsivenessValue = formatResponsivenessValue(fpsResults.react, longFrameResults.react, bestFps, worstFps, bestLongFrames, worstLongFrames);
+            if (benchmarkName.includes('1M Rows') && fpsResults.react === undefined) {
+                reactResponsivenessValue = 'Browser Crash';
+            }
+
             outputMarkdown += `| | ${browser} | `;
             outputMarkdown += `${formatResponsivenessValue(fpsResults.neo, longFrameResults.neo, bestFps, worstFps, bestLongFrames, worstLongFrames)} | `;
             outputMarkdown += `${formatResponsivenessValue(fpsResults.angular, longFrameResults.angular, bestFps, worstFps, bestLongFrames, worstLongFrames)} | `;
-            outputMarkdown += `${formatResponsivenessValue(fpsResults.react, longFrameResults.react, bestFps, worstFps, bestLongFrames, worstLongFrames)} |\n`;
+            outputMarkdown += `${reactResponsivenessValue} |\n`;
         }
-        outputMarkdown += `|---|---|---|---|---|`; // Separator after each benchmark group
+        outputMarkdown += `|---|---|---|---|---|\n`; // Separator after each benchmark group
     }
+
+    outputMarkdown += generateScrollingFluidityMarkdown(allFrameworkResults);
 
     writeFileSync(path.join(process.cwd(), 'COMBINED_BENCHMARK_REPORT.md'), outputMarkdown, 'utf8');
     console.log('Combined benchmark report generated: COMBINED_BENCHMARK_REPORT.md');

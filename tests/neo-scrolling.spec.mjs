@@ -229,7 +229,7 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('Neo.mjs benchmark: Discrete Scrolling Performance 10k Rows UI Responsiveness', async ({page}) => {
+test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
@@ -279,7 +279,7 @@ test('Neo.mjs benchmark: Discrete Scrolling Performance 10k Rows UI Responsivene
     expect(updateSuccessRate).toBeGreaterThanOrEqual(95); // Expect high success rate for updates
 });
 
-test('Neo.mjs benchmark: Discrete Scrolling Performance 100k Rows UI Responsiveness', async ({page}) => {
+test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
@@ -329,7 +329,7 @@ test('Neo.mjs benchmark: Discrete Scrolling Performance 100k Rows UI Responsiven
     expect(updateSuccessRate).toBeGreaterThanOrEqual(90); // Looser assertion for 100k rows
 });
 
-test('Neo.mjs benchmark: Discrete Scrolling Performance 1M Rows UI Responsiveness', async ({page, browserName}) => {
+test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiveness', async ({page, browserName}) => {
     // Skip this test in Firefox due to its known limitation with extremely large scroll heights (~17.9M pixels).
     // The 1M row grid (32M pixels) exceeds this limit, causing scrollTop to be clamped and preventing meaningful testing.
     test.skip(browserName === 'firefox', 'Skipping 1M rows test in Firefox due to scroll height limitation.');

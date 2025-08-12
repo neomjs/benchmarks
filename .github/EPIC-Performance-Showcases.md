@@ -66,7 +66,7 @@ This showcase pushes the boundaries of in-browser data handling and verifies the
 
 - **[ ] Task:** Add new benchmark tests for creating 2 million and 5 million rows.
 - **[ ] Task:** Add a "correctness" check to all "Create X rows" tests. After creation, the test must scroll to the very last row and verify that it has been rendered and is accessible in the DOM.
-- **[ ] Task:** Document any failures, such as the TanStack table's inability to render the full 1 million rows, as a key competitive differentiator.
+- [x] Task: Document any failures, such as the TanStack table's inability to render the full 1 million rows, as a key competitive differentiator. **Update:** The React/TanStack implementation has been confirmed to not just freeze, but to cause a hard browser tab crash (`Aww, Snap! Error code: 5`) when attempting to handle 1 million rows. This is a critical failure point and a powerful testament to the stability of Neo.mjs's worker-based architecture under extreme load. This will be a central point in our promotional materials.
 
 ---
 
