@@ -67,31 +67,29 @@ function parseResults(allRunsData) {
                         const mode = test.projectName.endsWith('-dev') ? 'dev' : 'prod';
                         const browser = BROWSERS.find(b => test.projectName.startsWith(b));
 
-                        if (browser) { // Removed the status check here
+                        if (browser) {
                             if (benchmarkName.endsWith(RESPONSIVENESS_TEST_SUFFIX)) {
                                 if (test.results.every(r => r.status === 'passed')) { // Keep status check for responsiveness
                                     const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
                                     const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
-                                    const avgLagAnnotation = test.annotations.find(a => a.type === 'averageRowLag');
-                                    const maxLagAnnotation = test.annotations.find(a => a.type === 'maxRowLag');
-                                    const staleFrameAnnotation = test.annotations.find(a => a.type === 'staleFrameCount');
+                                    
+                                    // New scrolling metrics annotations
+                                    const avgTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'avgTimeToValidState');
+                                    const maxTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'maxTimeToValidState');
+                                    const updateSuccessRateAnnotation = test.annotations.find(a => a.type === 'updateSuccessRate');
 
                                     const target = responsivenessBenchmarks[benchmarkName][mode][browser];
-                                    console.log('test.annotations:', test.annotations);
-                                    console.log('avgLagAnnotation:', avgLagAnnotation);
-                                    console.log('maxLagAnnotation:', maxLagAnnotation);
-                                    console.log('staleFrameAnnotation:', staleFrameAnnotation);
 
                                     if (fpsAnnotation && longFrameAnnotation) {
                                         target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
                                         target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
                                     }
 
-                                    if (avgLagAnnotation && maxLagAnnotation && staleFrameAnnotation) {
-                                        console.log('Populating avgLag, maxLag, staleFrames for:', benchmarkName, mode, browser);
-                                        target.avgLag = (target.avgLag || []).concat(parseFloat(avgLagAnnotation.description));
-                                        target.maxLag = (target.maxLag || []).concat(parseFloat(maxLagAnnotation.description));
-                                        target.staleFrames = (target.staleFrames || []).concat(parseFloat(staleFrameAnnotation.description));
+                                    // Aggregate new scrolling metrics
+                                    if (avgTimeToValidStateAnnotation && maxTimeToValidStateAnnotation && updateSuccessRateAnnotation) {
+                                        target.avgTimeToValidState = (target.avgTimeToValidState || []).concat(parseFloat(avgTimeToValidStateAnnotation.description));
+                                        target.maxTimeToValidState = (target.maxTimeToValidState || []).concat(parseFloat(maxTimeToValidStateAnnotation.description));
+                                        target.updateSuccessRate = (target.updateSuccessRate || []).concat(parseFloat(updateSuccessRateAnnotation.description));
                                     }
                                 }
                             } else {
@@ -130,21 +128,26 @@ function parseResults(allRunsData) {
                             result.stdDev = 0; // No std dev for timeouts
                         }
                     }
-                    if (result.fps) { // Responsiveness benchmarks
+                    if (result.fps) { // Responsiveness benchmarks (old FPS/LongFrames)
                         if (result.fps.length > 0) {
                             result.avgFps = result.fps.reduce((a, b) => a + b, 0) / result.fps.length;
                             result.stdDevFps = getStandardDeviation(result.fps);
                             result.avgLongFrames = result.longFrames.reduce((a, b) => a + b, 0) / result.longFrames.length;
                             result.stdDevLongFrames = getStandardDeviation(result.longFrames);
                         }
-                        if (result.avgLag) {
-                            result.avgRowLag = result.avgLag.reduce((a, b) => a + b, 0) / result.avgLag.length;
-                            result.stdDevRowLag = getStandardDeviation(result.avgLag);
-                            result.avgMaxRowLag = result.maxLag.reduce((a, b) => a + b, 0) / result.maxLag.length;
-                            result.stdDevMaxRowLag = getStandardDeviation(result.maxLag);
-                            result.avgStaleFrames = result.staleFrames.reduce((a, b) => a + b, 0) / result.staleFrames.length;
-                            result.stdDevStaleFrames = getStandardDeviation(result.staleFrames);
-                        }
+                    }
+                    // New scrolling metrics calculations
+                    if (result.avgTimeToValidState && result.avgTimeToValidState.length > 0) {
+                        result.avgTimeToValidStateAvg = result.avgTimeToValidState.reduce((a, b) => a + b, 0) / result.avgTimeToValidState.length;
+                        result.avgTimeToValidStateStdDev = getStandardDeviation(result.avgTimeToValidState);
+                    }
+                    if (result.maxTimeToValidState && result.maxTimeToValidState.length > 0) {
+                        result.maxTimeToValidStateAvg = result.maxTimeToValidState.reduce((a, b) => a + b, 0) / result.maxTimeToValidState.length;
+                        result.maxTimeToValidStateStdDev = getStandardDeviation(result.maxTimeToValidState);
+                    }
+                    if (result.updateSuccessRate && result.updateSuccessRate.length > 0) {
+                        result.updateSuccessRateAvg = result.updateSuccessRate.reduce((a, b) => a + b, 0) / result.updateSuccessRate.length;
+                        result.updateSuccessRateStdDev = getStandardDeviation(result.updateSuccessRate);
                     }
                 });
             });
@@ -161,15 +164,12 @@ function parseResults(allRunsData) {
  * @returns {String} The markdown table as a string.
  */
 function generateDurationMarkdown(benchmarks, runCount) {
-    let table = `| Benchmark                 | Browser    | Dev Mode (ms) | Prod Mode (ms) | Improvement |
-|---------------------------|------------|---------------|----------------|-------------|
-`;
+    let table = `| Benchmark                 | Browser    | Dev Mode (ms) | Prod Mode (ms) | Improvement |\n|---------------------------|------------|---------------|----------------|-------------|\n`;
     const sortedKeys = Object.keys(benchmarks).sort();
 
     for (const key of sortedKeys) {
         const result = benchmarks[key];
-        table += `| **${key}**               |            |               |                |             |
-`;
+        table += `| **${key}**               |            |               |                |             |\n`;
 
         let totalDevAvg = 0, totalProdAvg = 0, browserCount = 0;
 
@@ -281,17 +281,17 @@ function generateResponsivenessMarkdown(benchmarks) {
  * @returns {String} The markdown table as a string.
  */
 function generateScrollingFluidityMarkdown(benchmarks) {
-    let table = `| Benchmark                                   | Browser    | Dev Mode (Avg/Max Row Lag) | Dev Mode (Stale Frames) | Prod Mode (Avg/Max Row Lag) | Prod Mode (Stale Frames) |
-|---------------------------------------------|------------|----------------------------|-------------------------|-----------------------------|--------------------------|
+    let table = `| Benchmark                                   | Browser    | Dev Mode (Avg Time to Valid State / Max Time to Valid State) | Dev Mode (Update Success Rate) | Prod Mode (Avg Time to Valid State / Max Time to Valid State) | Prod Mode (Update Success Rate) |
+|---------------------------------------------|------------|--------------------------------------------------------------|--------------------------------|---------------------------------------------------------------|---------------------------------|
 `;
     const sortedKeys = Object.keys(benchmarks)
         .filter(key => {
             const result = benchmarks[key];
             // Check if there's any scrolling data for any browser in either dev or prod mode
             return BROWSERS.some(browser =>
-                (result.dev[browser].avgLag && result.dev[browser].avgLag.length > 0) ||
-                (result.prod[browser].avgLag && result.prod[browser].avgLag.length > 0)
-            );
+                (result.dev[browser].avgTimeToValidStateAvg && Number.isFinite(result.dev[browser].avgTimeToValidStateAvg)) ||
+                (result.prod[browser].avgTimeToValidStateAvg && Number.isFinite(result.prod[browser].avgTimeToValidStateAvg))
+            ); // Filter for tests that actually have scrolling data
         })
         .sort();
 
@@ -303,31 +303,37 @@ function generateScrollingFluidityMarkdown(benchmarks) {
     for (const key of sortedKeys) {
         const result = benchmarks[key];
         const shortKey = key.replace(RESPONSIVENESS_TEST_SUFFIX, '').trim();
-        table += `| **${shortKey}**                            |            |                            |                         |                             |                          |
+        table += `| **${shortKey}**                            |            |                                                              |                                |                                                               |                                 |
 `;
 
         BROWSERS.forEach(browser => {
             const devResult = result.dev[browser];
             const prodResult = result.prod[browser];
 
-            let devLagAvgFormatted = 'N/A';
-            let devStaleFramesFormatted = 'N/A';
-            if (devResult.avgLag && devResult.avgLag.length > 0) {
-                devLagAvgFormatted = `${devResult.avgRowLag.toFixed(1)} (±${devResult.stdDevRowLag.toFixed(1)}) / ${devResult.avgMaxRowLag.toFixed(1)} (±${devResult.stdDevMaxRowLag.toFixed(1)})`;
-                devStaleFramesFormatted = `${devResult.avgStaleFrames.toFixed(1)} (±${devResult.stdDevStaleFrames.toFixed(1)})`;
+            let devAvgTimeToValidStateFormatted = 'N/A';
+            let devMaxTimeToValidStateFormatted = 'N/A';
+            let devUpdateSuccessRateFormatted = 'N/A';
+
+            if (devResult.avgTimeToValidStateAvg && Number.isFinite(devResult.avgTimeToValidStateAvg)) {
+                devAvgTimeToValidStateFormatted = `${devResult.avgTimeToValidStateAvg.toFixed(2)} (±${devResult.avgTimeToValidStateStdDev.toFixed(2)})`;
+                devMaxTimeToValidStateFormatted = `${devResult.maxTimeToValidStateAvg.toFixed(2)} (±${devResult.maxTimeToValidStateStdDev.toFixed(2)})`;
+                devUpdateSuccessRateFormatted = `${devResult.updateSuccessRateAvg.toFixed(2)} (±${devResult.updateSuccessRateStdDev.toFixed(2)})%`;
             }
 
-            let prodLagAvgFormatted = 'N/A';
-            let prodStaleFramesFormatted = 'N/A';
-            if (prodResult.avgLag && prodResult.avgLag.length > 0) {
-                prodLagAvgFormatted = `${prodResult.avgRowLag.toFixed(1)} (±${prodResult.stdDevRowLag.toFixed(1)}) / ${prodResult.avgMaxRowLag.toFixed(1)} (±${prodResult.stdDevMaxRowLag.toFixed(1)})`;
-                prodStaleFramesFormatted = `${prodResult.avgStaleFrames.toFixed(1)} (±${prodResult.stdDevStaleFrames.toFixed(1)})`;
+            let prodAvgTimeToValidStateFormatted = 'N/A';
+            let prodMaxTimeToValidStateFormatted = 'N/A';
+            let prodUpdateSuccessRateFormatted = 'N/A';
+
+            if (prodResult.avgTimeToValidStateAvg && Number.isFinite(prodResult.avgTimeToValidStateAvg)) {
+                prodAvgTimeToValidStateFormatted = `${prodResult.avgTimeToValidStateAvg.toFixed(2)} (±${prodResult.avgTimeToValidStateStdDev.toFixed(2)})`;
+                prodMaxTimeToValidStateFormatted = `${prodResult.maxTimeToValidStateAvg.toFixed(2)} (±${prodResult.maxTimeToValidStateStdDev.toFixed(2)})`;
+                prodUpdateSuccessRateFormatted = `${prodResult.updateSuccessRateAvg.toFixed(2)} (±${prodResult.updateSuccessRateStdDev.toFixed(2)})%`;
             }
 
-            table += `|                                             | ${browser.padEnd(10)} | ${devLagAvgFormatted.padEnd(26)} | ${devStaleFramesFormatted.padEnd(23)} | ${prodLagAvgFormatted.padEnd(27)} | ${prodStaleFramesFormatted.padEnd(24)} |
+            table += `|                                             | ${browser.padEnd(10)} | ${devAvgTimeToValidStateFormatted.padEnd(60)} | ${devUpdateSuccessRateFormatted.padEnd(30)} | ${prodAvgTimeToValidStateFormatted.padEnd(61)} | ${prodUpdateSuccessRateFormatted.padEnd(31)} |
 `;
         });
-        table += `|---------------------------------------------|------------|----------------------------|-------------------------|-----------------------------|--------------------------|
+        table += `|---------------------------------------------|------------|--------------------------------------------------------------|--------------------------------|---------------------------------------------------------------|---------------------------------|
 `;
     }
     return table;
@@ -368,7 +374,11 @@ function generateBrowserVersionsMarkdown(browserInfo) {
  * @returns {String} The markdown table as a string.
  */
 function generateSystemInfoMarkdown(benchmarkSystemInfo) {
-    let table = `## System Information\n\n| Property   | Value       |\n|------------|-------------|\n`;
+    let table = `## System Information
+
+| Property   | Value       |
+|------------|-------------|
+`;
     if (benchmarkSystemInfo.os) {
         table += `| OS Name    | ${benchmarkSystemInfo.os.padEnd(11)} |
 `;
@@ -378,23 +388,29 @@ function generateSystemInfoMarkdown(benchmarkSystemInfo) {
 `;
     }
     if (benchmarkSystemInfo.totalMemory) {
-        table += `| Total RAM  | ${benchmarkSystemInfo.totalMemory}GB |\n`;
+        table += `| Total RAM  | ${benchmarkSystemInfo.totalMemory}GB |
+`;
     }
     if (benchmarkSystemInfo.cpuCores) {
-        table += `| CPU Cores  | ${benchmarkSystemInfo.cpuCores} |\n`;
+        table += `| CPU Cores  | ${benchmarkSystemInfo.cpuCores} |
+`;
     }
     if (benchmarkSystemInfo.nodeVersion) {
-        table += `| Node.js    | ${benchmarkSystemInfo.nodeVersion.padEnd(11)} |\n`;
+        table += `| Node.js    | ${benchmarkSystemInfo.nodeVersion.padEnd(11)} |
+`;
     }
     if (benchmarkSystemInfo.playwrightVersion) {
-        table += `| Playwright | ${benchmarkSystemInfo.playwrightVersion.padEnd(11)} |\n`;
+        table += `| Playwright | ${benchmarkSystemInfo.playwrightVersion.padEnd(11)} |
+`;
     }
 
     if (benchmarkSystemInfo.platform) {
-        table += `| Platform   | ${benchmarkSystemInfo.platform.padEnd(11)} |\n`;
+        table += `| Platform   | ${benchmarkSystemInfo.platform.padEnd(11)} |
+`;
     }
     if (benchmarkSystemInfo.arch) {
-        table += `| Architecture | ${benchmarkSystemInfo.arch.padEnd(11)} |\n`;
+        table += `| Architecture | ${benchmarkSystemInfo.arch.padEnd(11)} |
+`;
     }
     return table;
 }
@@ -404,8 +420,11 @@ function generateSystemInfoMarkdown(benchmarkSystemInfo) {
  * @returns {String} The markdown table as a string.
  */
 function generateKnownIssuesMarkdown() {
-    let markdown = `## Known Issues\n\n`;
-    markdown += `- **React benchmark: Create 1M rows (Firefox)**: This test is skipped for Firefox due to known Out-of-Memory issues when attempting to render 1 million rows.\n`;
+    let markdown = `## Known Issues
+
+`;
+    markdown += `- **React benchmark: Create 1M rows (Firefox)**: This test is skipped for Firefox due to known Out-of-Memory issues when attempting to render 1 million rows.
+`;
     return markdown;
 }
 
