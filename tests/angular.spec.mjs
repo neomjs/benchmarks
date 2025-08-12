@@ -143,85 +143,85 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('Angular benchmark: Create 10k rows', async ({page}) => {
+test('Angular benchmark: Create 10k Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Create 10k rows').click();
+            window.getButtonByText('Create 10k Rows').click();
         };
         const condition = () => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 10000;
         };
-        return window.measurePerformance('Create 10k rows', action, condition);
+        return window.measurePerformance('Create 10k Rows', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 10k rows: ${duration}ms`);
+    console.log(`Time to render 10k Rows: ${duration}ms`);
     expect(duration).toBeLessThan(30000);
 });
 
-test('Angular benchmark: Create 100k rows', async ({page}) => {
+test('Angular benchmark: Create 100k Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 100k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 100k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Create 100k rows').click();
+            window.getButtonByText('Create 100k Rows').click();
         };
         const condition = () => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 100000;
         };
-        return window.measurePerformance('Create 100k rows', action, condition);
+        return window.measurePerformance('Create 100k Rows', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 100k rows: ${duration}ms`);
+    console.log(`Time to render 100k Rows: ${duration}ms`);
     expect(duration).toBeLessThan(350000);
 });
 
-test('Angular benchmark: Create 1M rows', async ({page}) => {
+test('Angular benchmark: Create 1M Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 1M rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 1M Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Create 1M rows').click();
+            window.getButtonByText('Create 1M Rows').click();
         };
         const condition = () => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 1000000;
         };
-        return window.measurePerformance('Create 1M rows', action, condition, undefined, 110000);
+        return window.measurePerformance('Create 1M Rows', action, condition, undefined, 110000);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 1M rows: ${duration}ms`);
+    console.log(`Time to render 1M Rows: ${duration}ms`);
     expect(duration).toBeLessThan(350000);
 });
 
-test('Angular benchmark: Update every 10th row', async ({page}) => {
+test('Angular benchmark: Update Every 10th Row', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Update every 10th row').click();
+            window.getButtonByText('Update Every 10th Row').click();
         };
         const condition = () => {
             const node = document.querySelector('.ag-row:first-child .ag-cell:last-child');
             return node?.textContent.includes('updated');
         };
-        return window.measurePerformance('Update every 10th row', action, condition);
+        return window.measurePerformance('Update Every 10th Row', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -229,21 +229,21 @@ test('Angular benchmark: Update every 10th row', async ({page}) => {
     expect(duration).toBeLessThan(5000);
 });
 
-test('Angular benchmark: Select row', async ({page}) => {
+test('Angular benchmark: Select Row', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Select').click();
+            window.getButtonByText('Select Row').click();
         };
         const condition = () => {
             return document.querySelector('.ag-row-selected');
         };
-        return window.measurePerformance('Select row', action, condition);
+        return window.measurePerformance('Select Row', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -251,10 +251,10 @@ test('Angular benchmark: Select row', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('Angular benchmark: Swap rows', async ({page}) => {
+test('Angular benchmark: Swap Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
@@ -266,7 +266,7 @@ test('Angular benchmark: Swap rows', async ({page}) => {
         );
 
         const action = () => {
-            window.getButtonByText('Swap').click();
+            window.getButtonByText('Swap Rows').click();
         };
 
         const condition = (initials) => {
@@ -277,7 +277,7 @@ test('Angular benchmark: Swap rows', async ({page}) => {
             return newStyles.length > 0 && newStyles.join(',') !== initials.join(',');
         };
 
-        return window.measurePerformance('Swap rows', action, condition, initialTransforms);
+        return window.measurePerformance('Swap Rows', action, condition, initialTransforms);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -285,22 +285,22 @@ test('Angular benchmark: Swap rows', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('Angular benchmark: Remove row', async ({page}) => {
+test('Angular benchmark: Remove Row', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Remove').click();
+            window.getButtonByText('Remove Row').click();
         };
         const condition = () => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 9999;
         };
-        return window.measurePerformance('Remove row', action, condition);
+        return window.measurePerformance('Remove Row', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -308,16 +308,16 @@ test('Angular benchmark: Remove row', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('Angular benchmark: Clear rows', async ({page}) => {
+test('Angular benchmark: Clear Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Clear').click();
+            window.getButtonByText('Clear Rows').click();
         };
         const condition = () => {
             const grid = document.querySelector('.ag-root-wrapper');
@@ -325,7 +325,7 @@ test('Angular benchmark: Clear rows', async ({page}) => {
             const rowCount = grid.querySelectorAll('.ag-row').length;
             return rowCount === 0;
         };
-        return window.measurePerformance('Clear rows', action, condition);
+        return window.measurePerformance('Clear Rows', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -337,7 +337,7 @@ test('Angular benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
@@ -365,7 +365,7 @@ test('Angular benchmark: Heavy Calculation (Main Thread) UI Responsiveness', asy
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
 
@@ -389,7 +389,7 @@ test('Angular benchmark: Heavy Calculation (Task Worker) UI Responsiveness', asy
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     await page.getByRole('button', {name: 'Run Heavy Calculation (Task Worker)'}).click();
 

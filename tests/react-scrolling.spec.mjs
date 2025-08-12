@@ -250,7 +250,7 @@ test('React benchmark: Scrolling Performance Under Duress 10k Rows UI Responsive
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
@@ -258,9 +258,9 @@ test('React benchmark: Scrolling Performance Under Duress 10k Rows UI Responsive
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // As defined in the React Grid component
+    const rowHeight        = 32; // As defined in the React Grid component
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // React TanStack Virtual overscan is 3
 
     // Measure discrete scrolling fluidity
@@ -273,12 +273,12 @@ test('React benchmark: Scrolling Performance Under Duress 10k Rows UI Responsive
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
     // Process results
-    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const validResults          = results.filter(r => r.timeToValidState !== -1);
     const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
-    const avgTimeToValidState = totalTimeToValidState / validResults.length;
-    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
-    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
-    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+    const avgTimeToValidState   = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState   = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount    = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate     = (updateSuccessCount / validResults.length) * 100;
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
@@ -287,7 +287,7 @@ test('React benchmark: Scrolling Performance Under Duress 10k Rows UI Responsive
     console.log(`Discrete Scrolling Metrics (10k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy
@@ -302,7 +302,7 @@ test('React benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiv
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 100k rows'}).click();
+    await page.getByRole('button', {name: 'Create 100k Rows'}).click();
     await waitForGridReady(page, 100000); // React grid uses 0-based index for rowCount, so 100k rows is 100000
     await page.waitForTimeout(100);
 
@@ -310,9 +310,9 @@ test('React benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiv
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // As defined in the React Grid component
+    const rowHeight        = 32; // As defined in the React Grid component
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // React TanStack Virtual overscan is 3
 
     // Measure discrete scrolling fluidity
@@ -325,12 +325,12 @@ test('React benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiv
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
     // Process results
-    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const validResults          = results.filter(r => r.timeToValidState !== -1);
     const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
-    const avgTimeToValidState = totalTimeToValidState / validResults.length;
-    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
-    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
-    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+    const avgTimeToValidState   = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState   = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount    = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate     = (updateSuccessCount / validResults.length) * 100;
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
@@ -339,7 +339,7 @@ test('React benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiv
     console.log(`Discrete Scrolling Metrics (100k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy
@@ -359,7 +359,7 @@ test('React benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiven
 
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 1M rows'}).click();
+    await page.getByRole('button', {name: 'Create 1M Rows'}).click();
     await waitForGridReady(page, 1000000); // React grid uses 0-based index for rowCount, so 1M rows is 1000000
     await page.waitForTimeout(100);
 
@@ -367,9 +367,9 @@ test('React benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiven
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // As defined in the React Grid component
+    const rowHeight        = 32; // As defined in the React Grid component
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // React TanStack Virtual overscan is 3
 
     // Measure discrete scrolling fluidity
@@ -382,12 +382,12 @@ test('React benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiven
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
     // Process results
-    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const validResults          = results.filter(r => r.timeToValidState !== -1);
     const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
-    const avgTimeToValidState = totalTimeToValidState / validResults.length;
-    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
-    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
-    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+    const avgTimeToValidState   = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState   = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount    = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate     = (updateSuccessCount / validResults.length) * 100;
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
@@ -396,7 +396,7 @@ test('React benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiven
     console.log(`Discrete Scrolling Metrics (1M Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy

@@ -158,14 +158,14 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('React benchmark: Create 10k rows', async ({page}) => {
+test('React benchmark: Create 10k Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Create 10k rows').click();
+            window.getButtonByText('Create 10k Rows').click();
         };
         const condition = () => {
             const table = document.querySelector('table[role="grid"]');
@@ -175,22 +175,22 @@ test('React benchmark: Create 10k rows', async ({page}) => {
             const firstRow = table.querySelector('tbody tr:first-child td:first-child');
             return firstRow?.textContent === '1';
         };
-        return window.measurePerformance('Create 10k rows', action, condition);
+        return window.measurePerformance('Create 10k Rows', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 10k rows: ${duration}ms`);
+    console.log(`Time to render 10k Rows: ${duration}ms`);
     expect(duration).toBeLessThan(30000);
 });
 
-test('React benchmark: Create 100k rows', async ({page}) => {
+test('React benchmark: Create 100k Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 100k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 100k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Create 100k rows').click();
+            window.getButtonByText('Create 100k Rows').click();
         };
         const condition = () => {
             const table = document.querySelector('table[role="grid"]');
@@ -200,15 +200,15 @@ test('React benchmark: Create 100k rows', async ({page}) => {
             const firstRow = table.querySelector('tbody tr:first-child td:first-child');
             return firstRow?.textContent === '1';
         };
-        return window.measurePerformance('Create 100k rows', action, condition);
+        return window.measurePerformance('Create 100k Rows', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 100k rows: ${duration}ms`);
+    console.log(`Time to render 100k Rows: ${duration}ms`);
     expect(duration).toBeLessThan(350000);
 });
 
-test('React benchmark: Create 1M rows', async ({page, browserName}) => {
+test('React benchmark: Create 1M Rows', async ({page, browserName}) => {
     // This test is skipped for Firefox due to known Out-of-Memory issues when creating 1M rows.
     // Other browsers (Chromium, WebKit) will still run this test.
     if (browserName === 'firefox') {
@@ -218,13 +218,13 @@ test('React benchmark: Create 1M rows', async ({page, browserName}) => {
 
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 1M rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 1M Rows'}).waitFor();
 
     let duration;
     try {
         duration = await page.evaluate(() => {
             const action    = () => {
-                window.getButtonByText('Create 1M rows').click();
+                window.getButtonByText('Create 1M Rows').click();
             };
             const condition = () => {
                 const table = document.querySelector('table[role="grid"]');
@@ -234,7 +234,7 @@ test('React benchmark: Create 1M rows', async ({page, browserName}) => {
                 const firstRow = table.querySelector('tbody tr:first-child td:first-child');
                 return firstRow?.textContent === '1';
             };
-            return window.measurePerformance('Create 1M rows', action, condition, undefined, 110000);
+            return window.measurePerformance('Create 1M Rows', action, condition, undefined, 110000);
         });
     } catch (e) {
         console.warn(`Playwright test for "Create 1M rows" timed out or encountered an error: ${e.message}`);
@@ -244,31 +244,29 @@ test('React benchmark: Create 1M rows', async ({page, browserName}) => {
     }
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
-    console.log(`Time to render 1M rows: ${duration}ms`);
+    console.log(`Time to render 1M Rows: ${duration}ms`);
 
     if (duration === Infinity) {
         console.log(`Test "React benchmark: Create 1M rows" did not complete within expected time.`);
-    } else {
-        // Removed expect(duration).toBeLessThan(30000);
     }
 });
 
-test('React benchmark: Update every 10th row', async ({page}) => {
+test('React benchmark: Update Every 10th Row', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Update every 10th row').click();
+            window.getButtonByText('Update Every 10th Row').click();
         };
         const condition = () => {
             const node = document.querySelector('tbody tr:first-child td:last-child');
             return node?.textContent.includes('updated');
         };
-        return window.measurePerformance('Update every 10th row', action, condition);
+        return window.measurePerformance('Update Every 10th Row', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -276,21 +274,21 @@ test('React benchmark: Update every 10th row', async ({page}) => {
     expect(duration).toBeLessThan(5000);
 });
 
-test('React benchmark: Select row', async ({page}) => {
+test('React benchmark: Select Row', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Select').click();
+            window.getButtonByText('Select Row').click();
         };
         const condition = () => {
             return document.querySelector('tbody tr.selected');
         };
-        return window.measurePerformance('Select row', action, condition);
+        return window.measurePerformance('Select Row', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -298,10 +296,10 @@ test('React benchmark: Select row', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('React benchmark: Swap rows', async ({page}) => {
+test('React benchmark: Swap Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
@@ -309,13 +307,13 @@ test('React benchmark: Swap rows', async ({page}) => {
 
     const duration = await page.evaluate((labels) => {
         const action    = () => {
-            window.getButtonByText('Swap').click();
+            window.getButtonByText('Swap Rows').click();
         };
         const condition = (initialLabels) => {
             const newLabels = Array.from(document.querySelectorAll('tbody tr td:last-child'), el => el.textContent);
             return newLabels.length > 0 && newLabels.join('') !== initialLabels.join('');
         };
-        return window.measurePerformance('Swap rows', action, condition, labels);
+        return window.measurePerformance('Swap Rows', action, condition, labels);
     }, initialLabels);
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -323,16 +321,16 @@ test('React benchmark: Swap rows', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('React benchmark: Remove row', async ({page}) => {
+test('React benchmark: Remove Row', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Remove').click();
+            window.getButtonByText('Remove Row').click();
         };
         const condition = () => {
             const table = document.querySelector('table[role="grid"]');
@@ -340,7 +338,7 @@ test('React benchmark: Remove row', async ({page}) => {
             const rowCount = parseInt(table.getAttribute('aria-rowcount'), 10);
             return rowCount === 9999;
         };
-        return window.measurePerformance('Remove row', action, condition);
+        return window.measurePerformance('Remove Row', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -348,16 +346,16 @@ test('React benchmark: Remove row', async ({page}) => {
     expect(duration).toBeLessThan(500);
 });
 
-test('React benchmark: Clear rows', async ({page}) => {
+test('React benchmark: Clear Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
-            window.getButtonByText('Clear').click();
+            window.getButtonByText('Clear Rows').click();
         };
         const condition = () => {
             const table = document.querySelector('table[role="grid"]');
@@ -365,7 +363,7 @@ test('React benchmark: Clear rows', async ({page}) => {
             const rowCount = parseInt(table.getAttribute('aria-rowcount'), 10);
             return rowCount === 0;
         };
-        return window.measurePerformance('Clear rows', action, condition);
+        return window.measurePerformance('Clear Rows', action, condition);
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -377,7 +375,7 @@ test('React benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
@@ -408,7 +406,7 @@ test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor(); // Ensure page is ready
+    await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor(); // Ensure page is ready
 
     // Start the heavy calculation (don't await, so we can measure jank during execution)
     page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
@@ -438,7 +436,7 @@ test('React benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
-    await page.getByRole('button', {name: 'Create 10k rows'}).waitFor();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     // Start the heavy calculation
     await page.getByRole('button', {name: 'Run Heavy Calculation (Task Worker)'}).click();

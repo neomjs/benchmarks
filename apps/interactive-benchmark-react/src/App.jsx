@@ -185,14 +185,14 @@ function App() {
     return (
         <div className="app-container">
             <div className="button-container">
-                <button onClick={create10k}>Create 10k rows</button>
-                <button onClick={create100k}>Create 100k rows</button>
-                <button onClick={create1M}>Create 1M rows</button>
-                <button onClick={update}>Update every 10th row</button>
-                <button onClick={select}>Select</button>
-                <button onClick={swap}>Swap</button>
-                <button onClick={remove}>Remove</button>
-                <button onClick={clear}>Clear</button>
+                <button onClick={create10k}>Create 10k Rows</button>
+                <button onClick={create100k}>Create 100k Rows</button>
+                <button onClick={create1M}>Create 1M Rows</button>
+                <button onClick={update}>Update Every 10th Row</button>
+                <button onClick={select}>Select Row</button>
+                <button onClick={swap}>Swap Rows</button>
+                <button onClick={remove}>Remove Row</button>
+                <button onClick={clear}>Clear Rows</button>
                 <button onClick={runHeavy}>Run Heavy Calculation</button>
                 <button onClick={runHeavyTask}>Run Heavy Calculation (Task Worker)</button>
                 <button onClick={toggleFeed}>Start/Stop Real-time Feed</button>

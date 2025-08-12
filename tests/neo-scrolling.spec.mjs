@@ -233,7 +233,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
 
@@ -241,9 +241,9 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // As defined in the Neo.mjs grid styles
+    const rowHeight        = 32; // As defined in the Neo.mjs grid styles
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Fixed offset due to headers and buffering (set to 3 as per user)
 
     // Measure discrete scrolling fluidity
@@ -256,12 +256,12 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
     // Process results
-    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const validResults          = results.filter(r => r.timeToValidState !== -1);
     const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
-    const avgTimeToValidState = totalTimeToValidState / validResults.length;
-    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
-    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
-    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+    const avgTimeToValidState   = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState   = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount    = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate     = (updateSuccessCount / validResults.length) * 100;
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
@@ -270,7 +270,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     console.log(`Discrete Scrolling Metrics (10k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy
@@ -283,7 +283,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 100k rows'}).click();
+    await page.getByRole('button', {name: 'Create 100k Rows'}).click();
     await waitForGridReady(page, 100002);
     await page.waitForTimeout(100);
 
@@ -291,9 +291,9 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // As defined in the Neo.mjs grid styles
+    const rowHeight        = 32; // As defined in the Neo.mjs grid styles
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Fixed offset due to headers and buffering (set to 3 as per user)
 
     // Measure discrete scrolling fluidity
@@ -306,12 +306,12 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
     // Process results
-    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const validResults          = results.filter(r => r.timeToValidState !== -1);
     const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
-    const avgTimeToValidState = totalTimeToValidState / validResults.length;
-    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
-    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
-    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+    const avgTimeToValidState   = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState   = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount    = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate     = (updateSuccessCount / validResults.length) * 100;
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
@@ -320,7 +320,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     console.log(`Discrete Scrolling Metrics (100k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy
@@ -339,7 +339,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
 
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Benchmarks');
-    await page.getByRole('button', {name: 'Create 1M rows'}).click();
+    await page.getByRole('button', {name: 'Create 1M Rows'}).click();
     await waitForGridReady(page, 1000002);
     await page.waitForTimeout(100);
 
@@ -347,9 +347,9 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // As defined in the Neo.mjs grid styles
+    const rowHeight        = 32; // As defined in the Neo.mjs grid styles
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Fixed offset due to headers and buffering (set to 3 as per user)
 
     // Measure discrete scrolling fluidity
@@ -362,12 +362,12 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
     // Process results
-    const validResults = results.filter(r => r.timeToValidState !== -1);
+    const validResults          = results.filter(r => r.timeToValidState !== -1);
     const totalTimeToValidState = validResults.reduce((sum, r) => sum + r.timeToValidState, 0);
-    const avgTimeToValidState = totalTimeToValidState / validResults.length;
-    const maxTimeToValidState = Math.max(...validResults.map(r => r.timeToValidState));
-    const updateSuccessCount = validResults.filter(r => r.updateSuccess).length;
-    const updateSuccessRate = (updateSuccessCount / validResults.length) * 100;
+    const avgTimeToValidState   = totalTimeToValidState / validResults.length;
+    const maxTimeToValidState   = Math.max(...validResults.map(r => r.timeToValidState));
+    const updateSuccessCount    = validResults.filter(r => r.updateSuccess).length;
+    const updateSuccessRate     = (updateSuccessCount / validResults.length) * 100;
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
@@ -376,7 +376,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     console.log(`Discrete Scrolling Metrics (1M Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy

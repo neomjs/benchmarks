@@ -48,30 +48,30 @@ class Viewport extends BaseViewport {
             items : [{
                 handler: 'createRows',
                 rows   : 10000,
-                text   : 'Create 10k rows'
+                text   : 'Create 10k Rows'
             }, {
                 handler: 'createRows',
                 rows   : 100000,
-                text   : 'Create 100k rows'
+                text   : 'Create 100k Rows'
             }, {
                 handler: 'createRows',
                 rows   : 1000000,
-                text   : 'Create 1M rows'
+                text   : 'Create 1M Rows'
             }, {
                 handler: 'updateRows',
-                text   : 'Update every 10th row'
+                text   : 'Update Every 10th Row'
             }, {
                 handler: 'selectRow',
-                text   : 'Select'
+                text   : 'Select Row'
             }, {
                 handler: 'swapRows',
-                text   : 'Swap'
+                text   : 'Swap Rows'
             }, {
                 handler: 'removeRow',
-                text   : 'Remove'
+                text   : 'Remove Row'
             }, {
                 handler: 'clearRows',
-                text   : 'Clear'
+                text   : 'Clear Rows'
             }, {
                 handler: 'toggleRealtimeFeed',
                 text   : 'Start/Stop Real-time Feed'

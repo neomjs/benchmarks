@@ -164,7 +164,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 10k rows'}).click();
+    await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
 
@@ -172,9 +172,9 @@ test('Angular benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32; // Approximate row height for AG-Grid
+    const rowHeight        = 32; // Approximate row height for AG-Grid
     const scrollAmountRows = 50; // Scroll 50 rows per step
-    const numScrolls = 20; // Perform 20 discrete scroll steps
+    const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Matching other frameworks for overscan
 
     // Measure discrete scrolling fluidity
@@ -201,7 +201,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     console.log(`Discrete Scrolling Metrics (10k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     // Assertions based on the new strategy (adjust as needed for Angular/AG-Grid)
@@ -214,7 +214,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 100k rows'}).click();
+    await page.getByRole('button', {name: 'Create 100k Rows'}).click();
     await waitForGridReady(page, 100000);
     await page.waitForTimeout(100);
 
@@ -222,9 +222,9 @@ test('Angular benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32;
+    const rowHeight        = 32;
     const scrollAmountRows = 50;
-    const numScrolls = 20;
+    const numScrolls       = 20;
     const gridRenderOffset = 3; // Matching other frameworks for overscan
 
     const results = await page.evaluate((params) => {
@@ -249,7 +249,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     console.log(`Discrete Scrolling Metrics (100k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     expect(avgTimeToValidState).toBeLessThan(300);
@@ -265,7 +265,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
-    await page.getByRole('button', {name: 'Create 1M rows'}).click();
+    await page.getByRole('button', {name: 'Create 1M Rows'}).click();
     await waitForGridReady(page, 1000000);
     await page.waitForTimeout(100);
 
@@ -273,10 +273,10 @@ test('Angular benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
     await page.waitForTimeout(100); // Give the feed a moment to start updating
 
-    const rowHeight = 32;
+    const rowHeight        = 32;
     const scrollAmountRows = 50;
-    const numScrolls = 20;
-    const gridRenderOffset = 3; // Matching other frameworks for overscan
+    const numScrolls       = 20;
+    const gridRenderOffset = 3;
 
     const results = await page.evaluate((params) => {
         const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
@@ -300,7 +300,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     console.log(`Discrete Scrolling Metrics (1M Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
         maxTimeToValidState: maxTimeToValidState.toFixed(2),
-        updateSuccessRate: updateSuccessRate.toFixed(2)
+        updateSuccessRate  : updateSuccessRate.toFixed(2)
     });
 
     expect(avgTimeToValidState).toBeLessThan(1400);

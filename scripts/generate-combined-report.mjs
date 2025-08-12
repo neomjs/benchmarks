@@ -7,6 +7,27 @@ import fsExtra from 'fs-extra';
 const BROWSERS = ['chromium', 'firefox', 'webkit'];
 const RESPONSIVENESS_TEST_SUFFIX = 'UI Responsiveness';
 
+function sortBenchmarkNames(a, b) {
+    const order = ['1M Rows', '100k Rows', '10k Rows'];
+
+    const getOrderIndex = (name) => {console.log(name);
+        if (name.includes('1M rows'))   return 0;
+        if (name.includes('100k rows')) return 1;
+        if (name.includes('10k rows'))  return 2;
+        return order.length; // Put other benchmarks at the end
+    };
+
+    const indexA = getOrderIndex(a);
+    const indexB = getOrderIndex(b);
+
+    if (indexA !== indexB) {
+        return indexA - indexB;
+    }
+
+    // If they are of the same "order" (e.g., both not 1M/100k/10k, or both 10k), sort alphabetically
+    return a.localeCompare(b);
+}
+
 /**
  * Calculates the standard deviation of an array of numbers.
  * @param {number[]} arr The array of numbers.
@@ -161,7 +182,7 @@ function generateScrollingFluidityMarkdown(allFrameworkResults) {
             }
         });
     });
-    const sortedBenchmarkNames = Array.from(allBenchmarkNames).sort();
+    const sortedBenchmarkNames = Array.from(allBenchmarkNames).sort(sortBenchmarkNames);
 
     // --- Time to Valid State Table ---
     let timeTable = '\n## Scrolling Fluidity Benchmarks (Time to Valid State)\n\nLower is better.\n\n';
@@ -274,9 +295,9 @@ async function generateReport() {
     // Combine "Heavy Calculation" benchmarks under a single name
     frameworks.forEach(f => {
         const responsivenessBenchmarks = allFrameworkResults[f].responsivenessBenchmarks;
-        const appWorkerBenchName = 'Heavy Calculation (App Worker) UI Responsiveness';
-        const mainThreadBenchName = 'Heavy Calculation (Main Thread) UI Responsiveness';
-        const combinedBenchName = 'Heavy Calculation UI Responsiveness';
+        const appWorkerBenchName       = 'Heavy Calculation (App Worker) UI Responsiveness';
+        const mainThreadBenchName      = 'Heavy Calculation (Main Thread) UI Responsiveness';
+        const combinedBenchName        = 'Heavy Calculation UI Responsiveness';
 
         if (f === 'neo' && responsivenessBenchmarks[appWorkerBenchName]) {
             responsivenessBenchmarks[combinedBenchName] = responsivenessBenchmarks[appWorkerBenchName];
@@ -298,7 +319,7 @@ async function generateReport() {
     frameworks.forEach(f => {
         Object.keys(allFrameworkResults[f].durationBenchmarks).forEach(name => allDurationBenchmarkNames.add(name));
     });
-    const sortedDurationBenchmarkNames = Array.from(allDurationBenchmarkNames).sort();
+    const sortedDurationBenchmarkNames = Array.from(allDurationBenchmarkNames).sort(sortBenchmarkNames);
 
     for (const benchmarkName of sortedDurationBenchmarkNames) {
         outputMarkdown += `| **${benchmarkName}** | | | | |\n`; // Benchmark header row
