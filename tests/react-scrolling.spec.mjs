@@ -124,7 +124,7 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('React benchmark: Scrolling Performance Under Duress', async ({page}) => {
+test('React benchmark: Scrolling Performance Under Duress UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
     await page.goto('http://localhost:5174/');
     await expect(page).toHaveTitle('Vite + React');
