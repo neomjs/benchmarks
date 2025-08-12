@@ -157,7 +157,7 @@ test.beforeEach(async ({page}) => {
 
 test('Neo.mjs benchmark: Create 10k Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -183,7 +183,7 @@ test('Neo.mjs benchmark: Create 10k Rows', async ({page}) => {
 
 test('Neo.mjs benchmark: Create 100k Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 100k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -209,7 +209,7 @@ test('Neo.mjs benchmark: Create 100k Rows', async ({page}) => {
 
 test('Neo.mjs benchmark: Create 1M Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 1M Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -235,7 +235,7 @@ test('Neo.mjs benchmark: Create 1M Rows', async ({page}) => {
 
 test('Neo.mjs benchmark: Update Every 10th Row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -258,7 +258,7 @@ test('Neo.mjs benchmark: Update Every 10th Row', async ({page}) => {
 
 test('Neo.mjs benchmark: Select Row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -280,7 +280,7 @@ test('Neo.mjs benchmark: Select Row', async ({page}) => {
 
 test('Neo.mjs benchmark: Swap Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -305,7 +305,7 @@ test('Neo.mjs benchmark: Swap Rows', async ({page}) => {
 
 test('Neo.mjs benchmark: Remove Row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -328,7 +328,7 @@ test('Neo.mjs benchmark: Remove Row', async ({page}) => {
 
 test('Neo.mjs benchmark: Clear Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -352,7 +352,7 @@ test('Neo.mjs benchmark: Clear Rows', async ({page}) => {
 test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -381,7 +381,7 @@ test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
 test('Neo.mjs benchmark: Heavy Calculation (App Worker) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor(); // Ensure page is ready
 
     // Start the heavy calculation
@@ -411,7 +411,7 @@ test('Neo.mjs benchmark: Heavy Calculation (App Worker) UI Responsiveness', asyn
 test('Neo.mjs benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     // Start the heavy calculation

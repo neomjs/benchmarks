@@ -145,7 +145,7 @@ test.beforeEach(async ({page}) => {
 
 test('Angular benchmark: Create 10k Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -166,7 +166,7 @@ test('Angular benchmark: Create 10k Rows', async ({page}) => {
 
 test('Angular benchmark: Create 100k Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 100k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -187,7 +187,7 @@ test('Angular benchmark: Create 100k Rows', async ({page}) => {
 
 test('Angular benchmark: Create 1M Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 1M Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -208,7 +208,7 @@ test('Angular benchmark: Create 1M Rows', async ({page}) => {
 
 test('Angular benchmark: Update Every 10th Row', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -231,7 +231,7 @@ test('Angular benchmark: Update Every 10th Row', async ({page}) => {
 
 test('Angular benchmark: Select Row', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -253,7 +253,7 @@ test('Angular benchmark: Select Row', async ({page}) => {
 
 test('Angular benchmark: Swap Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -287,7 +287,7 @@ test('Angular benchmark: Swap Rows', async ({page}) => {
 
 test('Angular benchmark: Remove Row', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -310,7 +310,7 @@ test('Angular benchmark: Remove Row', async ({page}) => {
 
 test('Angular benchmark: Clear Rows', async ({page}) => {
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -336,7 +336,7 @@ test('Angular benchmark: Clear Rows', async ({page}) => {
 test('Angular benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -364,7 +364,7 @@ test('Angular benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
 test('Angular benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
@@ -388,7 +388,7 @@ test('Angular benchmark: Heavy Calculation (Main Thread) UI Responsiveness', asy
 test('Angular benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     await page.getByRole('button', {name: 'Run Heavy Calculation (Task Worker)'}).click();

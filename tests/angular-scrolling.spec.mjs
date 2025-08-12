@@ -163,7 +163,7 @@ test.beforeEach(async ({page}) => {
 test('Angular benchmark: Scrolling Performance Under Duress 10k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -213,7 +213,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
 test('Angular benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 100k Rows'}).click();
     await waitForGridReady(page, 100000);
     await page.waitForTimeout(100);
@@ -264,7 +264,7 @@ test('Angular benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
 
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('http://localhost:4200/');
-    await expect(page).toHaveTitle('InteractiveBenchmarkAngular');
+    await expect(page).toHaveTitle('Interactive Benchmark Angular');
     await page.getByRole('button', {name: 'Create 1M Rows'}).click();
     await waitForGridReady(page, 1000000);
     await page.waitForTimeout(100);

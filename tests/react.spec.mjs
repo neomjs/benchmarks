@@ -160,7 +160,7 @@ test.beforeEach(async ({page}) => {
 
 test('React benchmark: Create 10k Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -185,7 +185,7 @@ test('React benchmark: Create 10k Rows', async ({page}) => {
 
 test('React benchmark: Create 100k Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 100k Rows'}).waitFor();
 
     const duration = await page.evaluate(() => {
@@ -217,7 +217,7 @@ test('React benchmark: Create 1M Rows', async ({page, browserName}) => {
     }
 
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 1M Rows'}).waitFor();
 
     let duration;
@@ -253,7 +253,7 @@ test('React benchmark: Create 1M Rows', async ({page, browserName}) => {
 
 test('React benchmark: Update Every 10th Row', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -276,7 +276,7 @@ test('React benchmark: Update Every 10th Row', async ({page}) => {
 
 test('React benchmark: Select Row', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -298,7 +298,7 @@ test('React benchmark: Select Row', async ({page}) => {
 
 test('React benchmark: Swap Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -323,7 +323,7 @@ test('React benchmark: Swap Rows', async ({page}) => {
 
 test('React benchmark: Remove Row', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -348,7 +348,7 @@ test('React benchmark: Remove Row', async ({page}) => {
 
 test('React benchmark: Clear Rows', async ({page}) => {
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -374,7 +374,7 @@ test('React benchmark: Clear Rows', async ({page}) => {
 test('React benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -405,7 +405,7 @@ test('React benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
 test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor(); // Ensure page is ready
 
     // Start the heavy calculation (don't await, so we can measure jank during execution)
@@ -435,7 +435,7 @@ test('React benchmark: Heavy Calculation (Main Thread) UI Responsiveness', async
 test('React benchmark: Heavy Calculation (Task Worker) UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md'});
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
 
     // Start the heavy calculation

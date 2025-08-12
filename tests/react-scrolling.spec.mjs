@@ -249,7 +249,7 @@ test.beforeEach(async ({page}) => {
 test('React benchmark: Scrolling Performance Under Duress 10k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10000);
     await page.waitForTimeout(100);
@@ -301,7 +301,7 @@ test('React benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiv
 
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 100k Rows'}).click();
     await waitForGridReady(page, 100000); // React grid uses 0-based index for rowCount, so 100k rows is 100000
     await page.waitForTimeout(100);
@@ -358,7 +358,7 @@ test('React benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiven
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
 
     await page.goto('http://localhost:5174/');
-    await expect(page).toHaveTitle('Vite + React');
+    await expect(page).toHaveTitle('Interactive Benchmark React');
     await page.getByRole('button', {name: 'Create 1M Rows'}).click();
     await waitForGridReady(page, 1000000); // React grid uses 0-based index for rowCount, so 1M rows is 1000000
     await page.waitForTimeout(100);

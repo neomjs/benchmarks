@@ -232,7 +232,7 @@ test.beforeEach(async ({page}) => {
 test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
     await waitForGridReady(page, 10002);
     await page.waitForTimeout(100);
@@ -282,7 +282,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
 test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/SCROLLING_BENCHMARK_STRATEGY.md'});
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 100k Rows'}).click();
     await waitForGridReady(page, 100002);
     await page.waitForTimeout(100);
@@ -338,7 +338,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     test.setTimeout(180000); // Increased timeout for 1M rows
 
     await page.goto('/apps/benchmarks/');
-    await expect(page).toHaveTitle('Benchmarks');
+    await expect(page).toHaveTitle('Interactive Benchmark Neo.mjs');
     await page.getByRole('button', {name: 'Create 1M Rows'}).click();
     await waitForGridReady(page, 1000002);
     await page.waitForTimeout(100);
