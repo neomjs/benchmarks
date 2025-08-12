@@ -77,7 +77,11 @@ This sub-epic covers the creation of a credible, transparent, and easy-to-use be
 **Technical Strategy & Implementation Notes:**
 - The harness is built using **Playwright** for browser automation, video recording, and performance tracing.
 - Performance metrics are captured using the in-browser `performance.mark()` and `performance.measure()` APIs.
-- A top-level Node.js script runs the scenarios multiple times, aggregates the results, and generates reports.
+- A master Node.js script (`scripts/run-benchmarks.mjs`) orchestrates the test execution.
+    - It runs tests serially (`--workers=1`) to prevent resource contention and ensure accurate results.
+    - It can run tests for specific frameworks (`--framework=neo`) and specific suites (`--suite=scrolling`).
+- Test results (raw JSON) are saved to a clean, nested directory structure: `test-results-data/<framework>/<suite>/`. This directory is git-ignored.
+- A separate set of scripts (`scripts/generate-report.mjs`, `scripts/generate-combined-report.mjs`) is used to aggregate the raw data from the directories and generate the final markdown reports. This decouples test execution from report generation, allowing for faster, incremental updates to the benchmark data.
 
 - [x] Task: Set up the Playwright project.
 - [x] Task: Instrument the showcase apps with performance markers.
@@ -85,6 +89,8 @@ This sub-epic covers the creation of a credible, transparent, and easy-to-use be
 - [x] Task: Create a script to auto-generate a markdown report for a single framework.
 - [x] Task: Create a script (`generate-combined-report.mjs`) to generate a report comparing all frameworks.
 - [x] Task: Create a `README.md` with clear instructions for reproducibility.
+- [x] Task: Refactor the harness to use a clean, nested data directory structure.
+- [x] Task: Decouple test execution from report generation for a more flexible workflow.
 
 ---
 

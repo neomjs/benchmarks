@@ -134,16 +134,26 @@ async function generateReport() {
     const allFrameworkResults = {};
 
     for (const framework of frameworks) {
-        const resultsDir = path.join(process.cwd(), `test-results-data-${framework}`);
-        const resultFiles = glob.sync(`${resultsDir}/*.json`);
-
-        if (resultFiles.length === 0) {
-            console.warn(`No result files found for ${framework} in ${resultsDir}. Skipping.`);
+        const frameworkDataDirs = glob.sync(path.join(process.cwd(), 'test-results-data', framework, '*'));
+        if (frameworkDataDirs.length === 0) {
+            console.warn(`No data directories found for framework ${framework}. Skipping.`);
             allFrameworkResults[framework] = { durationBenchmarks: {}, responsivenessBenchmarks: {} };
             continue;
         }
 
-        const allRunsData = await Promise.all(resultFiles.map(file => fsExtra.readJson(file)));
+        let allResultFiles = [];
+        for (const dir of frameworkDataDirs) {
+            const files = glob.sync(path.join(dir, '*.json'));
+            allResultFiles.push(...files);
+        }
+
+        if (allResultFiles.length === 0) {
+            console.warn(`No result files found for ${framework} in any of its data directories. Skipping.`);
+            allFrameworkResults[framework] = { durationBenchmarks: {}, responsivenessBenchmarks: {} };
+            continue;
+        }
+
+        const allRunsData = await Promise.all(allResultFiles.map(file => fsExtra.readJson(file)));
         allFrameworkResults[framework] = parseResults(allRunsData);
     }
 

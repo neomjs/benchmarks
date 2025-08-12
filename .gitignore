@@ -22,7 +22,4 @@ resources/data/deck/EditorConfig.json
 /test-results/
 /test-results.json
 /test-results-data/
-/test-results-data-react/
-/test-results-data-neo/
 /benchmark-system-info.json
-/test-results-data-angular/
