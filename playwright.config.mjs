@@ -114,21 +114,32 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: [
-    {
-      command: 'npm --prefix apps/interactive-benchmark-neo run server-start:headless',
-      url: 'http://localhost:8080',
-      reuseExistingServer: !process.env.CI,
-    },
-    {
-      command: 'npm --prefix apps/interactive-benchmark-react run dev',
-      url: 'http://localhost:5174',
-      reuseExistingServer: !process.env.CI,
-    },
-    {
-      command: 'npm --prefix apps/interactive-benchmark-angular run start',
-      url: 'http://localhost:4200',
-      reuseExistingServer: !process.env.CI,
+  webServer: (() => {
+    const framework = process.env.FRAMEWORK;
+
+    const servers = {
+      'angular': {
+        command: 'npm --prefix apps/interactive-benchmark-angular run start',
+        url: 'http://localhost:4200',
+        reuseExistingServer: !process.env.CI,
+      },
+      'neo': {
+        command: 'npm --prefix apps/interactive-benchmark-neo run server-start:headless',
+        url: 'http://localhost:8080',
+        reuseExistingServer: !process.env.CI,
+      },
+      'react': {
+        command: 'npm --prefix apps/interactive-benchmark-react run dev',
+        url: 'http://localhost:5174',
+        reuseExistingServer: !process.env.CI,
+      }
+    };
+
+    if (framework && servers[framework]) {
+      return servers[framework];
     }
-  ],
+
+    // If no framework is specified, or for 'all', run all servers.
+    return Object.values(servers);
+  })(),
 });
