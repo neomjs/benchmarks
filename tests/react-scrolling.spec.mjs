@@ -39,7 +39,7 @@ const measureAdvancedScrollingFluidity = () => {
             return;
         }
 
-        const rowHeight = 35; // As defined in the React Grid component
+        const rowHeight = 32; // As defined in the React Grid component
         const frameTimes = [];
         const rowLags = [];
         let longFrameCount = 0;
@@ -67,8 +67,8 @@ const measureAdvancedScrollingFluidity = () => {
             scrollableElement.scrollTop = currentScrollTop;
 
             const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
-            const firstVisibleRow = document.querySelector('tbody tr[data-index]');
-            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('data-index'), 10) : -1;
+            const firstVisibleRow = document.querySelector('tbody tr[aria-rowindex]');
+            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
 
             if (actualTopRowIndex !== -1) {
                 const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);

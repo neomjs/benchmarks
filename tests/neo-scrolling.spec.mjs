@@ -38,7 +38,7 @@ const measureAdvancedScrollingFluidity = () => {
             return;
         }
 
-        const rowHeight = 35; // As defined in the Neo.mjs grid styles
+        const rowHeight = 32; // As defined in the Neo.mjs grid styles
         const frameTimes = [];
         const rowLags = [];
         let longFrameCount = 0;
@@ -69,8 +69,8 @@ const measureAdvancedScrollingFluidity = () => {
 
             // --- Content Lag Measurement ---
             const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
-            const firstVisibleRow = document.querySelector('.neo-grid-body .neo-list-item');
-            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.dataset.id.split('-').pop(), 10) : -1;
+            const firstVisibleRow = document.querySelector('.neo-grid-body .neo-grid-row[aria-rowindex]');
+            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
 
             if (actualTopRowIndex !== -1) {
                 const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);

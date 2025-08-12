@@ -37,7 +37,7 @@ const measureAdvancedScrollingFluidity = () => {
             return;
         }
 
-        const rowHeight = 35; // Approximate row height for calculation
+        const rowHeight = 32; // Approximate row height for calculation
         const frameTimes = [];
         const rowLags = [];
         let longFrameCount = 0;
@@ -65,8 +65,8 @@ const measureAdvancedScrollingFluidity = () => {
             scrollableElement.scrollTop = currentScrollTop;
 
             const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
-            const firstVisibleRow = document.querySelector('.ag-row[row-index]');
-            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('row-index'), 10) : -1;
+            const firstVisibleRow = document.querySelector('.ag-row[aria-rowindex]');
+            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
 
             if (actualTopRowIndex !== -1) {
                 const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);

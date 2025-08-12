@@ -20,6 +20,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     ],
     animateRows: false,
     rowSelection: {mode: 'singleRow'},
+    rowHeight: 32,
+    rowBuffer: 3,
     getRowId: (params) => String(params.data.id),
     onGridReady: (params) => {
       this.gridApi = params.api;

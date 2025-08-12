@@ -34,8 +34,8 @@ const Grid = React.forwardRef(({ data, selected }, ref) => {
     const rowVirtualizer = useVirtualizer({
         count: rows.length,
         getScrollElement: () => tableContainerRef.current,
-        estimateSize: () => 35,
-        overscan: 10,
+        estimateSize: () => 32,
+        overscan: 3,
     });
 
     React.useImperativeHandle(ref, () => ({
@@ -74,6 +74,7 @@ const Grid = React.forwardRef(({ data, selected }, ref) => {
                         const row = rows[virtualRow.index];
                         return (
                             <tr
+                                aria-rowindex={virtualRow.index + 2}
                                 key={row.id}
                                 className={row.original.id === selected ? 'selected' : ''}
                                 style={{

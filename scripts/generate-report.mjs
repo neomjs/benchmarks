@@ -3,6 +3,7 @@ import path   from 'path';
 import {glob} from 'glob';
 
 const args = process.argv.slice(2);
+const frameworkArg = args.find(arg => arg.startsWith('--framework='));
 const framework = frameworkArg ? frameworkArg.split('=')[1] : 'all';
 
 const DATA_DIRS_PATTERN = path.resolve(process.cwd(), 'test-results-data', framework, '*');
@@ -269,6 +270,42 @@ function generateResponsivenessMarkdown(benchmarks) {
 }
 
 /**
+ * Generates the markdown for the scrolling fluidity benchmarks.
+ * @param {Object} benchmarks The structured responsiveness benchmark data.
+ * @returns {String} The markdown table as a string.
+ */
+function generateScrollingFluidityMarkdown(benchmarks) {
+    let table = `| Benchmark                                   | Browser    | Avg/Max Row Lag | Stale Frames |
+|---------------------------------------------|------------|-----------------|--------------|
+`;
+    const sortedKeys = Object.keys(benchmarks).sort();
+
+    for (const key of sortedKeys) {
+        const result = benchmarks[key];
+        // Only include benchmarks that have row lag data
+        if (!result.prod[BROWSERS[0]]?.avgLag) continue;
+
+        const shortKey = key.replace(RESPONSIVENESS_TEST_SUFFIX, '').trim();
+        table += `| **${shortKey}**                            |            |                 |              |
+`;
+
+        BROWSERS.forEach(browser => {
+            const prodResult = result.prod[browser];
+            if (!prodResult.avgLag || !prodResult.avgLag.length) return;
+
+            const lagAvg = `${prodResult.avgRowLag.toFixed(1)} (±${prodResult.stdDevRowLag.toFixed(1)}) / ${prodResult.avgMaxRowLag.toFixed(1)} (±${prodResult.stdDevMaxRowLag.toFixed(1)})`;
+            const staleFramesAvg = `${prodResult.avgStaleFrames.toFixed(1)} (±${prodResult.stdDevStaleFrames.toFixed(1)})`;
+
+            table += `|                                             | ${browser.padEnd(10)} | ${lagAvg.padEnd(15)} | ${staleFramesAvg.padEnd(12)} |
+`;
+        });
+        table += `|---------------------------------------------|------------|-----------------|--------------|
+`;
+    }
+    return table;
+}
+
+/**
  * Generates the markdown for the browser versions.
  * @param {Object} browserInfo The collected browser information from custom reporter.
  * @returns {String} The markdown table as a string.
@@ -369,6 +406,7 @@ async function main() {
 
         const durationTable        = generateDurationMarkdown(durationBenchmarks, resultFiles.length);
         const responsivenessTable  = generateResponsivenessMarkdown(responsivenessBenchmarks);
+        const scrollingFluidityTable = generateScrollingFluidityMarkdown(responsivenessBenchmarks);
         const browserVersionsTable = generateBrowserVersionsMarkdown(benchmarkSystemInfo.browsers);
         const systemInfoTable      = generateSystemInfoMarkdown(benchmarkSystemInfo);
         const knownIssuesMarkdown  = generateKnownIssuesMarkdown();
@@ -394,6 +432,12 @@ ${durationTable}
 This table shows the average Frames Per Second (FPS) and the count of "Long Frames" (frames taking >50ms) during a 4-second test. For FPS, higher is better. For Long Frames, lower is better.
 
 ${responsivenessTable}
+
+## Scrolling Fluidity Benchmarks
+
+This table shows metrics related to how smoothly content updates during a scroll. For all metrics, lower is better.
+
+${scrollingFluidityTable}
 
 ${browserVersionsTable}
 
