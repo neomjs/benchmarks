@@ -352,6 +352,18 @@ async function generateReport() {
     const sortedResponsivenessBenchmarkNames = Array.from(allResponsivenessBenchmarkNames).sort();
 
     for (const benchmarkName of sortedResponsivenessBenchmarkNames) {
+        // Filter out scrolling fluidity benchmarks from this table
+        // A benchmark is a scrolling fluidity benchmark if it has avgTimeToValidStateAvg data for any browser/mode
+        const isScrollingFluidityBenchmark = frameworks.some(f =>
+            BROWSERS.some(browser =>
+                allFrameworkResults[f].responsivenessBenchmarks[benchmarkName]?.prod[browser]?.avgTimeToValidStateAvg !== undefined
+            )
+        );
+
+        if (isScrollingFluidityBenchmark) {
+            continue; // Skip this benchmark for the FPS/Long Frames table
+        }
+
         outputMarkdown += `| **${benchmarkName}** | | | | |\n`; // Benchmark header row
 
         for (const browser of BROWSERS) {

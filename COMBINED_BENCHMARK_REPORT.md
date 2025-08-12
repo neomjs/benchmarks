@@ -64,21 +64,6 @@
 | | firefox | ✅ 60.0 / ✅ 0.0 | 13.4 / ❌ 49.0 | ❌ 10.0 / 40.0 |
 | | webkit | ✅ 60.0 / ✅ 0.0 | 47.0 / ✅ 0.0 | ❌ 30.2 / ❌ 4.2 |
 |---|---|---|---|---|
-| **Scrolling Performance Under Duress 100k Rows UI Responsiveness** | | | | |
-| | chromium | N/A | N/A | N/A |
-| | firefox | N/A | N/A | N/A |
-| | webkit | N/A | N/A | N/A |
-|---|---|---|---|---|
-| **Scrolling Performance Under Duress 10k Rows UI Responsiveness** | | | | |
-| | chromium | N/A | N/A | N/A |
-| | firefox | N/A | N/A | N/A |
-| | webkit | N/A | N/A | N/A |
-|---|---|---|---|---|
-| **Scrolling Performance Under Duress 1M Rows UI Responsiveness** | | | | |
-| | chromium | N/A | N/A | Browser Crash |
-| | firefox | N/A | N/A | Browser Crash |
-| | webkit | N/A | N/A | Browser Crash |
-|---|---|---|---|---|
 
 ## Scrolling Fluidity Benchmarks (Time to Valid State)
 
@@ -87,19 +72,19 @@ Lower is better.
 | Benchmark | Browser | Neo (ms) | Angular (ms) | React (ms) |
 |---|---|---|---|---|
 | **Scrolling Performance Under Duress 100k Rows** | | | | |
-| | chromium | 43.09 / 50.28 | ✅ 40.27 / 125.90 | ❌ 345.66 / 766.00 |
-| | firefox | ✅ 45.18 / 49.80 | ❌ 273.60 / 332.00 | N/A |
-| | webkit | ✅ 53.58 / 69.60 | 96.65 / 206.00 | ❌ 314.10 / 823.25 |
+| | chromium | 43.09 / 50.28 | ✅ 32.54 / 124.80 | ❌ 345.66 / 766.00 |
+| | firefox | ✅ 45.18 / 49.80 | ❌ 264.43 / 309.50 | N/A |
+| | webkit | ✅ 53.58 / 69.60 | 94.22 / 203.00 | ❌ 314.10 / 823.25 |
 |---|---|---|---|---|
 | **Scrolling Performance Under Duress 10k Rows** | | | | |
-| | chromium | 33.75 / 46.32 | ✅ 15.59 / 24.70 | ❌ 37.74 / 70.94 |
-| | firefox | ✅ 37.50 / 50.20 | 52.40 / 69.00 | ❌ 90.39 / 174.40 |
-| | webkit | ❌ 46.62 / 50.40 | ✅ 21.20 / 39.00 | 37.49 / 103.20 |
+| | chromium | 33.75 / 46.32 | ✅ 17.09 / 29.85 | ❌ 37.74 / 70.94 |
+| | firefox | ✅ 37.50 / 50.20 | 54.92 / 81.50 | ❌ 90.39 / 174.40 |
+| | webkit | ❌ 46.62 / 50.40 | ✅ 22.35 / 45.50 | 37.49 / 103.20 |
 |---|---|---|---|---|
 | **Scrolling Performance Under Duress 1M Rows** | | | | |
-| | chromium | ✅ 68.94 / 83.24 | ❌ 1163.38 / 1195.50 | Browser Crash |
+| | chromium | ✅ 68.94 / 83.24 | ❌ 1163.15 / 1266.15 | Browser Crash |
 | | firefox | N/A | N/A | N/A |
-| | webkit | ❌ 218.25 / 272.00 | ✅ 188.95 / 1796.00 | Browser Crash |
+| | webkit | ✅ 218.25 / 272.00 | ❌ 269.02 / 1850.50 | Browser Crash |
 |---|---|---|---|---|
 
 
