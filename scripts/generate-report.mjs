@@ -77,12 +77,18 @@ function parseResults(allRunsData) {
                                     const staleFrameAnnotation = test.annotations.find(a => a.type === 'staleFrameCount');
 
                                     const target = responsivenessBenchmarks[benchmarkName][mode][browser];
+                                    console.log('test.annotations:', test.annotations);
+                                    console.log('avgLagAnnotation:', avgLagAnnotation);
+                                    console.log('maxLagAnnotation:', maxLagAnnotation);
+                                    console.log('staleFrameAnnotation:', staleFrameAnnotation);
 
                                     if (fpsAnnotation && longFrameAnnotation) {
                                         target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
                                         target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
                                     }
+
                                     if (avgLagAnnotation && maxLagAnnotation && staleFrameAnnotation) {
+                                        console.log('Populating avgLag, maxLag, staleFrames for:', benchmarkName, mode, browser);
                                         target.avgLag = (target.avgLag || []).concat(parseFloat(avgLagAnnotation.description));
                                         target.maxLag = (target.maxLag || []).concat(parseFloat(maxLagAnnotation.description));
                                         target.staleFrames = (target.staleFrames || []).concat(parseFloat(staleFrameAnnotation.description));
@@ -278,12 +284,19 @@ function generateScrollingFluidityMarkdown(benchmarks) {
     let table = `| Benchmark                                   | Browser    | Avg/Max Row Lag | Stale Frames |
 |---------------------------------------------|------------|-----------------|--------------|
 `;
-    const sortedKeys = Object.keys(benchmarks).sort();
+    const sortedKeys = Object.keys(benchmarks)
+        .filter(key => {
+            const result = benchmarks[key];
+            // Check if there's any scrolling data for any browser in prod mode
+            return BROWSERS.some(browser =>
+                result.prod[browser].avgLag && result.prod[browser].avgLag.length > 0
+            );
+        })
+        .sort();
 
     for (const key of sortedKeys) {
         const result = benchmarks[key];
-        // Only include benchmarks that have row lag data
-        if (!result.prod[BROWSERS[0]]?.avgLag) continue;
+        
 
         const shortKey = key.replace(RESPONSIVENESS_TEST_SUFFIX, '').trim();
         table += `| **${shortKey}**                            |            |                 |              |
@@ -291,6 +304,7 @@ function generateScrollingFluidityMarkdown(benchmarks) {
 
         BROWSERS.forEach(browser => {
             const prodResult = result.prod[browser];
+            console.log(`Browser: ${browser}, prodResult.avgLag: ${prodResult.avgLag}, prodResult.avgLag.length: ${prodResult.avgLag?.length}, prodResult.avgRowLag: ${prodResult.avgRowLag}`);
             if (!prodResult.avgLag || !prodResult.avgLag.length) return;
 
             const lagAvg = `${prodResult.avgRowLag.toFixed(1)} (±${prodResult.stdDevRowLag.toFixed(1)}) / ${prodResult.avgMaxRowLag.toFixed(1)} (±${prodResult.stdDevMaxRowLag.toFixed(1)})`;
@@ -384,7 +398,8 @@ function generateKnownIssuesMarkdown() {
  */
 async function main() {
     try {
-        const resultFiles = glob.sync(`${RESULTS_DIR}/*.json`);
+        const RESULTS_DIR = path.resolve(process.cwd(), 'test-results-data', framework);
+        const resultFiles = glob.sync(`${RESULTS_DIR}/**/*.json`);
         if (resultFiles.length === 0) {
             console.error(`Error: No result files found in ${RESULTS_DIR}. Please run the tests first.`);
             process.exit(1);
