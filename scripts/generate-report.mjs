@@ -281,43 +281,59 @@ function generateResponsivenessMarkdown(benchmarks) {
  * @returns {String} The markdown table as a string.
  */
 function generateScrollingFluidityMarkdown(benchmarks) {
-    let table = `| Benchmark                                   | Browser    | Avg/Max Row Lag | Stale Frames |
-|---------------------------------------------|------------|-----------------|--------------|
+    let table = `| Benchmark                                   | Browser    | Dev Mode (Avg/Max Row Lag) | Dev Mode (Stale Frames) | Prod Mode (Avg/Max Row Lag) | Prod Mode (Stale Frames) |
+|---------------------------------------------|------------|----------------------------|-------------------------|-----------------------------|--------------------------|
 `;
     const sortedKeys = Object.keys(benchmarks)
         .filter(key => {
             const result = benchmarks[key];
-            // Check if there's any scrolling data for any browser in prod mode
+            // Check if there's any scrolling data for any browser in either dev or prod mode
             return BROWSERS.some(browser =>
-                result.prod[browser].avgLag && result.prod[browser].avgLag.length > 0
+                (result.dev[browser].avgLag && result.dev[browser].avgLag.length > 0) ||
+                (result.prod[browser].avgLag && result.prod[browser].avgLag.length > 0)
             );
         })
         .sort();
 
+    if (sortedKeys.length === 0) {
+        // Return the empty table structure if no data is present
+        return table;
+    }
+
     for (const key of sortedKeys) {
         const result = benchmarks[key];
-        
-
         const shortKey = key.replace(RESPONSIVENESS_TEST_SUFFIX, '').trim();
-        table += `| **${shortKey}**                            |            |                 |              |
+        table += `| **${shortKey}**                            |            |                            |                         |                             |                          |
 `;
 
         BROWSERS.forEach(browser => {
+            const devResult = result.dev[browser];
             const prodResult = result.prod[browser];
-            console.log(`Browser: ${browser}, prodResult.avgLag: ${prodResult.avgLag}, prodResult.avgLag.length: ${prodResult.avgLag?.length}, prodResult.avgRowLag: ${prodResult.avgRowLag}`);
-            if (!prodResult.avgLag || !prodResult.avgLag.length) return;
 
-            const lagAvg = `${prodResult.avgRowLag.toFixed(1)} (±${prodResult.stdDevRowLag.toFixed(1)}) / ${prodResult.avgMaxRowLag.toFixed(1)} (±${prodResult.stdDevMaxRowLag.toFixed(1)})`;
-            const staleFramesAvg = `${prodResult.avgStaleFrames.toFixed(1)} (±${prodResult.stdDevStaleFrames.toFixed(1)})`;
+            let devLagAvgFormatted = 'N/A';
+            let devStaleFramesFormatted = 'N/A';
+            if (devResult.avgLag && devResult.avgLag.length > 0) {
+                devLagAvgFormatted = `${devResult.avgRowLag.toFixed(1)} (±${devResult.stdDevRowLag.toFixed(1)}) / ${devResult.avgMaxRowLag.toFixed(1)} (±${devResult.stdDevMaxRowLag.toFixed(1)})`;
+                devStaleFramesFormatted = `${devResult.avgStaleFrames.toFixed(1)} (±${devResult.stdDevStaleFrames.toFixed(1)})`;
+            }
 
-            table += `|                                             | ${browser.padEnd(10)} | ${lagAvg.padEnd(15)} | ${staleFramesAvg.padEnd(12)} |
+            let prodLagAvgFormatted = 'N/A';
+            let prodStaleFramesFormatted = 'N/A';
+            if (prodResult.avgLag && prodResult.avgLag.length > 0) {
+                prodLagAvgFormatted = `${prodResult.avgRowLag.toFixed(1)} (±${prodResult.stdDevRowLag.toFixed(1)}) / ${prodResult.avgMaxRowLag.toFixed(1)} (±${prodResult.stdDevMaxRowLag.toFixed(1)})`;
+                prodStaleFramesFormatted = `${prodResult.avgStaleFrames.toFixed(1)} (±${prodResult.stdDevStaleFrames.toFixed(1)})`;
+            }
+
+            table += `|                                             | ${browser.padEnd(10)} | ${devLagAvgFormatted.padEnd(26)} | ${devStaleFramesFormatted.padEnd(23)} | ${prodLagAvgFormatted.padEnd(27)} | ${prodStaleFramesFormatted.padEnd(24)} |
 `;
         });
-        table += `|---------------------------------------------|------------|-----------------|--------------|
+        table += `|---------------------------------------------|------------|----------------------------|-------------------------|-----------------------------|--------------------------|
 `;
     }
     return table;
 }
+
+
 
 /**
  * Generates the markdown for the browser versions.
