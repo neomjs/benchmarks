@@ -66,7 +66,7 @@ const measureAdvancedScrollingFluidity = () => {
 
             const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
             const firstVisibleRow = document.querySelector('.ag-row[aria-rowindex]');
-            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
+            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 1 : -1;
 
             if (actualTopRowIndex !== -1) {
                 const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);
@@ -122,7 +122,7 @@ test.beforeEach(async ({page}) => {
     });
 });
 
-test('Angular benchmark: Scrolling Performance Under Duress', async ({page}) => {
+test('Angular benchmark: Scrolling Performance Under Duress UI Responsiveness', async ({page}) => {
     test.info().annotations.push({type: 'story', description: 'https://github.com/neomjs/benchmarks/blob/main/.github/EPIC-Performance-Showcases.md#2-showcase-scrolling-performance-under-duress'});
     await page.goto('http://localhost:4200/');
     await expect(page).toHaveTitle('InteractiveBenchmarkAngular');

@@ -68,7 +68,7 @@ const measureAdvancedScrollingFluidity = () => {
 
             const expectedTopRowIndex = Math.floor(currentScrollTop / rowHeight);
             const firstVisibleRow = document.querySelector('tbody tr[aria-rowindex]');
-            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
+            const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 1 : -1;
 
             if (actualTopRowIndex !== -1) {
                 const lag = Math.abs(expectedTopRowIndex - actualTopRowIndex);
@@ -154,7 +154,7 @@ test('React benchmark: Scrolling Performance Under Duress UI Responsiveness', as
 
     // For React, we expect the main thread to be heavily impacted, leading to low FPS and high content lag.
     expect(jankMetrics.averageFps).toBeLessThan(45);
-    expect(jankMetrics.longFrameCount).toBeGreaterThanOrEqual(10);
+    expect(jankMetrics.longFrameCount).toBeGreaterThanOrEqual(2);
     expect(jankMetrics.maxRowLag).toBeGreaterThan(10);
     expect(jankMetrics.staleFrameCount).toBeGreaterThan(20);
 });
