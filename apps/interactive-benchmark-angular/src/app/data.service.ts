@@ -34,6 +34,27 @@ export class DataService {
     return this.data;
   }
 
+  updateRandomData(): RowData[] {
+    const updatedRecords: RowData[] = [];
+    const len = this.data.length;
+    const updateCount = 100;
+
+    if (len === 0) {
+      return [];
+    }
+
+    for (let i = 0; i < updateCount; i++) {
+      const randomIndex = Math.floor(Math.random() * len);
+      const record = this.data[randomIndex];
+      const updatedRecord = { ...record, label: `updated ${record.id} at ${new Date().toLocaleTimeString()}` };
+
+      this.data[randomIndex] = updatedRecord;
+      updatedRecords.push(updatedRecord);
+    }
+
+    return updatedRecords;
+  }
+
   clearData() {
     this.data = [];
     this.nextId = 1;

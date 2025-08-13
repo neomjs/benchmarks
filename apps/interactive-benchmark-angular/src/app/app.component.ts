@@ -134,8 +134,14 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     } else {
       console.log('Real-time feed started.');
       this.feedInterval = setInterval(() => {
-        const updatedData = this.dataService.updateData();
-        this.gridApi.setGridOption('rowData', updatedData);
+        const updatedRecords = this.dataService.updateRandomData();
+        if (updatedRecords.length > 0) {
+          this.gridApi.applyTransaction({ update: updatedRecords });
+        } else {
+          console.log('No rows to update. Stopping real-time feed.');
+          clearInterval(this.feedInterval);
+          this.feedInterval = null;
+        }
       }, 5);
     }
   }
