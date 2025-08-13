@@ -66,6 +66,7 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
         columnBuffer={bufferColumnRange}
         loading={loading} // Pass loading prop directly
         onGridReady={onGridReady}
+        onRowDataUpdated={(params) => onFilteredRowsChanged(params.api.getDisplayedRowCount())}
       />
     </div>
   );
