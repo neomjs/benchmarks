@@ -2,7 +2,48 @@ import { useState, useCallback, useMemo } from 'react';
 import './App.css';
 import Controls from './Controls';
 import Grid from './Grid';
-import { generateData } from './data.jsx';
+import { generateDataAsync } from './data.jsx';
+
+// Function to generate column definitions
+const generateColumns = (amountColumns) => {
+  const columns = [
+    { field: 'id', headerName: '#', width: 60 },
+    { field: 'firstname', headerName: 'Firstname', width: 150 },
+    { field: 'lastname', headerName: 'Lastname', width: 150 },
+    {
+      field: 'countAction',
+      headerName: 'Increase Counter',
+      width: 150,
+      cellRenderer: (params) => {
+        const onClick = () => {
+          params.node.setDataValue('counter', params.data.counter + 1);
+        };
+        return <button onClick={onClick}>{params.data.firstname} ++</button>;
+      },
+    },
+    { field: 'counter', headerName: 'Counter', width: 100 },
+    {
+      field: 'progress',
+      headerName: 'Progress',
+      width: 150,
+      cellRenderer: (params) => (
+        <div
+          style={{
+            width: `${params.value}%`,
+            backgroundColor: '#007bff',
+            height: '100%',
+          }}
+        ></div>
+      ),
+    },
+  ];
+
+  for (let i = 7; i <= amountColumns; i++) {
+    columns.push({ field: 'number' + i, headerName: 'Number ' + i, width: 100 });
+  }
+
+  return columns;
+};
 
 function App() {
   const [allData, setAllData] = useState([]);
@@ -14,14 +55,17 @@ function App() {
   const [rowSelectionType, setRowSelectionType] = useState('single');
   const [bufferRowRange, setBufferRowRange] = useState(5);
   const [bufferColumnRange, setBufferColumnRange] = useState(3);
+  const [loading, setLoading] = useState(false);
 
   const [showControls, setShowControls] = useState(false);
 
-  const handleConfigChange = useCallback((config) => {
+  const handleConfigChange = useCallback(async (config) => {
+    setLoading(true);
     const { amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange } = config;
-    const { data, columns } = generateData(amountRows, amountColumns);
+    const data = await generateDataAsync(amountRows, amountColumns);
+    const newColumns = generateColumns(amountColumns);
     setAllData(data);
-    setColumns(columns);
+    setColumns(newColumns);
     setTheme(theme);
     setFirstnameFilter(firstnameFilter);
     setLastnameFilter(lastnameFilter);
@@ -29,6 +73,7 @@ function App() {
     setRowSelectionType(rowSelectionType);
     setBufferRowRange(bufferRowRange);
     setBufferColumnRange(bufferColumnRange);
+    setLoading(false);
   }, []);
 
   const handleToggleControls = useCallback(() => {
@@ -71,6 +116,7 @@ function App() {
           rowSelectionType={rowSelectionType}
           bufferRowRange={bufferRowRange}
           bufferColumnRange={bufferColumnRange}
+          loading={loading}
         />
       </div>
     </div>
