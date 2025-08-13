@@ -18,7 +18,6 @@ class ViewportController extends Base {
      * @private
      */
     #counter = 0
-
     /**
      * @member {Number|null} realtimeFeedInterval=null
      * @private
