@@ -10,10 +10,10 @@ const RESPONSIVENESS_TEST_SUFFIX = 'UI Responsiveness';
 function sortBenchmarkNames(a, b) {
     const order = ['1M Rows', '100k Rows', '10k Rows'];
 
-    const getOrderIndex = (name) => {console.log(name);
-        if (name.includes('1M rows'))   return 0;
-        if (name.includes('100k rows')) return 1;
-        if (name.includes('10k rows'))  return 2;
+    const getOrderIndex = (name) => {
+        if (name.includes('1M Rows'))   return 0;
+        if (name.includes('100k Rows')) return 1;
+        if (name.includes('10k Rows'))  return 2;
         return order.length; // Put other benchmarks at the end
     };
 
