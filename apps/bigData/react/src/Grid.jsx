@@ -1,7 +1,6 @@
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css'; // Core grid CSS
-import 'ag-grid-community/styles/ag-theme-alpine.css'; // Light Theme
-import 'ag-grid-community/styles/ag-theme-alpine-dark.css'; // Dark Theme
+import 'ag-grid-community/styles/ag-theme-alpine.css'; // Light & Dark Theme
 
 function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType }) {
   const defaultColDef = {

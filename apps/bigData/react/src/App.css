@@ -1,13 +1,14 @@
 .App {
-  display: flex;
+  position: relative;
   height: 100vh;
   width: 100vw;
+  overflow: hidden; /* Hide overflow during slide */
 }
 
 .controls {
   width: 250px;
   padding: 20px;
-  border-right: 1px solid #ccc;
+  border-right: 1px solid #333;
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -16,14 +17,17 @@
 .control-group label {
   display: block;
   margin-bottom: 5px;
+  color: #eee; /* Light text for dark background */
 }
 
 .control-group select,
 .control-group input {
   width: 100%;
   padding: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #555;
   border-radius: 4px;
+  background-color: #444; /* Darker background for inputs */
+  color: #eee; /* Light text for inputs */
 }
 
 .controls button {
@@ -37,4 +41,79 @@
 
 .controls button:hover {
   background-color: #0056b3;
+}
+
+.hamburger-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 10px 15px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 1000;
+  font-size: 24px;
+  line-height: 1;
+  transition: right 0.3s ease-in-out; /* Add transition for smooth movement */
+}
+
+.hamburger-button.shifted {
+  right: 310px; /* Move to the left when controls are open (300px panel + 10px offset) */
+}
+
+.hamburger-button:hover {
+  background-color: #5a6268;
+}
+
+.controls-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 300px; /* Adjust width as needed */
+  background-color: #2c2c2c; /* Dark background for controls panel */
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease-in-out;
+  transform: translateX(100%); /* Start off-screen */
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+}
+
+.controls-panel.open {
+  transform: translateX(0); /* Slide in */
+}
+
+.tab-headers {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.tab-headers button {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #555;
+  border-bottom: none;
+  background-color: #3a3a3a; /* Darker background for inactive tabs */
+  color: #eee; /* Light text for tabs */
+  cursor: pointer;
+}
+
+.tab-headers button.active {
+  background-color: #2c2c2c; /* Background matching controls-panel for active tab */
+  border-bottom: 1px solid #2c2c2c;
+}
+
+.tab-content {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.settings-tab-content,
+.selection-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }

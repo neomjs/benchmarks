@@ -12,6 +12,7 @@ function App() {
   const [lastnameFilter, setLastnameFilter] = useState('');
   const [selectionModel, setSelectionModel] = useState('row');
   const [rowSelectionType, setRowSelectionType] = useState('single');
+  const [showControls, setShowControls] = useState(false);
 
   const handleConfigChange = useCallback((config) => {
     const { amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType } = config;
@@ -23,6 +24,10 @@ function App() {
     setLastnameFilter(lastnameFilter);
     setSelectionModel(selectionModel);
     setRowSelectionType(rowSelectionType);
+  }, []);
+
+  const handleToggleControls = useCallback(() => {
+    setShowControls((prev) => !prev);
   }, []);
 
   const filteredData = useMemo(() => {
@@ -45,7 +50,12 @@ function App() {
 
   return (
     <div className="App">
-      <Controls onConfigChange={handleConfigChange} />
+      <button className={`hamburger-button ${showControls ? 'shifted' : ''}`} onClick={handleToggleControls}>
+        ☰
+      </button>
+      <div className={`controls-panel ${showControls ? 'open' : 'closed'}`}>
+        <Controls onConfigChange={handleConfigChange} />
+      </div>
       <Grid
         rowData={filteredData}
         columnDefs={columns}
