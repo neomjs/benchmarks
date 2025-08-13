@@ -140,7 +140,7 @@ function Controls({ onDataConfigChange, onFilterChange, filteredRowCount }) {
             </div>
 
             <div className="control-group">
-              <label>Firstname Filter</label>
+              <label>Firstname</label>
               <input
                 type="text"
                 value={firstnameFilter}
@@ -149,7 +149,7 @@ function Controls({ onDataConfigChange, onFilterChange, filteredRowCount }) {
               />
             </div>
             <div className="control-group">
-              <label>Lastname Filter</label>
+              <label>Lastname</label>
               <input
                 type="text"
                 value={lastnameFilter}

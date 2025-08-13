@@ -9,8 +9,11 @@
   overflow: hidden; /* Hide overflow during slide */
 }
 
+* {
+  box-sizing: border-box;
+}
+
 .controls {
-  width: 250px;
   padding: 20px;
   border-right: 1px solid #333;
   display: flex;
@@ -18,20 +21,28 @@
   gap: 15px;
 }
 
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Add some gap between label and input */
+}
+
 .control-group label {
-  display: block;
-  margin-bottom: 5px;
+  /* Removed display: block; margin-bottom: 5px; */
+  width: 100px; /* Fixed width for labels */
+  flex-shrink: 0; /* Prevent label from shrinking */
   color: #eee; /* Light text for dark background */
 }
 
 .control-group select,
 .control-group input {
-  width: 100%;
+  flex: 1; /* Take up remaining space */
   padding: 8px;
   border: 1px solid #555;
   border-radius: 4px;
   background-color: #444; /* Darker background for inputs */
   color: #eee; /* Light text for inputs */
+  max-width: 148px;
 }
 
 .controls button {
@@ -117,6 +128,7 @@
 .tab-content {
   flex-grow: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* Hide horizontal overflow */
 }
 
 .settings-tab-content,
@@ -130,7 +142,6 @@
   flex: 1 1 auto;
   position: relative; /* For grid to fill it */
   margin: 3.5em 1em 1em 1em; /* From Neo.mjs example */
-  box-sizing: border-box;
 }
 
 .main-grid {
