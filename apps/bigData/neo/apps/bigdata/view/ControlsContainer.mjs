@@ -267,11 +267,21 @@ class ControlsContainer extends Container {
         })
     }
 
+    firstFiltering = true
+
     /**
      * @param {Object} data
      */
     onFilterFieldChange(data) {
-        this.grid.store.getFilter(data.component.name).value = data.value
+        let me = this;
+
+        if (me.firstFiltering) {
+            me.firstFiltering = false;
+            me.grid.isLoading = 'Is Loading'
+        }
+
+        me.grid.store.getFilter(data.component.name).value = data.value;
+        me.grid.isLoading = false
     }
 
     /**
