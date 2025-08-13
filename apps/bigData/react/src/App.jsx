@@ -59,7 +59,7 @@ function App() {
         ☰
       </button>
       <div className={`controls-panel ${showControls ? 'open' : 'closed'}`}>
-        <Controls onConfigChange={handleConfigChange} />
+        <Controls onConfigChange={handleConfigChange} filteredRowCount={filteredData.length} />
       </div>
       <div className="grid-container">
         <Grid

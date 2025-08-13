@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function Controls({ onConfigChange }) {
+function Controls({ onConfigChange, filteredRowCount }) {
   const [amountRows, setAmountRows] = useState(1000);
   const [amountColumns, setAmountColumns] = useState(50);
   const [theme, setTheme] = useState('alpine-dark');
@@ -141,6 +141,9 @@ function Controls({ onConfigChange }) {
                 onChange={(e) => setLastnameFilter(e.target.value)}
                 placeholder="Filter by lastname"
               />
+            </div>
+            <div className="control-group">
+              <label>Filtered rows: {filteredRowCount}</label>
             </div>
           </div>
         )}
