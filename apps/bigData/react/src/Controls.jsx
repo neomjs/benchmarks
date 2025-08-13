@@ -1,19 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function Controls({ onConfigChange }) {
   const [amountRows, setAmountRows] = useState(1000);
   const [amountColumns, setAmountColumns] = useState(50);
-  const [theme, setTheme] = useState('alpine');
+  const [theme, setTheme] = useState('alpine-dark');
   const [firstnameFilter, setFirstnameFilter] = useState('');
   const [lastnameFilter, setLastnameFilter] = useState('');
   const [selectionModel, setSelectionModel] = useState('row'); // 'row' or 'cell'
   const [rowSelectionType, setRowSelectionType] = useState('single'); // 'single' or 'multiple'
+  const [bufferRowRange, setBufferRowRange] = useState(5);
+  const [bufferColumnRange, setBufferColumnRange] = useState(3);
 
   const [activeTab, setActiveTab] = useState('settings'); // New state for active tab
 
-  const handleApply = () => {
-    onConfigChange({ amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType });
-  };
+  // Helper to get the current config state
+  const getCurrentConfig = () => ({
+    amountRows,
+    amountColumns,
+    theme,
+    firstnameFilter,
+    lastnameFilter,
+    selectionModel,
+    rowSelectionType,
+    bufferRowRange,
+    bufferColumnRange,
+  });
+
+  // Use useEffect to trigger onConfigChange whenever relevant state changes
+  useEffect(() => {
+    onConfigChange(getCurrentConfig());
+  }, [amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange]);
 
   return (
     <div className="controls">
@@ -57,6 +73,28 @@ function Controls({ onConfigChange }) {
                 <option value="75">75</option>
                 <option value="100">100</option>
                 <option value="200">200</option>
+              </select>
+            </div>
+
+            <div className="control-group">
+              <label>Buffer Rows</label>
+              <select value={bufferRowRange} onChange={(e) => setBufferRowRange(parseInt(e.target.value))}>
+                <option value="0">0</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+            <div className="control-group">
+              <label>Buffer Columns</label>
+              <select value={bufferColumnRange} onChange={(e) => setBufferColumnRange(parseInt(e.target.value))}>
+                <option value="0">0</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
               </select>
             </div>
 
@@ -165,8 +203,6 @@ function Controls({ onConfigChange }) {
           </div>
         )}
       </div>
-
-      <button onClick={handleApply}>Apply</button>
     </div>
   );
 }

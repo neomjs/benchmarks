@@ -2,7 +2,7 @@ import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css'; // Core grid CSS
 import 'ag-grid-community/styles/ag-theme-alpine.css'; // Light & Dark Theme
 
-function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType }) {
+function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange }) {
   const defaultColDef = {
     resizable: true,
     sortable: true,
@@ -18,6 +18,8 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType }) 
         rowSelection={selectionModel === 'row' ? rowSelectionType : undefined}
         suppressRowClickSelection={selectionModel === 'cell'}
         enableCellTextSelection={selectionModel === 'cell'}
+        rowBuffer={bufferRowRange}
+        columnBuffer={bufferColumnRange}
         // enableCellTextSelection={true}
         // ensureDomOrder={true}
         // suppressColumnVirtualisation={true}
