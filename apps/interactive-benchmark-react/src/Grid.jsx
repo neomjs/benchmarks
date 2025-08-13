@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-const Grid = React.forwardRef(({ data, selected }, ref) => {
+const Grid = React.forwardRef(({ data, selected, dataVersion }, ref) => {
     const columns = React.useMemo(
         () => [
             {

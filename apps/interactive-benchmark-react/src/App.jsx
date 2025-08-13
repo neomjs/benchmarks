@@ -27,7 +27,7 @@ function App() {
      *    without triggering a re-render.
      * 2. `useReducer` is used as a simple `forceUpdate` mechanism.
      * 3. In the high-frequency `toggleFeed` interval, we directly mutate the `data.current` array.
-     *    This avoids creating a new, multi-million item array every 5ms, which would otherwise
+     *    This avoids creating a new, up to 1M items array every 5ms, which would otherwise
      *    cause immense memory pressure and garbage collector lag.
      * 4. After mutating the data, we call `forceUpdate()` once to trigger a single, efficient
      *    re-render of the component.
@@ -37,7 +37,7 @@ function App() {
      * standard immutable state management at this extreme scale.
      */
     const data = useRef([]);
-    const [_, forceUpdate] = useReducer(x => x + 1, 0);
+    const [dataVersion, setDataVersion] = useState(0);
     const [selected, setSelected] = useState(null);
     const feedInterval = useRef(null);
     const gridRef = useRef(null);
@@ -45,17 +45,17 @@ function App() {
     const create10k = () => {
         idCounter = 1;
         data.current = buildData(10000);
-        forceUpdate();
+        setDataVersion(v => v + 1);
     };
     const create100k = () => {
         idCounter = 1;
         data.current = buildData(100000);
-        forceUpdate();
+        setDataVersion(v => v + 1);
     };
     const create1M = () => {
         idCounter = 1;
         data.current = buildData(1000000);
-        forceUpdate();
+        setDataVersion(v => v + 1);
     };
     const update = () => {
         const newData = [...data.current];
@@ -63,7 +63,7 @@ function App() {
             newData[i] = { ...newData[i], label: newData[i].label + ' updated' };
         }
         data.current = newData;
-        forceUpdate();
+        setDataVersion(v => v + 1);
     };
     const select = () => {
         if (gridRef.current) {
@@ -93,7 +93,7 @@ function App() {
 
                 [newData[originalIndex1], newData[originalIndex2]] = [newData[originalIndex2], newData[originalIndex1]];
                 data.current = newData;
-                forceUpdate();
+                setDataVersion(v => v + 1);
             }
         }
     };
@@ -103,13 +103,13 @@ function App() {
             const index = Math.floor(Math.random() * data.current.length);
             newData.splice(index, 1);
             data.current = newData;
-            forceUpdate();
+            setDataVersion(v => v + 1);
         }
     };
     const clear = () => {
         data.current = [];
         idCounter = 1;
-        forceUpdate();
+        setDataVersion(v => v + 1);
     };
 
     const heavyCalcOutputRef = useRef(null);
@@ -193,7 +193,7 @@ function App() {
                     }
                 }
                 // Trigger a single re-render after all mutations are done.
-                forceUpdate();
+                setDataVersion(v => v + 1);
             }, 5);
         }
     };
@@ -239,7 +239,7 @@ function App() {
                     <div style={{ marginLeft: '10px', fontWeight: 'bold', minWidth: '8.2em' }}>Counter: {mainThreadCounter}</div>
                 </div>
                 <div className="grid-container">
-                    <Grid ref={gridRef} data={data.current} selected={selected} />
+                    <Grid ref={gridRef} key={dataVersion} data={data.current} selected={selected} />
                 </div>
             </div>
         </div>
