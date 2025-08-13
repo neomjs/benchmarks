@@ -12,6 +12,18 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
     filter: true,
   };
 
+  let rowSelectionMode = undefined; // Default to undefined
+  let enableClickSelection = true; // Default to true
+
+  if (selectionModel === 'row') {
+    rowSelectionMode = rowSelectionType === 'single' ? 'singleRow' : 'multipleRow';
+    enableClickSelection = true; // Allow click selection for row selection
+  } else if (selectionModel === 'cell') {
+    // For cell selection, we want to disable row click selection
+    rowSelectionMode = undefined; // No specific row selection mode for cell selection
+    enableClickSelection = false; // Disable row click selection for cell selection
+  }
+
   useEffect(() => {
     if (gridRef.current && gridRef.current.api) {
       if (loading) {
@@ -29,8 +41,8 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
         rowData={rowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
-        rowSelection={selectionModel === 'row' ? rowSelectionType : undefined}
-        suppressRowClickSelection={selectionModel === 'cell'}
+        rowSelection={rowSelectionMode ? { mode: rowSelectionMode } : undefined}
+        enableClickSelection={enableClickSelection}
         enableCellTextSelection={selectionModel === 'cell'}
         rowBuffer={bufferRowRange}
         columnBuffer={bufferColumnRange}

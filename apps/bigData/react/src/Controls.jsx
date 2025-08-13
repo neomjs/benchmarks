@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function Controls({ onConfigChange, filteredRowCount }) {
   const [amountRows, setAmountRows] = useState(1000);
@@ -12,6 +12,8 @@ function Controls({ onConfigChange, filteredRowCount }) {
   const [bufferColumnRange, setBufferColumnRange] = useState(3);
 
   const [activeTab, setActiveTab] = useState('settings'); // New state for active tab
+
+  const isInitialMount = useRef(true); // Create a ref
 
   // Helper to get the current config state
   const getCurrentConfig = () => ({
@@ -28,7 +30,11 @@ function Controls({ onConfigChange, filteredRowCount }) {
 
   // Use useEffect to trigger onConfigChange whenever relevant state changes
   useEffect(() => {
-    onConfigChange(getCurrentConfig());
+    if (isInitialMount.current) {
+      isInitialMount.current = false; // Set to false after first run
+    } else {
+      onConfigChange(getCurrentConfig());
+    }
   }, [amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange]);
 
   return (
