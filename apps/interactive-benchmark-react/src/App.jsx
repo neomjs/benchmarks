@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useReducer } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Grid from './Grid';
 import './App.css';
 
@@ -17,53 +17,29 @@ const buildData = (count) => {
 };
 
 function App() {
-    /*
-     * PERFORMANCE OPTIMIZATION:
-     * To handle high-frequency updates on a massive dataset without performance degradation,
-     * this component deviates from the standard React `useState` pattern for its main `data` array.
-     *
-     * THE STRATEGY:
-     * 1. `useRef` holds the data array (`data`). This allows us to mutate the array directly
-     *    without triggering a re-render.
-     * 2. `useReducer` is used as a simple `forceUpdate` mechanism.
-     * 3. In the high-frequency `toggleFeed` interval, we directly mutate the `data.current` array.
-     *    This avoids creating a new, up to 1M items array every 5ms, which would otherwise
-     *    cause immense memory pressure and garbage collector lag.
-     * 4. After mutating the data, we call `forceUpdate()` once to trigger a single, efficient
-     *    re-render of the component.
-     *
-     * This is a known optimization pattern for performance-critical scenarios in React. It ensures
-     * the benchmark fairly measures rendering performance under load, not the overhead of React's
-     * standard immutable state management at this extreme scale.
-     */
-    const data = useRef([]);
-    const [dataVersion, setDataVersion] = useState(0);
+    const [data, setData] = useState([]);
     const [selected, setSelected] = useState(null);
     const feedInterval = useRef(null);
     const gridRef = useRef(null);
 
     const create10k = () => {
         idCounter = 1;
-        data.current = buildData(10000);
-        setDataVersion(v => v + 1);
+        setData(buildData(10000));
     };
     const create100k = () => {
         idCounter = 1;
-        data.current = buildData(100000);
-        setDataVersion(v => v + 1);
+        setData(buildData(100000));
     };
     const create1M = () => {
         idCounter = 1;
-        data.current = buildData(1000000);
-        setDataVersion(v => v + 1);
+        setData(buildData(1000000));
     };
     const update = () => {
-        const newData = [...data.current];
+        const newData = [...data];
         for (let i = 0; i < newData.length; i += 10) {
             newData[i] = { ...newData[i], label: newData[i].label + ' updated' };
         }
-        data.current = newData;
-        setDataVersion(v => v + 1);
+        setData(newData);
     };
     const select = () => {
         if (gridRef.current) {
@@ -72,7 +48,7 @@ function App() {
                 const randomVisibleIndex = Math.floor(Math.random() * visibleRows.length);
                 const randomRow = visibleRows[randomVisibleIndex];
                 const originalRowIndex = randomRow.index;
-                setSelected(data.current[originalRowIndex].id);
+                setSelected(data[originalRowIndex].id);
             }
         }
     };
@@ -80,7 +56,7 @@ function App() {
         if (gridRef.current) {
             const visibleRows = gridRef.current.getVisibleRows();
             if (visibleRows.length > 1) {
-                const newData = [...data.current];
+                const newData = [...data];
 
                 const visibleIndex1 = Math.floor(Math.random() * visibleRows.length);
                 let visibleIndex2 = Math.floor(Math.random() * visibleRows.length);
@@ -92,24 +68,21 @@ function App() {
                 const originalIndex2 = visibleRows[visibleIndex2].index;
 
                 [newData[originalIndex1], newData[originalIndex2]] = [newData[originalIndex2], newData[originalIndex1]];
-                data.current = newData;
-                setDataVersion(v => v + 1);
+                setData(newData);
             }
         }
     };
     const remove = () => {
-        if (data.current.length > 0) {
-            const newData = [...data.current];
-            const index = Math.floor(Math.random() * data.current.length);
+        if (data.length > 0) {
+            const newData = [...data];
+            const index = Math.floor(Math.random() * data.length);
             newData.splice(index, 1);
-            data.current = newData;
-            setDataVersion(v => v + 1);
+            setData(newData);
         }
     };
     const clear = () => {
-        data.current = [];
+        setData([]);
         idCounter = 1;
-        setDataVersion(v => v + 1);
     };
 
     const heavyCalcOutputRef = useRef(null);
@@ -176,24 +149,17 @@ function App() {
         } else {
             console.log('Real-time feed started.');
             feedInterval.current = setInterval(() => {
-                const currentData = data.current;
-                if (currentData.length === 0) {
-                    console.log('No rows to update. Stopping real-time feed.');
-                    clearInterval(feedInterval.current);
-                    feedInterval.current = null;
-                    return;
-                }
-                const updateCount = 100;
-                for (let i = 0; i < updateCount; i++) {
-                    const randomIndex = Math.floor(Math.random() * currentData.length);
-                    if (currentData[randomIndex]) {
-                        // Directly mutate the array element for performance.
-                        // This is safe because the array is held in a useRef.
-                        currentData[randomIndex] = { ...currentData[randomIndex], label: `updated ${currentData[randomIndex].id} at ${new Date().toLocaleTimeString()}` };
+                setData(currentData => {
+                    const newData = [...currentData];
+                    const updateCount = 100;
+                    for (let i = 0; i < updateCount; i++) {
+                        const randomIndex = Math.floor(Math.random() * newData.length);
+                        if (newData[randomIndex]) {
+                            newData[randomIndex] = { ...newData[randomIndex], label: `updated ${newData[randomIndex].id} at ${new Date().toLocaleTimeString()}` };
+                        }
                     }
-                }
-                // Trigger a single re-render after all mutations are done.
-                setDataVersion(v => v + 1);
+                    return newData;
+                });
             }, 5);
         }
     };
@@ -239,7 +205,7 @@ function App() {
                     <div style={{ marginLeft: '10px', fontWeight: 'bold', minWidth: '8.2em' }}>Counter: {mainThreadCounter}</div>
                 </div>
                 <div className="grid-container">
-                    <Grid ref={gridRef} key={dataVersion} data={data.current} selected={selected} />
+                    <Grid ref={gridRef} data={data} selected={selected} />
                 </div>
             </div>
         </div>
