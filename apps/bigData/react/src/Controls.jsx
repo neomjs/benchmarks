@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-function Controls({ onConfigChange, filteredRowCount }) {
+function Controls({ onDataConfigChange, onFilterChange, filteredRowCount }) {
   const [amountRows, setAmountRows] = useState(1000);
   const [amountColumns, setAmountColumns] = useState(50);
   const [theme, setTheme] = useState('alpine-dark');
@@ -15,27 +15,36 @@ function Controls({ onConfigChange, filteredRowCount }) {
 
   const isInitialMount = useRef(true); // Create a ref
 
-  // Helper to get the current config state
-  const getCurrentConfig = () => ({
+  // Helper to get the current data config state
+  const getCurrentDataConfig = () => ({
     amountRows,
     amountColumns,
     theme,
-    firstnameFilter,
-    lastnameFilter,
     selectionModel,
     rowSelectionType,
     bufferRowRange,
     bufferColumnRange,
   });
 
-  // Use useEffect to trigger onConfigChange whenever relevant state changes
+  // Helper to get the current filter state
+  const getCurrentFilterConfig = () => ({
+    firstnameFilter,
+    lastnameFilter,
+  });
+
+  // Use useEffect to trigger onDataConfigChange whenever relevant data config state changes
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false; // Set to false after first run
     } else {
-      onConfigChange(getCurrentConfig());
+      onDataConfigChange(getCurrentDataConfig());
     }
-  }, [amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange]);
+  }, [amountRows, amountColumns, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange]);
+
+  // Use useEffect to trigger onFilterChange whenever relevant filter state changes
+  useEffect(() => {
+    onFilterChange(getCurrentFilterConfig());
+  }, [firstnameFilter, lastnameFilter]);
 
   return (
     <div className="controls">

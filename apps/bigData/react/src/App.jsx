@@ -8,8 +8,8 @@ import { generateDataAsync } from './data.jsx';
 const generateColumns = (amountColumns) => {
   const columns = [
     { field: 'id', headerName: '#', width: 60 },
-    { field: 'firstname', headerName: 'Firstname', width: 150 },
-    { field: 'lastname', headerName: 'Lastname', width: 150 },
+    { field: 'firstname', headerName: 'Firstname', width: 150, filter: true, suppressHeaderFilterButton: true },
+    { field: 'lastname', headerName: 'Lastname', width: 150, filter: true, suppressHeaderFilterButton: true },
     {
       field: 'countAction',
       headerName: 'Increase Counter',
@@ -56,19 +56,18 @@ function App() {
   const [bufferRowRange, setBufferRowRange] = useState(5);
   const [bufferColumnRange, setBufferColumnRange] = useState(3);
   const [loading, setLoading] = useState(false);
+  const [actualFilteredRowCount, setActualFilteredRowCount] = useState(0);
 
   const [showControls, setShowControls] = useState(false);
 
-  const handleConfigChange = useCallback(async (config) => {
+  const handleDataConfigChange = useCallback(async (config) => {
     setLoading(true);
-    const { amountRows, amountColumns, theme, firstnameFilter, lastnameFilter, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange } = config;
+    const { amountRows, amountColumns, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange } = config;
     const data = await generateDataAsync(amountRows, amountColumns);
     const newColumns = generateColumns(amountColumns);
     setAllData(data);
     setColumns(newColumns);
     setTheme(theme);
-    setFirstnameFilter(firstnameFilter);
-    setLastnameFilter(lastnameFilter);
     setSelectionModel(selectionModel);
     setRowSelectionType(rowSelectionType);
     setBufferRowRange(bufferRowRange);
@@ -76,27 +75,18 @@ function App() {
     setLoading(false);
   }, []);
 
+  const handleFilterChange = useCallback((filters) => {
+    setFirstnameFilter(filters.firstnameFilter);
+    setLastnameFilter(filters.lastnameFilter);
+  }, []);
+
+  const handleFilteredRowsChanged = useCallback((count) => {
+    setActualFilteredRowCount(count);
+  }, []);
+
   const handleToggleControls = useCallback(() => {
     setShowControls((prev) => !prev);
   }, []);
-
-  const filteredData = useMemo(() => {
-    let currentData = allData;
-
-    if (firstnameFilter) {
-      currentData = currentData.filter(row =>
-        row.firstname.toLowerCase().includes(firstnameFilter.toLowerCase())
-      );
-    }
-
-    if (lastnameFilter) {
-      currentData = currentData.filter(row =>
-        row.lastname.toLowerCase().includes(lastnameFilter.toLowerCase())
-      );
-    }
-
-    return currentData;
-  }, [allData, firstnameFilter, lastnameFilter]);
 
   return (
     <div className="App">
@@ -104,12 +94,16 @@ function App() {
         ☰
       </button>
       <div className={`controls-panel ${showControls ? 'open' : 'closed'}`}>
-        <Controls onConfigChange={handleConfigChange} filteredRowCount={filteredData.length} />
+        <Controls
+          onDataConfigChange={handleDataConfigChange}
+          onFilterChange={handleFilterChange}
+          filteredRowCount={actualFilteredRowCount}
+        />
       </div>
       <div className="grid-container">
         <Grid
           className="main-grid"
-          rowData={filteredData}
+          rowData={allData}
           columnDefs={columns}
           theme={theme}
           selectionModel={selectionModel}
@@ -117,6 +111,9 @@ function App() {
           bufferRowRange={bufferRowRange}
           bufferColumnRange={bufferColumnRange}
           loading={loading}
+          firstnameFilter={firstnameFilter}
+          lastnameFilter={lastnameFilter}
+          onFilteredRowsChanged={handleFilteredRowsChanged}
         />
       </div>
     </div>

@@ -1,9 +1,9 @@
 import { AgGridReact } from 'ag-grid-react';
-import { useRef } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import 'ag-grid-community/styles/ag-grid.css'; // Core grid CSS
 import 'ag-grid-community/styles/ag-theme-alpine.css'; // Light & Dark Theme
 
-function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange, loading }) {
+function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange, loading, firstnameFilter, lastnameFilter, onFilteredRowsChanged }) {
   const gridRef = useRef(null);
 
   const defaultColDef = {
@@ -26,6 +26,32 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
     rowSelectionCheckboxes = false; // Explicitly disable checkboxes for cell selection
   }
 
+  const onGridReady = useCallback((params) => {
+    onFilteredRowsChanged(params.api.getDisplayedRowCount());
+  }, [onFilteredRowsChanged]);
+
+  useEffect(() => {
+    if (gridRef.current && gridRef.current.api) {
+      const filterModel = {};
+      if (firstnameFilter) {
+        filterModel.firstname = {
+          filterType: 'text',
+          type: 'contains',
+          filter: firstnameFilter,
+        };
+      }
+      if (lastnameFilter) {
+        filterModel.lastname = {
+          filterType: 'text',
+          type: 'contains',
+          filter: lastnameFilter,
+        };
+      }
+      gridRef.current.api.setFilterModel(filterModel);
+      onFilteredRowsChanged(gridRef.current.api.getDisplayedRowCount());
+    }
+  }, [firstnameFilter, lastnameFilter, onFilteredRowsChanged]);
+
   return (
     <div className={`ag-theme-${theme}`} style={{ height: '100%', width: '100%' }}>
       <AgGridReact
@@ -39,6 +65,7 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
         rowBuffer={bufferRowRange}
         columnBuffer={bufferColumnRange}
         loading={loading} // Pass loading prop directly
+        onGridReady={onGridReady}
       />
     </div>
   );
