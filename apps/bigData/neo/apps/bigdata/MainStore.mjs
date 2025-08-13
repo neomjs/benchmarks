@@ -1,0 +1,150 @@
+import Model from './MainModel.mjs';
+import Store from '../../node_modules/neo.mjs/src/data/Store.mjs';
+
+/**
+ * @class BigData.MainStore
+ * @extends Neo.data.Store
+ */
+class MainStore extends Store {
+    static config = {
+        /**
+         * @member {String} className='BigData.MainStore'
+         * @protected
+         */
+        className: 'BigData.MainStore',
+        /**
+         * @member {Number} amountColumns_=50
+         * @reactive
+         */
+        amountColumns_: 50,
+        /**
+         * @member {Number} amountRows_=1000
+         * @reactive
+         */
+        amountRows_: 1000,
+        /**
+         * @member {Object[]} filters
+         * @reactive
+         */
+        filters: [{
+            property: 'firstname',
+            operator: 'like',
+            value   : null
+        }, {
+            property: 'lastname',
+            operator: 'like',
+            value   : null
+        }],
+        /**
+         * @member {Neo.data.Model} model=Model
+         * @reactive
+         */
+        model: Model
+    }
+
+    firstnames = [
+        'Amanda', 'Andrew', 'Anthony', 'Ashley', 'Barbara', 'Betty', 'Brian', 'Carol', 'Charles', 'Christopher',
+        'Daniel', 'David', 'Deborah', 'Donna', 'Elizabeth', 'Emily', 'George', 'Jack', 'James', 'Jennifer',
+        'Jessica', 'Joe', 'John', 'Joseph', 'Joshua', 'Karen', 'Kenneth', 'Kelly', 'Kevin', 'Kimberly',
+        'Linda', 'Lisa', 'Margaret', 'Mark', 'Mary', 'Matthew', 'Max', 'Melissa', 'Michael', 'Michelle',
+        'Nancy', 'Patricia', 'Paul', 'Richard', 'Robert', 'Ronald', 'Sam', 'Sandra', 'Sarah', 'Stephanie',
+        'Steven', 'Susan', 'Thomas', 'Timothy', 'Tobias', 'William'
+    ]
+
+    lastnames = [
+        'Adams', 'Allen', 'Anderson', 'Baker', 'Brown', 'Campbell', 'Carter', 'Clark', 'Davis', 'Flores',
+        'Garcia', 'Gonzales', 'Green', 'Hall', 'Harris', 'Hernandez', 'Hill', 'Jackson', 'Johnson', 'Jones',
+        'King', 'Lee', 'Lewis', 'Lopez', 'Martin', 'Martinez', 'Miller', 'Mitchell', 'Moore', 'Nelson',
+        'Nguyen', 'Perez', 'Rahder', 'Ramirez', 'Roberts', 'Rivera', 'Robinson', 'Rodriguez', 'Sanchez', 'Scott',
+        'Smith', 'Taylor', 'Thomas', 'Thompson', 'Torres', 'Uhlig', 'Walker', 'Waters', 'White', 'Williams',
+        'Wilson', 'Wright', 'Young'
+    ]
+
+    /**
+     * Triggered after the amountColumns config got changed
+     * @param {Number} value
+     * @param {Number} oldValue
+     * @protected
+     */
+    afterSetAmountColumns(value, oldValue) {
+        if (oldValue !== undefined) {
+            let me    = this,
+                data  = me.generateData(me.amountRows, value),
+                start = performance.now();
+
+            me.model.amountColumns = value;
+
+            console.log('Start generating data and adding to collection');
+
+            if (me.items?.length > 0) {
+                me.clear()
+            }
+
+            me.add(data);
+
+            console.log(`Data generation and collection add total time: ${Math.round(performance.now() - start)}ms`)
+        }
+    }
+
+    /**
+     * Triggered after the amountRows config got changed
+     * @param {Number} value
+     * @param {Number} oldValue
+     * @protected
+     */
+    afterSetAmountRows(value, oldValue) {
+        let me    = this,
+            data  = me.generateData(value, me.amountColumns),
+            start = performance.now();
+
+        console.log('Start generating data and adding to collection');
+
+        if (me.items?.length > 0) {
+            me.clear()
+        }
+
+        me.add(data);
+
+        console.log(`Data generation and collection add total time: ${Math.round(performance.now() - start)}ms`)
+    }
+
+    /**
+     * @param {Number} amountRows
+     * @param {Number} amountColumns
+     * @returns {Object[]}
+     */
+    generateData(amountRows, amountColumns) {
+        console.log('Start creating data', {amountRows, amountColumns});
+
+        let me               = this,
+            start            = performance.now(),
+            amountFirstnames = me.firstnames.length,
+            amountLastnames  = me.lastnames.length,
+            records          = [],
+            row              = 0,
+            column, record;
+
+        for (; row < amountRows; row++) {
+            column = 7;
+            record = {
+                id       : row + 1,
+                counter  : Math.round(Math.random() * 100),
+                firstname: me.firstnames[Math.floor(Math.random() * amountFirstnames)],
+                lastname : me.lastnames[ Math.floor(Math.random() * amountLastnames)],
+                progress : Math.round(Math.random() * 100)
+            };
+
+            for (; column <= amountColumns; column++) {
+                record['number' + column] = Math.round(Math.random() * 10000)
+            }
+
+            records.push(record)
+        }
+
+        console.log(`Data creation total time: ${Math.round(performance.now() - start)}ms`);
+
+        return records
+    }
+}
+
+export default Neo.setupClass(MainStore);
