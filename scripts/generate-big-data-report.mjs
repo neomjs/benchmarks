@@ -1,6 +1,18 @@
 import fs from 'fs-extra';
 import path from 'path';
 
+/**
+ * Calculates the standard deviation of an array of numbers.
+ * @param {number[]} arr The array of numbers.
+ * @returns {number} The standard deviation.
+ */
+function getStandardDeviation(arr) {
+    if (arr.length < 2) return 0;
+    const n = arr.length;
+    const mean = arr.reduce((a, b) => a + b) / n;
+    return Math.sqrt(arr.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
+}
+
 const resultsDir = './test-results-data/neo/big-data';
 const outputFile = 'BENCHMARK_RESULTS_NEO_BIG_DATA.md';
 
@@ -41,16 +53,21 @@ async function generateReport() {
     }
 
     // 2. Calculate stats
-    const stats = {}; // { 'change-rows': { 'chromium-dev': { min, max, avg }, ... } }
+    const stats = {}; // { 'change-rows': { 'chromium-dev': { min, max, avg, stdDev, runs }, ... } }
     for (const metricName in results) {
         stats[metricName] = {};
         for (const browser in results[metricName]) {
             const values = results[metricName][browser];
             const sum = values.reduce((a, b) => a + b, 0);
+            const avg = (sum / values.length); // Calculate raw average for stdDev
+            const stdDev = getStandardDeviation(values);
+
             stats[metricName][browser] = {
                 min: Math.min(...values).toFixed(2),
                 max: Math.max(...values).toFixed(2),
-                avg: (sum / values.length).toFixed(2),
+                avg: avg.toFixed(2),
+                stdDev: stdDev.toFixed(2),
+                runs: values.length,
             };
         }
     }
@@ -85,12 +102,18 @@ async function generateReport() {
     for (const groupName of sortedGroupNames) {
         const group = groupedStats[groupName];
         report += `## ${groupName}\n\n`;
-        report += `| Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
-`;
-        report += `| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-`;
-        report += `| | | Min | Max | Avg | Min | Max | Avg |
-`; // Second header row for sub-columns
+
+        const hasUiUpdateTime = !!group['UI Update Time'];
+
+        if (hasUiUpdateTime) {
+            report += `| Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |\n`;
+            report += `| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |\n`;
+            report += `| | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |\n`;
+        } else {
+            report += `| Browser | Mode | Total Time (ms) | | |\n`;
+            report += `| :--- | :--- | ---: | ---: | ---: |\n`;
+            report += `| | | Min | Max | Avg ± StdDev |\n`;
+        }
 
         const sortedBrowsers = Object.keys(group['Total Time'] || group['UI Update Time'] || {}).sort();
 
@@ -99,12 +122,15 @@ async function generateReport() {
             const capitalizedBrowser = browser.charAt(0).toUpperCase() + browser.slice(1);
 
             // Get data for Total Time
-            const totalData = group['Total Time'] && group['Total Time'][browserMode] ? group['Total Time'][browserMode] : { min: 'N/A', max: 'N/A', avg: 'N/A' };
-            // Get data for UI Update Time
-            const uiUpdateData = group['UI Update Time'] && group['UI Update Time'][browserMode] ? group['UI Update Time'][browserMode] : { min: 'N/A', max: 'N/A', avg: 'N/A' };
+            const totalData = group['Total Time'] && group['Total Time'][browserMode] ? group['Total Time'][browserMode] : { min: 'N/A', max: 'N/A', avg: 'N/A', stdDev: 'N/A', runs: 'N/A' };
 
-            report += `| ${capitalizedBrowser} | ${mode} | ${totalData.min} | ${totalData.max} | ${totalData.avg} | ${uiUpdateData.min} | ${uiUpdateData.max} | ${uiUpdateData.avg} |
-`;
+            if (hasUiUpdateTime) {
+                // Get data for UI Update Time
+                const uiUpdateData = group['UI Update Time'] && group['UI Update Time'][browserMode] ? group['UI Update Time'][browserMode] : { min: 'N/A', max: 'N/A', avg: 'N/A', stdDev: 'N/A', runs: 'N/A' };
+                report += `| ${capitalizedBrowser} | ${mode} | ${totalData.min} | ${totalData.max} | ${totalData.avg} ± ${totalData.stdDev} | ${uiUpdateData.min} | ${uiUpdateData.max} | ${uiUpdateData.avg} ± ${uiUpdateData.stdDev} |\n`;
+            } else {
+                report += `| ${capitalizedBrowser} | ${mode} | ${totalData.min} | ${totalData.max} | ${totalData.avg} ± ${totalData.stdDev} |\n`;
+            }
         }
         report += '\n'; // Add a newline after each group table
     }
@@ -120,6 +146,18 @@ async function generateReport() {
         systemInfoSection += `* **Playwright:** ${systemInfo.playwrightVersion}\n\n`;
     } catch (e) {
         systemInfoSection += 'Could not load system information.\n\n';
+    }
+
+    // Add number of runs as a footer note
+    let numberOfRuns = 0;
+    if (Object.keys(stats).length > 0) {
+        const firstMetricName = Object.keys(stats)[0];
+        const firstBrowserMode = Object.keys(stats[firstMetricName])[0];
+        numberOfRuns = stats[firstMetricName][firstBrowserMode].runs;
+    }
+
+    if (numberOfRuns > 0) {
+        report += `\n\nThe data is aggregated over **${numberOfRuns} run(s)**.\n\n`;
     }
 
     report += systemInfoSection;
