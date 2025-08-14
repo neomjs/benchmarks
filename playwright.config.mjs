@@ -116,6 +116,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: (() => {
     const framework = process.env.FRAMEWORK;
+    const app       = process.env.APP;
 
     const servers = {
       'angular': {
@@ -124,7 +125,7 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
       },
       'neo': {
-        command: 'npm --prefix apps/interactive-benchmark-neo run server-start:headless',
+        command: `npm --prefix apps/${app === 'bigData' ? 'bigData/neo' : 'interactive-benchmark-neo'} run server-start:headless`,
         url: 'http://localhost:8080',
         reuseExistingServer: !process.env.CI,
       },

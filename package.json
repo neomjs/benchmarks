@@ -9,6 +9,7 @@
         "test:angular-scrolling"              : "FRAMEWORK=angular npx playwright test tests/angular-scrolling.spec.mjs",
         "test:neo"                            : "FRAMEWORK=neo npx playwright test tests/neo.spec.mjs",
         "test:neo-scrolling"                  : "FRAMEWORK=neo npx playwright test tests/neo-scrolling.spec.mjs",
+        "test:neo-big-data"                   : "FRAMEWORK=neo APP=bigData npx playwright test tests/neo-big-data.spec.mjs",
         "test:react"                          : "FRAMEWORK=react npx playwright test tests/react.spec.mjs",
         "test:react-scrolling"                : "FRAMEWORK=react npx playwright test tests/react-scrolling.spec.mjs",
         "benchmark:accurate:all"              : "node ./scripts/run-benchmarks.mjs --framework=all --suite=all",
