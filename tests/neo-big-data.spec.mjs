@@ -180,3 +180,73 @@ test('should filter the grid by firstname', async ({page}) => {
     test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid': duration }) });
     console.log(`[Benchmark] filter-grid: ${duration.toFixed(2)} ms`);
 });
+
+test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
+    // 1. Change rows to 100k
+    const rowsDuration = await page.evaluate(() => {
+        const action = () => {
+            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+            const label = findLabel('Amount Rows');
+            const combobox = label.closest('.neo-combobox');
+            const trigger = combobox.querySelector('.fa-caret-down');
+            trigger.click();
+
+            const pickerObserver = new MutationObserver(() => {
+                const picker = document.querySelector('.neo-picker-container');
+                if (picker) {
+                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '100000');
+                    if (item) {
+                        pickerObserver.disconnect();
+                        item.click();
+                    }
+                }
+            });
+            pickerObserver.observe(document.body, { childList: true, subtree: true });
+        };
+
+        const condition = () => {
+            const grid = document.querySelector('[role="grid"]');
+            return grid && grid.getAttribute('aria-rowcount') === '100002';
+        };
+
+        return window.measurePerformance('change-rows-100k', action, condition);
+    });
+
+    const rowsMetricName = 'Change Rows from 1,000 to 100,000';
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ [rowsMetricName]: rowsDuration }) });
+    console.log(`[Benchmark] ${rowsMetricName}: ${rowsDuration.toFixed(2)} ms`);
+
+    // 2. Change columns to 200
+    const colsDuration = await page.evaluate(() => {
+        const action = () => {
+            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+            const label = findLabel('Amount Columns');
+            const combobox = label.closest('.neo-combobox');
+            const trigger = combobox.querySelector('.fa-caret-down');
+            trigger.click();
+
+            const pickerObserver = new MutationObserver(() => {
+                const picker = document.querySelector('.neo-picker-container');
+                if (picker) {
+                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '200');
+                    if (item) {
+                        pickerObserver.disconnect();
+                        item.click();
+                    }
+                }
+            });
+            pickerObserver.observe(document.body, { childList: true, subtree: true });
+        };
+
+        const condition = () => {
+            const grid = document.querySelector('[role="grid"]');
+            return grid && grid.getAttribute('aria-colcount') === '200';
+        };
+
+        return window.measurePerformance('change-cols-200', action, condition);
+    });
+
+    const colsMetricName = 'Change Columns from 50 to 200';
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ [colsMetricName]: colsDuration }) });
+    console.log(`[Benchmark] ${colsMetricName}: ${colsDuration.toFixed(2)} ms`);
+});

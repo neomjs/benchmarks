@@ -4,34 +4,56 @@
 
 | Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |
 | :--- | :--- | ---: | ---: | ---: |
-| Chromium | dev | 136.80 | 158.00 | 143.40 |
-| Chromium | prod | 133.10 | 162.60 | 143.50 |
-| Firefox | dev | 141.00 | 180.00 | 159.20 |
-| Firefox | prod | 157.00 | 175.00 | 162.00 |
-| Webkit | dev | 183.00 | 193.00 | 189.60 |
-| Webkit | prod | 183.00 | 199.00 | 191.80 |
+| Chromium | dev | 132.10 | 153.00 | 145.18 |
+| Chromium | prod | 132.70 | 150.00 | 137.22 |
+| Firefox | dev | 142.00 | 159.00 | 154.80 |
+| Firefox | prod | 140.00 | 159.00 | 154.60 |
+| Webkit | dev | 165.00 | 210.00 | 191.20 |
+| Webkit | prod | 190.00 | 204.00 | 196.40 |
 
 ## Change Columns from 50 to 75
 
 | Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |
 | :--- | :--- | ---: | ---: | ---: |
-| Chromium | dev | 232.70 | 251.10 | 243.64 |
-| Chromium | prod | 234.00 | 250.90 | 241.30 |
-| Firefox | dev | 256.00 | 274.00 | 260.40 |
-| Firefox | prod | 257.00 | 290.00 | 275.60 |
-| Webkit | dev | 286.00 | 313.00 | 298.60 |
-| Webkit | prod | 286.00 | 304.00 | 297.60 |
+| Chromium | dev | 232.80 | 236.40 | 234.42 |
+| Chromium | prod | 231.80 | 250.90 | 243.58 |
+| Firefox | dev | 252.00 | 274.00 | 262.40 |
+| Firefox | prod | 252.00 | 273.00 | 261.20 |
+| Webkit | dev | 283.00 | 329.00 | 307.60 |
+| Webkit | prod | 294.00 | 316.00 | 307.00 |
 
 ## Filter Grid
 
 | Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |
 | :--- | :--- | ---: | ---: | ---: |
-| Chromium | dev | 55.30 | 67.90 | 63.02 |
-| Chromium | prod | 52.50 | 57.60 | 55.92 |
-| Firefox | dev | 39.00 | 42.00 | 40.60 |
-| Firefox | prod | 38.00 | 42.00 | 40.00 |
-| Webkit | dev | 61.00 | 103.00 | 78.00 |
-| Webkit | prod | 46.00 | 86.00 | 68.80 |
+| Chromium | dev | 59.00 | 68.40 | 64.64 |
+| Chromium | prod | 64.00 | 70.70 | 67.28 |
+| Firefox | dev | 38.00 | 43.00 | 40.40 |
+| Firefox | prod | 37.00 | 60.00 | 43.20 |
+| Webkit | dev | 45.00 | 67.00 | 58.80 |
+| Webkit | prod | 47.00 | 63.00 | 56.80 |
+
+## Change Rows From 1,000 To 100,000
+
+| Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |
+| :--- | :--- | ---: | ---: | ---: |
+| Chromium | dev | 835.50 | 880.00 | 856.14 |
+| Chromium | prod | 835.10 | 910.80 | 865.74 |
+| Firefox | dev | 650.00 | 708.00 | 680.40 |
+| Firefox | prod | 674.00 | 692.00 | 684.40 |
+| Webkit | dev | 457.00 | 464.00 | 461.40 |
+| Webkit | prod | 455.00 | 486.00 | 472.00 |
+
+## Change Columns From 50 To 200
+
+| Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |
+| :--- | :--- | ---: | ---: | ---: |
+| Chromium | dev | 2973.90 | 3071.20 | 3042.00 |
+| Chromium | prod | 3030.70 | 3184.00 | 3097.00 |
+| Firefox | dev | 2160.00 | 2232.00 | 2204.80 |
+| Firefox | prod | 2178.00 | 2329.00 | 2243.00 |
+| Webkit | dev | 2848.00 | 3188.00 | 3030.20 |
+| Webkit | prod | 2923.00 | 3169.00 | 3075.40 |
 
 ## System Information
 * **OS:** macOS 15.5 (x64)
