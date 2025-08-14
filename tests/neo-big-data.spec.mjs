@@ -36,60 +36,80 @@ async function waitForGridFilter(page, initialRowCount, timeout = 15000) {
     }, initialRowCount, { timeout });
 }
 
-test.beforeEach(async ({page}) => {
-    // Inject the measurement functions into the browser context's window object
-    await page.addInitScript({
-        content: `
-            window.consoleLogs = [];
-        `
-    });
+/**
+ * Measures the performance of a given action within a single browser context.
+ * @param {import('@playwright/test').Page} page
+ * @param {Function} actionFn The function to execute that triggers the DOM change.
+ * @returns {Promise<number>} The duration of the operation in milliseconds.
+ */
+async function measurePerformance(page, actionFn) {
+    return page.evaluate(async (actionFnString) => {
+        const action = new Function(`return (${actionFnString})()`);
+        const gridEl = document.querySelector('[role="grid"]');
 
-    // Listen for console messages from the browser and print them to Node.js console
-    page.on('console', msg => {
-        // Also push to an array in the browser context for later inspection
-        page.evaluate(log => {
-            if (window.consoleLogs) {
-                window.consoleLogs.push(log);
-            }
-        }, msg.text()).catch(() => {
-            // This can happen if the test ends and the page is closed
-            // before the console message is processed. It's safe to ignore.
-        });
-
-        if (msg.type() !== 'warning') {
-            console.log(`Browser console [${msg.type()}]: ${msg.text()}`);
+        if (!gridEl) {
+            throw new Error('Grid element not found');
         }
-    });
-});
+
+        return new Promise(async (resolve, reject) => {
+            const gridObserver = new MutationObserver(() => {
+                const time = performance.now() - startTime;
+                gridObserver.disconnect();
+                resolve(time);
+            });
+
+            gridObserver.observe(gridEl, { attributes: true, childList: true, subtree: true });
+
+            const startTime = performance.now();
+
+            try {
+                await action();
+            } catch (e) {
+                reject(e.message);
+            }
+        });
+    }, actionFn.toString());
+}
 
 test.describe('Neo BigData App', () => {
     test.beforeEach(async ({page}) => {
         await page.goto('/apps/bigdata/');
+        await waitForGridReady(page, 1002, 50);
     });
 
     test('should load the app and display the initial grid data', async ({page}) => {
-        // Check the page title
         await expect(page).toHaveTitle('Big Data Neo');
-
-        // Wait for the grid to be ready with 1002 rows (1-based index, plus column headers) and 50 columns
-        await waitForGridReady(page, 1002, 50);
-
-        // At this point, the core conditions are met, so we can consider the test passed.
         const grid = await page.locator('[role="grid"]');
         await expect(grid).toHaveAttribute('aria-rowcount', '1002');
         await expect(grid).toHaveAttribute('aria-colcount', '50');
     });
 
     test('should change the amount of rows', async ({page}) => {
-        await waitForGridReady(page, 1002, 50);
+        const duration = await measurePerformance(page, () => {
+            return new Promise(resolve => {
+                const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+                const label = findLabel('Amount Rows');
+                const combobox = label.closest('.neo-combobox');
+                const trigger = combobox.querySelector('.fa-caret-down');
 
-        // Open the controls panel
-        await page.locator('button.controls-container-button').click();
-        await page.waitForTimeout(500); // Wait for animation
+                const pickerObserver = new MutationObserver(() => {
+                    const picker = document.querySelector('.neo-picker-container');
+                    if (picker) {
+                        const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '5000');
+                        if (item) {
+                            pickerObserver.disconnect();
+                            item.click();
+                            resolve();
+                        }
+                    }
+                });
+                pickerObserver.observe(document.body, { childList: true, subtree: true });
+                trigger.click();
+            });
+        });
 
-        // Click the combo box to open the list, then click the item.
-        await page.locator('label:has-text("Amount Rows")').click();
-        await page.getByRole('option', { name: '5000', exact: true }).click();
+        console.log(`[Benchmark] change-rows: ${duration.toFixed(2)} ms`);
+        expect(duration).toBeGreaterThan(0);
 
         await waitForGridReady(page, 5002, 50);
         const grid = await page.locator('[role="grid"]');
@@ -97,14 +117,31 @@ test.describe('Neo BigData App', () => {
     });
 
     test('should change the amount of columns', async ({page}) => {
-        await waitForGridReady(page, 1002, 50);
+        const duration = await measurePerformance(page, () => {
+            return new Promise(resolve => {
+                const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+                const label = findLabel('Amount Columns');
+                const combobox = label.closest('.neo-combobox');
+                const trigger = combobox.querySelector('.fa-caret-down');
 
-        // Open the controls panel
-        await page.locator('button.controls-container-button').click();
-        await page.waitForTimeout(500); // Wait for animation
+                const pickerObserver = new MutationObserver(() => {
+                    const picker = document.querySelector('.neo-picker-container');
+                    if (picker) {
+                        const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '75');
+                        if (item) {
+                            pickerObserver.disconnect();
+                            item.click();
+                            resolve();
+                        }
+                    }
+                });
+                pickerObserver.observe(document.body, { childList: true, subtree: true });
+                trigger.click();
+            });
+        });
 
-        await page.locator('label:has-text("Amount Columns")').click();
-        await page.locator('.neo-list-item', { hasText: '75' }).click();
+        console.log(`[Benchmark] change-cols: ${duration.toFixed(2)} ms`);
+        expect(duration).toBeGreaterThan(0);
 
         await waitForGridReady(page, 1002, 75);
         const grid = await page.locator('[role="grid"]');
@@ -112,20 +149,25 @@ test.describe('Neo BigData App', () => {
     });
 
     test('should filter the grid by firstname', async ({page}) => {
-        await waitForGridReady(page, 1002, 50);
+        const initialRowCount = await page.locator('[role="grid"]').getAttribute('aria-rowcount');
 
-        // Open the controls panel
-        await page.locator('button.controls-container-button').click();
-        await page.waitForTimeout(500); // Wait for animation
+        const duration = await measurePerformance(page, () => {
+            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+            const label = findLabel('Firstname');
+            const textfield = label.closest('.neo-textfield');
+            const input = textfield.querySelector('input');
+            input.value = 'Amanda';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
 
-        await page.locator('input[name="firstname"]').fill('Amanda');
+        console.log(`[Benchmark] filter-grid: ${duration.toFixed(2)} ms`);
+        expect(duration).toBeGreaterThan(0);
 
-        // Wait for the filter to be applied, which will change the row count
-        await waitForGridFilter(page, 1002);
-
+        await waitForGridFilter(page, parseInt(initialRowCount));
         const grid = await page.locator('[role="grid"]');
         const currentRowCount = await grid.getAttribute('aria-rowcount');
-        expect(parseInt(currentRowCount)).toBeLessThan(1002);
+        expect(parseInt(currentRowCount)).toBeLessThan(parseInt(initialRowCount));
         expect(parseInt(currentRowCount)).toBeGreaterThan(0);
     });
 });
