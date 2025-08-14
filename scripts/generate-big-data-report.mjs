@@ -23,15 +23,15 @@ async function generateReport() {
                         for (const annotation of test.annotations) {
                             if (annotation.type === 'performance') {
                                 const performanceData = JSON.parse(annotation.description);
-                                const [metricName, value] = Object.entries(performanceData)[0];
-
-                                if (!results[metricName]) {
-                                    results[metricName] = {};
+                                for (const [metricName, value] of Object.entries(performanceData)) {
+                                    if (!results[metricName]) {
+                                        results[metricName] = {};
+                                    }
+                                    if (!results[metricName][browser]) {
+                                        results[metricName][browser] = [];
+                                    }
+                                    results[metricName][browser].push(value);
                                 }
-                                if (!results[metricName][browser]) {
-                                    results[metricName][browser] = [];
-                                }
-                                results[metricName][browser].push(value);
                             }
                         }
                     }
