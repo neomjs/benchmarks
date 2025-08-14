@@ -69,18 +69,9 @@ async function generateReport() {
             baseName = metricName.replace(' (UI Update)', '');
             type = 'UI Update Time';
         }
-
-        // Normalize base names for older metrics and new large data tests
-        if (baseName === 'change-rows') {
-            baseName = 'Change Rows (Small)';
-        } else if (baseName === 'change-cols') {
-            baseName = 'Change Columns (Small)';
-        } else if (baseName === 'filter-grid') {
-            baseName = 'Filter Grid';
-        } else if (baseName === 'Change Rows from 1,000 to 100,000') {
-            baseName = 'Change Rows (Large)';
-        } else if (baseName === 'Change Columns from 50 to 200 (with 100k rows)') {
-            baseName = 'Change Columns (Large)';
+        // If the metricName includes "(Total)", remove it for the baseName
+        if (baseName.includes('(Total)')) {
+            baseName = baseName.replace(' (Total)', '');
         }
 
         if (!groupedStats[baseName]) {
@@ -94,22 +85,26 @@ async function generateReport() {
     for (const groupName of sortedGroupNames) {
         const group = groupedStats[groupName];
         report += `## ${groupName}\n\n`;
-        report += '| Type | Browser | Mode | Min (ms) | Max (ms) | Avg (ms) |\n';
-        report += '| :--- | :--- | :--- | ---: | ---: | ---: |\n';
+        report += `| Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
+`;
+        report += `| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+`;
+        report += `| | | Min | Max | Avg | Min | Max | Avg |
+`; // Second header row for sub-columns
 
-        const types = ['Total Time', 'UI Update Time']; // Order of display
+        const sortedBrowsers = Object.keys(group['Total Time'] || group['UI Update Time'] || {}).sort();
 
-        for (const type of types) {
-            if (group[type]) {
-                const data = group[type];
-                const sortedBrowsers = Object.keys(data).sort(); // Sort browsers within each type
+        for (const browserMode of sortedBrowsers) {
+            const [browser, mode] = browserMode.split('-');
+            const capitalizedBrowser = browser.charAt(0).toUpperCase() + browser.slice(1);
 
-                for (const browserMode of sortedBrowsers) {
-                    const [browser, mode] = browserMode.split('-');
-                    const { min, max, avg } = data[browserMode];
-                    report += `| ${type} | ${browser.charAt(0).toUpperCase() + browser.slice(1)} | ${mode} | ${min} | ${max} | ${avg} |\n`;
-                }
-            }
+            // Get data for Total Time
+            const totalData = group['Total Time'] && group['Total Time'][browserMode] ? group['Total Time'][browserMode] : { min: 'N/A', max: 'N/A', avg: 'N/A' };
+            // Get data for UI Update Time
+            const uiUpdateData = group['UI Update Time'] && group['UI Update Time'][browserMode] ? group['UI Update Time'][browserMode] : { min: 'N/A', max: 'N/A', avg: 'N/A' };
+
+            report += `| ${capitalizedBrowser} | ${mode} | ${totalData.min} | ${totalData.max} | ${totalData.avg} | ${uiUpdateData.min} | ${uiUpdateData.max} | ${uiUpdateData.avg} |
+`;
         }
         report += '\n'; // Add a newline after each group table
     }
