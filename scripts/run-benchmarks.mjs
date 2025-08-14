@@ -21,7 +21,7 @@ async function main() {
     }
 
     const frameworksToRun = framework === 'all' ? ['neo', 'react', 'angular'] : [framework];
-    const suitesToRun     = suite === 'all' ? ['duration', 'scrolling'] : [suite];
+    const suitesToRun     = suite === 'all' ? ['duration', 'scrolling', 'big-data'] : [suite];
 
     console.log(`Starting benchmark suite for framework(s): ${frameworksToRun.join(', ')} and suite(s): ${suitesToRun.join(', ')}. Executing tests ${runs} time(s)...`);
 
@@ -29,7 +29,8 @@ async function main() {
     const specFiles = {
         neo: {
             duration: 'tests/neo.spec.mjs',
-            scrolling: 'tests/neo-scrolling.spec.mjs'
+            scrolling: 'tests/neo-scrolling.spec.mjs',
+            'big-data': 'tests/neo-big-data.spec.mjs'
         },
         react: {
             duration: 'tests/react.spec.mjs',
@@ -57,7 +58,10 @@ async function main() {
             await fs.ensureDir(RESULTS_DIR);
             await fs.emptyDir(RESULTS_DIR);
 
-            const testCommand = `CI=true npx playwright test ${filesToTest}`;
+            let testCommand = `CI=true npx playwright test ${filesToTest}`;
+            if (fw === 'neo' && s === 'big-data') {
+                testCommand = `APP=bigData ${testCommand}`;
+            }
 
             // 4. Loop through the specified number of runs for the current suite
             for (let i = 1; i <= runs; i++) {
