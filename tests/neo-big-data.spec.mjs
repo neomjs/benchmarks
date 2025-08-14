@@ -13,12 +13,27 @@ async function waitForGridReady(page, expectedRowCount, expectedColCount, timeou
         const grid = document.querySelector('[role="grid"]');
         if (!grid) return false;
 
-        const rowCountCorrect = grid.getAttribute('aria-rowcount') === String(expectedRowCount);
-        const colCountCorrect = grid.getAttribute('aria-colcount') === String(expectedColCount);
-        const firstRowExists  = document.querySelector('#neo-grid-body-1__row-0');
+        const rowCountTotal = grid.getAttribute('aria-rowcount') === String(expectedRowCount);
+        const colCountTotal = grid.getAttribute('aria-colcount') === String(expectedColCount);
+        const firstRowExists  = document.querySelector('.neo-grid-row');
 
-        return rowCountCorrect && colCountCorrect && firstRowExists;
+        return rowCountTotal && colCountTotal && firstRowExists;
     }, { expectedRowCount, expectedColCount }, {timeout});
+}
+
+/**
+ * Waits for the grid's row count to change to a value other than the initial one.
+ * @param {import('@playwright/test').Page} page
+ * @param {number} initialRowCount
+ * @param {number} [timeout=15000]
+ */
+async function waitForGridFilter(page, initialRowCount, timeout = 15000) {
+    await page.waitForFunction((initialRowCount) => {
+        const grid = document.querySelector('[role="grid"]');
+        if (!grid) return false;
+        const currentRowCount = grid.getAttribute('aria-rowcount');
+        return currentRowCount !== String(initialRowCount);
+    }, initialRowCount, { timeout });
 }
 
 test.beforeEach(async ({page}) => {
@@ -60,9 +75,57 @@ test.describe('Neo BigData App', () => {
         await waitForGridReady(page, 1002, 50);
 
         // At this point, the core conditions are met, so we can consider the test passed.
-        // We can add a final expect for good measure.
         const grid = await page.locator('[role="grid"]');
         await expect(grid).toHaveAttribute('aria-rowcount', '1002');
         await expect(grid).toHaveAttribute('aria-colcount', '50');
+    });
+
+    test('should change the amount of rows', async ({page}) => {
+        await waitForGridReady(page, 1002, 50);
+
+        // Open the controls panel
+        await page.locator('button.controls-container-button').click();
+        await page.waitForTimeout(500); // Wait for animation
+
+        // Click the combo box to open the list, then click the item.
+        await page.locator('label:has-text("Amount Rows")').click();
+        await page.locator('.neo-list-item', { hasText: '5000' }).click();
+
+        await waitForGridReady(page, 5002, 50);
+        const grid = await page.locator('[role="grid"]');
+        await expect(grid).toHaveAttribute('aria-rowcount', '5002');
+    });
+
+    test('should change the amount of columns', async ({page}) => {
+        await waitForGridReady(page, 1002, 50);
+
+        // Open the controls panel
+        await page.locator('button.controls-container-button').click();
+        await page.waitForTimeout(500); // Wait for animation
+
+        await page.locator('label:has-text("Amount Columns")').click();
+        await page.locator('.neo-list-item', { hasText: '75' }).click();
+
+        await waitForGridReady(page, 1002, 75);
+        const grid = await page.locator('[role="grid"]');
+        await expect(grid).toHaveAttribute('aria-colcount', '75');
+    });
+
+    test('should filter the grid by firstname', async ({page}) => {
+        await waitForGridReady(page, 1002, 50);
+
+        // Open the controls panel
+        await page.locator('button.controls-container-button').click();
+        await page.waitForTimeout(500); // Wait for animation
+
+        await page.locator('input[name="firstname"]').fill('Amanda');
+
+        // Wait for the filter to be applied, which will change the row count
+        await waitForGridFilter(page, 1002);
+
+        const grid = await page.locator('[role="grid"]');
+        const currentRowCount = await grid.getAttribute('aria-rowcount');
+        expect(parseInt(currentRowCount)).toBeLessThan(1002);
+        expect(parseInt(currentRowCount)).toBeGreaterThan(0);
     });
 });
