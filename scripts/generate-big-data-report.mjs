@@ -59,27 +59,59 @@ async function generateReport() {
     let report = '# Neo.mjs Big Data Grid Benchmark Results\n\n';
     let systemInfoSection = '';
 
+    const groupedStats = {};
+
     for (const metricName in stats) {
-        let title = metricName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        if (metricName === 'change-rows') {
-            title = 'Change Rows from 1,000 to 5,000';
-        } else if (metricName === 'change-cols') {
-            title = 'Change Columns from 50 to 75';
-        } else if (metricName === 'Change Columns from 50 to 200') {
-            title = 'Change Columns from 50 to 200 (with 100k rows)';
-        }
-        report += `## ${title}\n\n`;
-        report += '| Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |\n';
-        report += '| :--- | :--- | ---: | ---: | ---: |\n';
+        let baseName = metricName;
+        let type = 'Total Time';
 
-        const sortedKeys = Object.keys(stats[metricName]).sort();
-
-        for (const key of sortedKeys) {
-            const [browser, mode] = key.split('-');
-            const { min, max, avg } = stats[metricName][key];
-            report += `| ${browser.charAt(0).toUpperCase() + browser.slice(1)} | ${mode} | ${min} | ${max} | ${avg} |\n`;
+        if (metricName.includes('(UI Update)')) {
+            baseName = metricName.replace(' (UI Update)', '');
+            type = 'UI Update Time';
         }
-        report += '\n';
+
+        // Normalize base names for older metrics and new large data tests
+        if (baseName === 'change-rows') {
+            baseName = 'Change Rows (Small)';
+        } else if (baseName === 'change-cols') {
+            baseName = 'Change Columns (Small)';
+        } else if (baseName === 'filter-grid') {
+            baseName = 'Filter Grid';
+        } else if (baseName === 'Change Rows from 1,000 to 100,000') {
+            baseName = 'Change Rows (Large)';
+        } else if (baseName === 'Change Columns from 50 to 200 (with 100k rows)') {
+            baseName = 'Change Columns (Large)';
+        }
+
+        if (!groupedStats[baseName]) {
+            groupedStats[baseName] = {};
+        }
+        groupedStats[baseName][type] = stats[metricName];
+    }
+
+    const sortedGroupNames = Object.keys(groupedStats).sort();
+
+    for (const groupName of sortedGroupNames) {
+        const group = groupedStats[groupName];
+        report += `## ${groupName}\n\n`;
+        report += '| Type | Browser | Mode | Min (ms) | Max (ms) | Avg (ms) |\n';
+        report += '| :--- | :--- | :--- | ---: | ---: | ---: |\n';
+
+        const types = ['Total Time', 'UI Update Time']; // Order of display
+
+        for (const type of types) {
+            if (group[type]) {
+                const data = group[type];
+                const sortedBrowsers = Object.keys(data).sort(); // Sort browsers within each type
+
+                for (const browserMode of sortedBrowsers) {
+                    const [browser, mode] = browserMode.split('-');
+                    const { min, max, avg } = data[browserMode];
+                    report += `| ${type} | ${browser.charAt(0).toUpperCase() + browser.slice(1)} | ${mode} | ${min} | ${max} | ${avg} |\n`;
+                }
+            }
+        }
+        report += '\n'; // Add a newline after each group table
     }
 
     // Add system info

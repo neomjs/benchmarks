@@ -52,10 +52,41 @@ const measurePerformanceInBrowser = (testName, action, condition) => {
     });
 };
 
+const measureUiUpdatePerformanceInBrowser = (testName, condition) => {
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+            try {
+                if (condition()) {
+                    const endTime = performance.now();
+                    observer.disconnect();
+                    clearTimeout(timeoutId);
+                    resolve(endTime - startTime);
+                }
+            } catch (e) {
+                observer.disconnect();
+                clearTimeout(timeoutId);
+                console.error(`Condition error in ${testName}:`, e);
+                reject(e);
+            }
+        });
+
+        observer.observe(document.body, {attributes: true, childList: true, subtree: true});
+
+        const timeoutId = setTimeout(() => {
+            observer.disconnect();
+            reject(new Error(`UI update benchmark timed out for "${testName}".`));
+        }, 30000);
+
+        const startTime = performance.now(); // Measurement starts here
+        // The action (store.add) is assumed to have just happened
+    });
+};
+
 test.beforeEach(async ({page}) => {
     await page.addInitScript({
         content: `
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
+            window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
             window.consoleLogs        = [];
         `
     });
@@ -89,71 +120,81 @@ test('should load the app and display the initial grid data', async ({page}) => 
 });
 
 test('should change the amount of rows', async ({page}) => {
-    const duration = await page.evaluate(() => {
-        const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Rows');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
+    // Step 1: Trigger the UI action (combobox click)
+    await page.evaluate(() => {
+        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+        const label = findLabel('Amount Rows');
+        const combobox = label.closest('.neo-combobox');
+        const trigger = combobox.querySelector('.fa-caret-down');
+        trigger.click();
 
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '5000');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
+        const pickerObserver = new MutationObserver(() => {
+            const picker = document.querySelector('.neo-picker-container');
+            if (picker) {
+                const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '5000');
+                if (item) {
+                    pickerObserver.disconnect();
+                    item.click();
                 }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
-        };
+            }
+        });
+        pickerObserver.observe(document.body, { childList: true, subtree: true });
+    });
 
+    // Step 2: Wait for the "Data creation total time" log
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
+
+    // Step 3: Start measuring UI update
+    const duration = await page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
             return grid && grid.getAttribute('aria-rowcount') === '5002';
         };
-
-        return window.measurePerformance('change-rows', action, condition);
+        return window.measureUiUpdatePerformance('change-rows-ui-update', condition);
     });
 
-    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'change-rows': duration }) });
-    console.log(`[Benchmark] change-rows: ${duration.toFixed(2)} ms`);
+    const metricName = 'Change Rows from 1,000 to 5,000 (UI Update)';
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ [metricName]: duration }) });
+    console.log(`[Benchmark] ${metricName}: ${duration.toFixed(2)} ms`);
 });
 
 test('should change the amount of columns', async ({page}) => {
-    const duration = await page.evaluate(() => {
-        const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Columns');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
+    // Step 1: Trigger the UI action (combobox click)
+    await page.evaluate(() => {
+        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+        const label = findLabel('Amount Columns');
+        const combobox = label.closest('.neo-combobox');
+        const trigger = combobox.querySelector('.fa-caret-down');
+        trigger.click();
 
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '75');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
+        const pickerObserver = new MutationObserver(() => {
+            const picker = document.querySelector('.neo-picker-container');
+            if (picker) {
+                const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '75');
+                if (item) {
+                    pickerObserver.disconnect();
+                    item.click();
                 }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
-        };
+            }
+        });
+        pickerObserver.observe(document.body, { childList: true, subtree: true });
+    });
 
+    // Step 2: Wait for the "Data creation total time" log
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
+
+    // Step 3: Start measuring UI update
+    const duration = await page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
             return grid && grid.getAttribute('aria-colcount') === '75';
         };
-
-        return window.measurePerformance('change-cols', action, condition);
+        return window.measureUiUpdatePerformance('change-cols-ui-update', condition);
     });
 
-    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'change-cols': duration }) });
-    console.log(`[Benchmark] change-cols: ${duration.toFixed(2)} ms`);
+    const metricName = 'Change Columns from 50 to 75 (UI Update)';
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ [metricName]: duration }) });
+    console.log(`[Benchmark] ${metricName}: ${duration.toFixed(2)} ms`);
 });
 
 test('should filter the grid by firstname', async ({page}) => {
@@ -183,70 +224,78 @@ test('should filter the grid by firstname', async ({page}) => {
 
 test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
     // 1. Change rows to 100k
-    const rowsDuration = await page.evaluate(() => {
-        const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Rows');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
+    // Step 1: Trigger the UI action (combobox click)
+    await page.evaluate(() => {
+        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+        const label = findLabel('Amount Rows');
+        const combobox = label.closest('.neo-combobox');
+        const trigger = combobox.querySelector('.fa-caret-down');
+        trigger.click();
 
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '100000');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
+        const pickerObserver = new MutationObserver(() => {
+            const picker = document.querySelector('.neo-picker-container');
+            if (picker) {
+                const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '100000');
+                if (item) {
+                    pickerObserver.disconnect();
+                    item.click();
                 }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
-        };
+            }
+        });
+        pickerObserver.observe(document.body, { childList: true, subtree: true });
+    });
 
+    // Step 2: Wait for the "Data creation total time" log
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
+
+    // Step 3: Start measuring UI update
+    const rowsDuration = await page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
             return grid && grid.getAttribute('aria-rowcount') === '100002';
         };
-
-        return window.measurePerformance('change-rows-100k', action, condition);
+        return window.measureUiUpdatePerformance('change-rows-100k-ui-update', condition);
     });
 
-    const rowsMetricName = 'Change Rows from 1,000 to 100,000';
+    const rowsMetricName = 'Change Rows from 1,000 to 100,000 (UI Update)';
     test.info().annotations.push({ type: 'performance', description: JSON.stringify({ [rowsMetricName]: rowsDuration }) });
     console.log(`[Benchmark] ${rowsMetricName}: ${rowsDuration.toFixed(2)} ms`);
 
     // 2. Change columns to 200
-    const colsDuration = await page.evaluate(() => {
-        const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Columns');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
+    // Step 1: Trigger the UI action (combobox click)
+    await page.evaluate(() => {
+        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+        const label = findLabel('Amount Columns');
+        const combobox = label.closest('.neo-combobox');
+        const trigger = combobox.querySelector('.fa-caret-down');
+        trigger.click();
 
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '200');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
+        const pickerObserver = new MutationObserver(() => {
+            const picker = document.querySelector('.neo-picker-container');
+            if (picker) {
+                const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '200');
+                if (item) {
+                    pickerObserver.disconnect();
+                    item.click();
                 }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
-        };
+            }
+        });
+        pickerObserver.observe(document.body, { childList: true, subtree: true });
+    });
 
+    // Step 2: Wait for the "Data creation total time" log
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
+
+    // Step 3: Start measuring UI update
+    const colsDuration = await page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
             return grid && grid.getAttribute('aria-colcount') === '200';
         };
-
-        return window.measurePerformance('change-cols-200', action, condition);
+        return window.measureUiUpdatePerformance('change-cols-200-ui-update', condition);
     });
 
-    const colsMetricName = 'Change Columns from 50 to 200';
+    const colsMetricName = 'Change Columns from 50 to 200 (with 100k rows) (UI Update)';
     test.info().annotations.push({ type: 'performance', description: JSON.stringify({ [colsMetricName]: colsDuration }) });
     console.log(`[Benchmark] ${colsMetricName}: ${colsDuration.toFixed(2)} ms`);
 });
