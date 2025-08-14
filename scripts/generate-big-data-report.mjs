@@ -17,11 +17,13 @@ async function generateReport() {
             for (const suite of runData.suites) {
                 for (const spec of suite.specs) {
                     for (const test of spec.tests) {
+                        const browser = test.projectName;
+                        if (!browser) continue;
+
                         for (const annotation of test.annotations) {
                             if (annotation.type === 'performance') {
                                 const performanceData = JSON.parse(annotation.description);
                                 const [metricName, value] = Object.entries(performanceData)[0];
-                                const browser = runData.config.projects.find(p => p.name.includes('chromium') || p.name.includes('firefox') || p.name.includes('webkit')).name;
 
                                 if (!results[metricName]) {
                                     results[metricName] = {};
@@ -55,22 +57,16 @@ async function generateReport() {
 
     // 3. Generate Markdown Report
     let report = '# Neo.mjs Big Data Grid Benchmark Results\n\n';
-
-    // Add system info
-    try {
-        const systemInfo = await fs.readJson('./benchmark-system-info.json');
-        report += '## System Information\n';
-        report += `* **OS:** ${systemInfo.os} ${systemInfo.osVersion} (${systemInfo.arch})\n`;
-        report += `* **CPU:** ${systemInfo.cpuModel} (${systemInfo.cpuCores} cores @ ${systemInfo.cpuSpeed}GHz)\n`;
-        report += `* **Memory:** ${systemInfo.totalMemory}GB\n`;
-        report += `* **Node.js:** ${systemInfo.nodeVersion}\n`;
-        report += `* **Playwright:** ${systemInfo.playwrightVersion}\n\n`;
-    } catch (e) {
-        report += 'Could not load system information.\n\n';
-    }
+    let systemInfoSection = '';
 
     for (const metricName in stats) {
-        report += `## ${metricName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n\n`;
+        let title = metricName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        if (metricName === 'change-rows') {
+            title = 'Change Rows from 1,000 to 5,000';
+        } else if (metricName === 'change-cols') {
+            title = 'Change Columns from 50 to 75';
+        }
+        report += `## ${title}\n\n`;
         report += '| Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |\n';
         report += '| :--- | :--- | ---: | ---: | ---: |\n';
 
@@ -83,6 +79,21 @@ async function generateReport() {
         }
         report += '\n';
     }
+
+    // Add system info
+    try {
+        const systemInfo = await fs.readJson('./benchmark-system-info.json');
+        systemInfoSection += '## System Information\n';
+        systemInfoSection += `* **OS:** ${systemInfo.os} ${systemInfo.osVersion} (${systemInfo.arch})\n`;
+        systemInfoSection += `* **CPU:** ${systemInfo.cpuModel} (${systemInfo.cpuCores} cores @ ${systemInfo.cpuSpeed}GHz)\n`;
+        systemInfoSection += `* **Memory:** ${systemInfo.totalMemory}GB\n`;
+        systemInfoSection += `* **Node.js:** ${systemInfo.nodeVersion}\n`;
+        systemInfoSection += `* **Playwright:** ${systemInfo.playwrightVersion}\n\n`;
+    } catch (e) {
+        systemInfoSection += 'Could not load system information.\n\n';
+    }
+
+    report += systemInfoSection;
 
     await fs.writeFile(outputFile, report);
     console.log(`Benchmark report generated: ${outputFile}`);
