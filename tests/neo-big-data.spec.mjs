@@ -89,7 +89,7 @@ test.describe('Neo BigData App', () => {
 
         // Click the combo box to open the list, then click the item.
         await page.locator('label:has-text("Amount Rows")').click();
-        await page.locator('.neo-list-item', { hasText: '5000' }).click();
+        await page.getByRole('option', { name: '5000', exact: true }).click();
 
         await waitForGridReady(page, 5002, 50);
         const grid = await page.locator('[role="grid"]');
