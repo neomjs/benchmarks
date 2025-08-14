@@ -65,6 +65,8 @@ async function generateReport() {
             title = 'Change Rows from 1,000 to 5,000';
         } else if (metricName === 'change-cols') {
             title = 'Change Columns from 50 to 75';
+        } else if (metricName === 'Change Columns from 50 to 200') {
+            title = 'Change Columns from 50 to 200 (with 100k rows)';
         }
         report += `## ${title}\n\n`;
         report += '| Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |\n';

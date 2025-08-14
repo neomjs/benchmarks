@@ -44,7 +44,7 @@
 | Webkit | dev | 457.00 | 464.00 | 461.40 |
 | Webkit | prod | 455.00 | 486.00 | 472.00 |
 
-## Change Columns From 50 To 200
+## Change Columns from 50 to 200 (with 100k rows)
 
 | Browser  | Mode | Min (ms) | Max (ms) | Avg (ms) |
 | :--- | :--- | ---: | ---: | ---: |
