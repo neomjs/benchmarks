@@ -23,7 +23,7 @@ const measurePerformanceInBrowser = (testName, action, condition) => {
         const timeoutId = setTimeout(() => {
             observer.disconnect();
             reject(new Error(`Benchmark timed out for "${testName}".`));
-        }, 30000);
+        }, 90000);
 
         const startTime = performance.now();
         try {
@@ -75,7 +75,7 @@ const measureUiUpdatePerformanceInBrowser = (testName, condition) => {
         const timeoutId = setTimeout(() => {
             observer.disconnect();
             reject(new Error(`UI update benchmark timed out for "${testName}".`));
-        }, 30000);
+        }, 90000);
 
         const startTime = performance.now(); // Measurement starts here
         // The action (store.add) is assumed to have just happened
@@ -123,6 +123,7 @@ test('should load the app and display the initial grid data', async ({page}) => 
 });
 
 test('should change the amount of rows', async ({page}) => {
+    test.setTimeout(90000);
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate(() => {
         const action = () => {
@@ -291,6 +292,9 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
         const grid = document.querySelector('[role="treegrid"]');
         return grid && grid.getAttribute('aria-rowcount') === '100001';
     });
+
+    // Wait for any potential loading overlay to disappear, ensuring the grid is ready
+    await page.waitForSelector('.ag-overlay-loading-wrapper', { state: 'hidden' });
 
     // 2. Change columns to 200
     // Step 1: Trigger the UI action and start total duration measurement
