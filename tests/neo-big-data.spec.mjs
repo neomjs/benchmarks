@@ -240,28 +240,57 @@ test('should change the amount of columns', async ({page}) => {
 });
 
 test('should filter the grid by firstname', async ({page}) => {
-    const duration = await page.evaluate(() => {
-        const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Firstname');
-            const textfield = label.closest('.neo-textfield');
-            const input = textfield.querySelector('input');
+    const durations = await page.evaluate(async () => {
+        const measure = window.measurePerformance;
+
+        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+        const label = findLabel('Firstname');
+        const textfield = label.closest('.neo-textfield');
+        const input = textfield.querySelector('input');
+        const initialRowCount = document.querySelector('[role="grid"]').getAttribute('aria-rowcount');
+
+        // 1. First filter (cold)
+        const duration1 = await measure('filter-grid-first', () => {
             input.value = 'Amanda';
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
-        };
-
-        const condition = () => {
+        }, () => {
             const grid = document.querySelector('[role="grid"]');
-            // Assuming initial row count is 1001, and filtering will result in fewer rows.
-            return grid && grid.getAttribute('aria-rowcount') !== '1001';
-        };
+            return grid && grid.getAttribute('aria-rowcount') !== initialRowCount;
+        });
 
-        return window.measurePerformance('filter-grid', action, condition);
+        const afterFirstFilterRowCount = document.querySelector('[role="grid"]').getAttribute('aria-rowcount');
+
+        // 2. Second filter (warm)
+        const duration2 = await measure('filter-grid-second', () => {
+            input.value = 'John';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }, () => {
+            const grid = document.querySelector('[role="grid"]');
+            return grid && grid.getAttribute('aria-rowcount') !== afterFirstFilterRowCount;
+        });
+
+        // 3. Clear filter (warm)
+        const duration3 = await measure('filter-grid-clear', () => {
+            input.value = '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }, () => {
+            const grid = document.querySelector('[role="grid"]');
+            return grid && grid.getAttribute('aria-rowcount') === initialRowCount;
+        });
+
+        return { duration1, duration2, duration3 };
     });
 
-    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid': duration }) });
-    console.log(`[Benchmark] filter-grid: ${duration.toFixed(2)} ms`);
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid (first)': durations.duration1 }) });
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid (second)': durations.duration2 }) });
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid (clear)': durations.duration3 }) });
+
+    console.log(`[Benchmark] filter-grid (first): ${durations.duration1.toFixed(2)} ms`);
+    console.log(`[Benchmark] filter-grid (second): ${durations.duration2.toFixed(2)} ms`);
+    console.log(`[Benchmark] filter-grid (clear): ${durations.duration3.toFixed(2)} ms`);
 });
 
 test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
