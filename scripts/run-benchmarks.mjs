@@ -34,7 +34,8 @@ async function main() {
         },
         react: {
             duration: 'tests/react.spec.mjs',
-            scrolling: 'tests/react-scrolling.spec.mjs'
+            scrolling: 'tests/react-scrolling.spec.mjs',
+            'big-data': 'tests/react-big-data.spec.mjs'
         },
         angular: {
             duration: 'tests/angular.spec.mjs',
@@ -59,7 +60,7 @@ async function main() {
             await fs.emptyDir(RESULTS_DIR);
 
             let testCommand = `CI=true npx playwright test ${filesToTest}`;
-            if (fw === 'neo' && s === 'big-data') {
+            if (s === 'big-data') {
                 testCommand = `APP=bigData ${testCommand}`;
             }
 
