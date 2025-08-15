@@ -240,45 +240,55 @@ test('should change the amount of columns', async ({page}) => {
 });
 
 test('should filter the grid by firstname', async ({page}) => {
+    // Wait for the grid and its first row to be rendered before starting the test.
+    await page.waitForSelector('[id^="neo-grid-body-"][id$="__row-0"] [id$="__firstname"]');
+
     const durations = await page.evaluate(async () => {
         const measure = window.measurePerformance;
 
-        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-        const label = findLabel('Firstname');
-        const textfield = label.closest('.neo-textfield');
-        const input = textfield.querySelector('input');
-        const initialRowCount = document.querySelector('[role="grid"]').getAttribute('aria-rowcount');
+        const changeInputValue = (value) => {
+            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+            const label = findLabel('Firstname');
+            const textfield = label.closest('.neo-textfield');
+            const input = textfield.querySelector('input');
+            input.value = value;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        };
 
-        // 1. First filter (cold)
+        const getFirstCellContent = () => {
+            const firstRow = document.querySelector('[id^="neo-grid-body-"][id$="__row-0"]');
+            if (!firstRow) {
+                return null;
+            }
+            const firstCell = firstRow.querySelector('[id$="__firstname"]');
+            if (!firstCell) {
+                return null;
+            }
+            return firstCell.textContent.trim();
+        };
+
+        const initialFirstCellContent = getFirstCellContent();
+
+        // 1. First filter
         const duration1 = await measure('filter-grid-first', () => {
-            input.value = 'Amanda';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            changeInputValue('Amanda');
         }, () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') !== initialRowCount;
+            return getFirstCellContent() === 'Amanda';
         });
 
-        const afterFirstFilterRowCount = document.querySelector('[role="grid"]').getAttribute('aria-rowcount');
-
-        // 2. Second filter (warm)
+        // 2. Second filter
         const duration2 = await measure('filter-grid-second', () => {
-            input.value = 'John';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            changeInputValue('John');
         }, () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') !== afterFirstFilterRowCount;
+            return getFirstCellContent() === 'John';
         });
 
-        // 3. Clear filter (warm)
+        // 3. Clear filter
         const duration3 = await measure('filter-grid-clear', () => {
-            input.value = '';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            changeInputValue('');
         }, () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === initialRowCount;
+            return getFirstCellContent() === initialFirstCellContent;
         });
 
         return { duration1, duration2, duration3 };
