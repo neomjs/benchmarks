@@ -96,20 +96,22 @@ const measureUiUpdatePerformanceInBrowser = (testName, condition) => {
     });
 };
 
+const getAgGridNames = () => {
+    const names = [];
+    for (let i = 0; i < 3; i++) {
+        const cell = document.querySelector(`.ag-row[row-index="${i}"] .ag-cell[col-id="firstname"]`);
+        if (cell) names.push(cell.textContent.trim());
+    }
+    return names;
+};
+
 test.beforeEach(async ({page}) => {
     await page.addInitScript({
         content: `
-            window.measurePerformance = ${measurePerformanceInBrowser.toString()};
+            window.getAgGridNames             = ${getAgGridNames.toString()};
+            window.measurePerformance         = ${measurePerformanceInBrowser.toString()};
             window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
-            window.consoleLogs        = [];
-            window.getAgGridNames = () => {
-                const names = [];
-                for (let i = 0; i < 3; i++) {
-                    const cell = document.querySelector(`.ag-row[row-index="${i}"] .ag-cell[col-id="firstname"]`);
-                    if (cell) names.push(cell.textContent.trim());
-                }
-                return names;
-            };
+            window.consoleLogs                = [];
         `
     });
 
@@ -158,13 +160,11 @@ test('should change the amount of rows', async ({page}) => {
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
-            console.log('[ACTION] Looking for label: Amount Rows');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Rows'));
             if (!label) {
                 console.error('[ACTION] ERROR: Label "Amount Rows" not found!');
                 return;
             }
-            console.log('[ACTION] Label "Amount Rows" found.');
             const selectElement = label.nextElementSibling;
             if (!selectElement) {
                 console.error('[ACTION] ERROR: selectElement not found!');
@@ -173,7 +173,6 @@ test('should change the amount of rows', async ({page}) => {
 
             selectElement.value = '5000';
             selectElement.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log('[ACTION] Event dispatched for "Amount Rows".');
         };
 
         const condition = () => {
@@ -223,13 +222,11 @@ test('should change the amount of columns', async ({page}) => {
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
-            console.log('[ACTION] Looking for label: Amount Columns');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Columns'));
             if (!label) {
                 console.error('[ACTION] ERROR: Label "Amount Columns" not found!');
                 return;
             }
-            console.log('[ACTION] Label "Amount Columns" found.');
             const selectElement = label.nextElementSibling;
             if (!selectElement) {
                 console.error('[ACTION] ERROR: selectElement not found!');
@@ -309,16 +306,13 @@ test('should filter the grid by firstname', async ({page}) => {
                 return null;
             }
             const content = firstCell.textContent.trim();
-            console.log('getFirstCellContent: Found content:', `"${content}"`);
             return content;
         };
 
         const initialFirstCellContent = getFirstCellContent();
-        console.log('Initial cell content:', `"${initialFirstCellContent}"`);
 
         // 1. First filter
         const duration1 = await measure('filter-grid-first', () => {
-            console.log('Applying first filter: Amanda');
             changeInputValue('Amanda');
         }, () => {
             return getFirstCellContent() === 'Amanda';
@@ -326,7 +320,6 @@ test('should filter the grid by firstname', async ({page}) => {
 
         // 2. Second filter
         const duration2 = await measure('filter-grid-second', () => {
-            console.log('Applying second filter: John');
             changeInputValue('John');
         }, () => {
             return getFirstCellContent() === 'John';
@@ -334,11 +327,9 @@ test('should filter the grid by firstname', async ({page}) => {
 
         // 3. Clear filter
         const duration3 = await measure('filter-grid-clear', () => {
-            console.log('Clearing filter');
             changeInputValue('');
         }, () => {
             const content = getFirstCellContent();
-            console.log('Checking clear condition. Current content:', `"${content}"`, 'Expected:', `"${initialFirstCellContent}"`);
             return content === initialFirstCellContent;
         });
 
@@ -360,7 +351,6 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     // Step 1: Trigger the UI action and start total duration measurement
     const rowsTotalDurationPromise = page.evaluate(() => {
         const action = () => {
-            console.log('[ACTION] Looking for label: Amount Rows');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Rows'));
             if (!label) {
                 console.error('[ACTION] ERROR: Label "Amount Rows" not found!');
