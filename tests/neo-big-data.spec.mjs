@@ -88,6 +88,14 @@ test.beforeEach(async ({page}) => {
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
             window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
             window.consoleLogs        = [];
+            window.getNeoGridNames = () => {
+                const names = [];
+                for (let i = 0; i < 3; i++) {
+                    const cell = document.querySelector('[id^="neo-grid-body-"][id$="__row-${i}"] [id$="__firstname"]');
+                    if (cell) names.push(cell.textContent.trim());
+                }
+                return names;
+            };
         `
     });
 
@@ -120,8 +128,34 @@ test('should load the app and display the initial grid data', async ({page}) => 
 });
 
 test('should change the amount of rows', async ({page}) => {
+    await page.waitForSelector('[id^="neo-grid-body-"][id$="__row-2"] [id$="__firstname"]');
+
+    const getNames = () => {
+        const names = [];
+        for (let i = 0; i < 3; i++) {
+            const cell = document.querySelector(`[id^="neo-grid-body-"][id$="__row-${i}"] [id$="__firstname"]`);
+            if (cell) names.push(cell.textContent.trim());
+        }
+        return names;
+    };
+
+    const initialNames = await page.evaluate(getNames);
+    console.log('Initial names:', initialNames);
+
+    const condition = (initial) => {
+        const currentNames = [];
+        for (let i = 0; i < 3; i++) {
+            const cell = document.querySelector(`[id^="neo-grid-body-"][id$="__row-${i}"] [id$="__firstname"]`);
+            if (cell) currentNames.push(cell.textContent.trim());
+        }
+
+        console.log(initialNames, currentNames);
+
+        return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
+    };
+
     // Step 1: Trigger the UI action and start total duration measurement
-    const totalDurationPromise = page.evaluate(() => {
+    const totalDurationPromise = page.evaluate((conditionString, initial) => {
         const action = () => {
             const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
             const label = findLabel('Amount Rows');
@@ -142,25 +176,19 @@ test('should change the amount of rows', async ({page}) => {
             pickerObserver.observe(document.body, { childList: true, subtree: true });
         };
 
-        const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '5001';
-        };
+        const conditionFunc = new Function('initial', `return (${conditionString})(initial)`).bind(null, initial);
 
-        return window.measurePerformance('change-rows-total', action, condition);
-    });
+        return window.measurePerformance('change-rows-total', action, conditionFunc);
+    }, `(${condition.toString()})`, initialNames);
 
     // Step 2: Wait for the "Data creation total time" log
     await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
-    const uiUpdateDurationPromise = page.evaluate(() => {
-        const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '5001';
-        };
-        return window.measureUiUpdatePerformance('change-rows-ui-update', condition);
-    });
+    const uiUpdateDurationPromise = page.evaluate((conditionString, initial) => {
+        const conditionFunc = new Function('initial', `return (${conditionString})(initial)`).bind(null, initial);
+        return window.measureUiUpdatePerformance('change-rows-ui-update', conditionFunc);
+    }, `(${condition.toString()})`, initialNames);
 
     // Step 4: Await both promises
     const [totalDuration, uiUpdateDuration] = await Promise.all([totalDurationPromise, uiUpdateDurationPromise]);
@@ -180,8 +208,12 @@ test('should change the amount of rows', async ({page}) => {
 });
 
 test('should change the amount of columns', async ({page}) => {
+    await page.waitForSelector('[id^="neo-grid-body-"][id$="__row-2"] [id$="__firstname"]');
+
+    const initialNames = await page.evaluate(() => window.getNeoGridNames());
+
     // Step 1: Trigger the UI action and start total duration measurement
-    const totalDurationPromise = page.evaluate(() => {
+    const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
             const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
             const label = findLabel('Amount Columns');
@@ -203,24 +235,24 @@ test('should change the amount of columns', async ({page}) => {
         };
 
         const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-colcount') === '75';
+            const currentNames = window.getNeoGridNames();
+            return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
         };
 
         return window.measurePerformance('change-cols-total', action, condition);
-    });
+    }, initialNames);
 
     // Step 2: Wait for the "Data creation total time" log
     await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
-    const uiUpdateDurationPromise = page.evaluate(() => {
+    const uiUpdateDurationPromise = page.evaluate((initial) => {
         const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-colcount') === '75';
+            const currentNames = window.getNeoGridNames();
+            return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
         };
         return window.measureUiUpdatePerformance('change-cols-ui-update', condition);
-    });
+    }, initialNames);
 
     // Step 4: Await both promises
     const [totalDuration, uiUpdateDuration] = await Promise.all([totalDurationPromise, uiUpdateDurationPromise]);

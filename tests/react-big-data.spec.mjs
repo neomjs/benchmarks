@@ -102,6 +102,14 @@ test.beforeEach(async ({page}) => {
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
             window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
             window.consoleLogs        = [];
+            window.getAgGridNames = () => {
+                const names = [];
+                for (let i = 0; i < 3; i++) {
+                    const cell = document.querySelector(`.ag-row[row-index="${i}"] .ag-cell[col-id="firstname"]`);
+                    if (cell) names.push(cell.textContent.trim());
+                }
+                return names;
+            };
         `
     });
 
@@ -142,8 +150,13 @@ test('should load the app and display the initial grid data', async ({page}) => 
 
 test('should change the amount of rows', async ({page}) => {
     test.setTimeout(30000);
+
+    await page.waitForSelector('.ag-row[row-index="2"] .ag-cell[col-id="firstname"]');
+
+    const initialNames = await page.evaluate(() => window.getAgGridNames());
+
     // Step 1: Trigger the UI action and start total duration measurement
-    const totalDurationPromise = page.evaluate(() => {
+    const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
             console.log('[ACTION] Looking for label: Amount Rows');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Rows'));
@@ -164,24 +177,24 @@ test('should change the amount of rows', async ({page}) => {
         };
 
         const condition = () => {
-            const grid = document.querySelector('[role="treegrid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '5001';
+            const currentNames = window.getAgGridNames();
+            return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
         };
 
         return window.measurePerformance('change-rows-total', action, condition);
-    });
+    }, initialNames);
 
     // Step 2: Wait for the "Data creation total time" log from the worker
     await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
-    const uiUpdateDurationPromise = page.evaluate(() => {
+    const uiUpdateDurationPromise = page.evaluate((initial) => {
         const condition = () => {
-            const grid = document.querySelector('[role="treegrid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '5001';
+            const currentNames = window.getAgGridNames();
+            return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
         };
         return window.measureUiUpdatePerformance('change-rows-ui-update', condition);
-    });
+    }, initialNames);
 
     // Step 4: Await both promises
     const [totalDuration, uiUpdateDuration] = await Promise.all([totalDurationPromise, uiUpdateDurationPromise]);
@@ -202,8 +215,13 @@ test('should change the amount of rows', async ({page}) => {
 
 test('should change the amount of columns', async ({page}) => {
     test.setTimeout(30000);
+
+    await page.waitForSelector('.ag-row[row-index="2"] .ag-cell[col-id="firstname"]');
+
+    const initialNames = await page.evaluate(() => window.getAgGridNames());
+
     // Step 1: Trigger the UI action and start total duration measurement
-    const totalDurationPromise = page.evaluate(() => {
+    const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
             console.log('[ACTION] Looking for label: Amount Columns');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Columns'));
@@ -223,24 +241,25 @@ test('should change the amount of columns', async ({page}) => {
         };
 
         const condition = () => {
-            const grid = document.querySelector('[role="treegrid"]');
-            return grid && grid.getAttribute('aria-colcount') === '75';
+            const currentNames = window.getAgGridNames();
+            return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
         };
 
         return window.measurePerformance('change-cols-total', action, condition);
-    });
+    }, initialNames);
 
     // Step 2: Wait for the "Data creation total time" log from the worker
     await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
-    const uiUpdateDurationPromise = page.evaluate(() => {
+    const uiUpdateDurationPromise = page.evaluate((initial) => {
         const condition = () => {
-            const grid = document.querySelector('[role="treegrid"]');
-            return grid && grid.getAttribute('aria-colcount') === '75';
+            const currentNames = window.getAgGridNames();
+            return currentNames.length === initial.length && currentNames.some((name, i) => name !== initial[i]);
         };
         return window.measureUiUpdatePerformance('change-cols-ui-update', condition);
-    });
+    }, initialNames);
+
 
     // Step 4: Await both promises
     const [totalDuration, uiUpdateDuration] = await Promise.all([totalDurationPromise, uiUpdateDurationPromise]);
