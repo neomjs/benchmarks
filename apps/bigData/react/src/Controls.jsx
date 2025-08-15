@@ -13,8 +13,6 @@ function Controls({ onDataConfigChange, onFilterChange, filteredRowCount }) {
 
   const [activeTab, setActiveTab] = useState('settings'); // New state for active tab
 
-  const isInitialMount = useRef(true); // Create a ref
-
   // Helper to get the current data config state
   const getCurrentDataConfig = () => ({
     amountRows,
@@ -34,11 +32,7 @@ function Controls({ onDataConfigChange, onFilterChange, filteredRowCount }) {
 
   // Use useEffect to trigger onDataConfigChange whenever relevant data config state changes
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false; // Set to false after first run
-    } else {
-      onDataConfigChange(getCurrentDataConfig());
-    }
+    onDataConfigChange(getCurrentDataConfig());
   }, [amountRows, amountColumns, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange]);
 
   // Use useEffect to trigger onFilterChange whenever relevant filter state changes
