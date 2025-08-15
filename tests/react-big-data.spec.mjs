@@ -23,7 +23,7 @@ const measurePerformanceInBrowser = (testName, action, condition) => {
         const timeoutId = setTimeout(() => {
             observer.disconnect();
             reject(new Error(`Benchmark timed out for "${testName}".`));
-        }, 90000);
+        }, 30000);
 
         const startTime = performance.now();
         try {
@@ -75,10 +75,24 @@ const measureUiUpdatePerformanceInBrowser = (testName, condition) => {
         const timeoutId = setTimeout(() => {
             observer.disconnect();
             reject(new Error(`UI update benchmark timed out for "${testName}".`));
-        }, 90000);
+        }, 30000);
 
         const startTime = performance.now(); // Measurement starts here
         // The action (store.add) is assumed to have just happened
+
+        try {
+            if (condition()) {
+                const endTime = performance.now();
+                observer.disconnect();
+                clearTimeout(timeoutId);
+                resolve(endTime - startTime);
+            }
+        } catch (e) {
+            observer.disconnect();
+            clearTimeout(timeoutId);
+            console.error(`Initial condition check error in ${testName}:`, e);
+            reject(e);
+        }
     });
 };
 
@@ -103,7 +117,7 @@ test.beforeEach(async ({page}) => {
             // before the console message is processed. It's safe to ignore.
         });
 
-        if (msg.type() !== 'warning') {
+        if (msg.type() !== 'debug' && msg.type() !== 'info' && msg.type() !== 'warning') {
             console.log(`Browser console [${msg.type()}]: ${msg.text()}`);
         }
     });
@@ -113,6 +127,10 @@ test.beforeEach(async ({page}) => {
         const grid = document.querySelector('[role="treegrid"]');
         return grid && !grid.classList.contains('ag-root-wrapper-loading');
     });
+
+    // Open the controls panel
+    await page.locator('button.hamburger-button').click();
+    await page.waitForSelector('.controls-panel.open');
 });
 
 test('should load the app and display the initial grid data', async ({page}) => {
@@ -123,14 +141,26 @@ test('should load the app and display the initial grid data', async ({page}) => 
 });
 
 test('should change the amount of rows', async ({page}) => {
-    test.setTimeout(90000);
+    test.setTimeout(30000);
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate(() => {
         const action = () => {
+            console.log('[ACTION] Looking for label: Amount Rows');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Rows'));
+            if (!label) {
+                console.error('[ACTION] ERROR: Label "Amount Rows" not found!');
+                return;
+            }
+            console.log('[ACTION] Label "Amount Rows" found.');
             const selectElement = label.nextElementSibling;
+            if (!selectElement) {
+                console.error('[ACTION] ERROR: selectElement not found!');
+                return;
+            }
+
             selectElement.value = '5000';
             selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log('[ACTION] Event dispatched for "Amount Rows".');
         };
 
         const condition = () => {
@@ -171,11 +201,23 @@ test('should change the amount of rows', async ({page}) => {
 });
 
 test('should change the amount of columns', async ({page}) => {
+    test.setTimeout(30000);
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate(() => {
         const action = () => {
+            console.log('[ACTION] Looking for label: Amount Columns');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Columns'));
+            if (!label) {
+                console.error('[ACTION] ERROR: Label "Amount Columns" not found!');
+                return;
+            }
+            console.log('[ACTION] Label "Amount Columns" found.');
             const selectElement = label.nextElementSibling;
+            if (!selectElement) {
+                console.error('[ACTION] ERROR: selectElement not found!');
+                return;
+            }
+
             selectElement.value = '75';
             selectElement.dispatchEvent(new Event('change', { bubbles: true }));
         };
@@ -222,15 +264,20 @@ test('should filter the grid by firstname', async ({page}) => {
         const action = () => {
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Firstname'));
             const inputElement = label.nextElementSibling;
-            inputElement.value = 'Amanda';
+
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype,
+                'value'
+            ).set;
+            nativeInputValueSetter.call(inputElement, 'Amanda');
+
             inputElement.dispatchEvent(new Event('input', { bubbles: true }));
-            inputElement.dispatchEvent(new Event('change', { bubbles: true }));
         };
 
         const condition = () => {
             const grid = document.querySelector('[role="treegrid"]');
-            // Assuming initial row count is 1002, and filtering will result in fewer rows.
-            return grid && grid.getAttribute('aria-rowcount') !== '1002';
+            // Assuming initial row count is 1001, and filtering will result in fewer rows.
+            return grid && grid.getAttribute('aria-rowcount') !== '1001';
         };
 
         return window.measurePerformance('filter-grid', action, condition);
@@ -241,13 +288,24 @@ test('should filter the grid by firstname', async ({page}) => {
 });
 
 test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
-    test.setTimeout(90000); // Set timeout to 90 seconds for this specific test
+    test.setTimeout(30000); // Set timeout to 30 seconds for this specific test
     // 1. Change rows to 100k
     // Step 1: Trigger the UI action and start total duration measurement
     const rowsTotalDurationPromise = page.evaluate(() => {
         const action = () => {
+            console.log('[ACTION] Looking for label: Amount Rows');
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Rows'));
+            if (!label) {
+                console.error('[ACTION] ERROR: Label "Amount Rows" not found!');
+                return;
+            }
+
             const selectElement = label.nextElementSibling;
+            if (!selectElement) {
+                console.error('[ACTION] ERROR: selectElement not found!');
+                return;
+            }
+
             selectElement.value = '100000';
             selectElement.dispatchEvent(new Event('change', { bubbles: true }));
         };
@@ -301,7 +359,17 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     const colsTotalDurationPromise = page.evaluate(() => {
         const action = () => {
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Amount Columns'));
+            if (!label) {
+                console.error('[ACTION] ERROR: Label "Amount Columns" not found!');
+                return;
+            }
+
             const selectElement = label.nextElementSibling;
+            if (!selectElement) {
+                console.error('[ACTION] ERROR: selectElement not found!');
+                return;
+            }
+
             selectElement.value = '200';
             selectElement.dispatchEvent(new Event('change', { bubbles: true }));
         };
