@@ -260,8 +260,10 @@ test('should change the amount of columns', async ({page}) => {
 });
 
 test('should filter the grid by firstname', async ({page}) => {
-    const duration = await page.evaluate(() => {
-        const action = () => {
+    const durations = await page.evaluate(async () => {
+        const measure = window.measurePerformance;
+
+        const changeInputValue = (value) => {
             const label = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Firstname'));
             const inputElement = label.nextElementSibling;
 
@@ -269,22 +271,68 @@ test('should filter the grid by firstname', async ({page}) => {
                 window.HTMLInputElement.prototype,
                 'value'
             ).set;
-            nativeInputValueSetter.call(inputElement, 'Amanda');
+            nativeInputValueSetter.call(inputElement, value);
 
             inputElement.dispatchEvent(new Event('input', { bubbles: true }));
         };
 
-        const condition = () => {
-            const grid = document.querySelector('[role="treegrid"]');
-            // Assuming initial row count is 1001, and filtering will result in fewer rows.
-            return grid && grid.getAttribute('aria-rowcount') !== '1001';
+        const getFirstCellContent = () => {
+            // More robust selector for the first visible row
+            const firstRow = document.querySelector('.ag-body-viewport .ag-row[row-index="0"]');
+            if (!firstRow) {
+                console.log('getFirstCellContent: First row not found.');
+                return null;
+            }
+
+            const firstCell = firstRow.querySelector('.ag-cell[col-id="firstname"]');
+            if (!firstCell) {
+                console.log('getFirstCellContent: First cell with col-id="firstname" not found.');
+                return null;
+            }
+            const content = firstCell.textContent.trim();
+            console.log('getFirstCellContent: Found content:', `"${content}"`);
+            return content;
         };
 
-        return window.measurePerformance('filter-grid', action, condition);
+        const initialFirstCellContent = getFirstCellContent();
+        console.log('Initial cell content:', `"${initialFirstCellContent}"`);
+
+        // 1. First filter
+        const duration1 = await measure('filter-grid-first', () => {
+            console.log('Applying first filter: Amanda');
+            changeInputValue('Amanda');
+        }, () => {
+            return getFirstCellContent() === 'Amanda';
+        });
+
+        // 2. Second filter
+        const duration2 = await measure('filter-grid-second', () => {
+            console.log('Applying second filter: John');
+            changeInputValue('John');
+        }, () => {
+            return getFirstCellContent() === 'John';
+        });
+
+        // 3. Clear filter
+        const duration3 = await measure('filter-grid-clear', () => {
+            console.log('Clearing filter');
+            changeInputValue('');
+        }, () => {
+            const content = getFirstCellContent();
+            console.log('Checking clear condition. Current content:', `"${content}"`, 'Expected:', `"${initialFirstCellContent}"`);
+            return content === initialFirstCellContent;
+        });
+
+        return { duration1, duration2, duration3 };
     });
 
-    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid': duration }) });
-    console.log(`[Benchmark] filter-grid: ${duration.toFixed(2)} ms`);
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid (first)': durations.duration1 }) });
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid (second)': durations.duration2 }) });
+    test.info().annotations.push({ type: 'performance', description: JSON.stringify({ 'filter-grid (clear)': durations.duration3 }) });
+
+    console.log(`[Benchmark] filter-grid (first): ${durations.duration1.toFixed(2)} ms`);
+    console.log(`[Benchmark] filter-grid (second): ${durations.duration2.toFixed(2)} ms`);
+    console.log(`[Benchmark] filter-grid (clear): ${durations.duration3.toFixed(2)} ms`);
 });
 
 test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
