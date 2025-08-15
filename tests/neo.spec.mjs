@@ -168,7 +168,7 @@ test('Neo.mjs benchmark: Create 10k Rows', async ({page}) => {
             const grid = document.querySelector('[role="grid"]');
             if (!grid) return false;
             const rowCount = grid.getAttribute('aria-rowcount');
-            if (rowCount !== '10002') return false;
+            if (rowCount !== '10001') return false;
 
             const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
             return firstRowIdCell && firstRowIdCell.textContent === '1';
@@ -194,7 +194,7 @@ test('Neo.mjs benchmark: Create 100k Rows', async ({page}) => {
             const grid = document.querySelector('[role="grid"]');
             if (!grid) return false;
             const rowCount = grid.getAttribute('aria-rowcount');
-            if (rowCount !== '100002') return false;
+            if (rowCount !== '100001') return false;
 
             const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
             return firstRowIdCell && firstRowIdCell.textContent === '1';
@@ -220,7 +220,7 @@ test('Neo.mjs benchmark: Create 1M Rows', async ({page}) => {
             const grid = document.querySelector('[role="grid"]');
             if (!grid) return false;
             const rowCount = grid.getAttribute('aria-rowcount');
-            if (rowCount !== '1000002') return false;
+            if (rowCount !== '1000001') return false;
 
             const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
             return firstRowIdCell && firstRowIdCell.textContent === '1';
@@ -237,7 +237,7 @@ test('Neo.mjs benchmark: Update Every 10th Row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
@@ -260,7 +260,7 @@ test('Neo.mjs benchmark: Select Row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
@@ -282,7 +282,7 @@ test('Neo.mjs benchmark: Swap Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     const initialLabels = await page.locator('[role="gridcell"][aria-colindex="2"]').evaluateAll(elements => elements.map(el => el.textContent));
@@ -307,7 +307,7 @@ test('Neo.mjs benchmark: Remove Row', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
@@ -330,7 +330,7 @@ test('Neo.mjs benchmark: Clear Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     const duration = await page.evaluate(() => {
@@ -354,7 +354,7 @@ test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     // Start the feed

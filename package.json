@@ -1,6 +1,6 @@
 {
     "name": "neo.mjs-benchmarks",
-    "version": "10.3.3",
+    "version": "10.5.3",
     "description": "Neo.mjs: Benchmarks",
     "type": "module",
     "scripts": {

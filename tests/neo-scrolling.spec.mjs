@@ -234,7 +234,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).click();
-    await waitForGridReady(page, 10002);
+    await waitForGridReady(page, 10001);
     await page.waitForTimeout(100);
 
     // Start the feed to create stress
@@ -284,7 +284,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 100k Rows'}).click();
-    await waitForGridReady(page, 100002);
+    await waitForGridReady(page, 100001);
     await page.waitForTimeout(100);
 
     // Start the feed to create stress
@@ -340,7 +340,7 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 1M Rows'}).click();
-    await waitForGridReady(page, 1000002);
+    await waitForGridReady(page, 1000001);
     await page.waitForTimeout(100);
 
     // Start the feed to create stress

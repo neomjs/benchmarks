@@ -115,7 +115,7 @@ test.beforeEach(async ({page}) => {
 test('should load the app and display the initial grid data', async ({page}) => {
     await expect(page).toHaveTitle('Big Data Neo');
     const grid = await page.locator('[role="grid"]');
-    await expect(grid).toHaveAttribute('aria-rowcount', '1002');
+    await expect(grid).toHaveAttribute('aria-rowcount', '1001');
     await expect(grid).toHaveAttribute('aria-colcount', '50');
 });
 
@@ -144,7 +144,7 @@ test('should change the amount of rows', async ({page}) => {
 
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '5002';
+            return grid && grid.getAttribute('aria-rowcount') === '5001';
         };
 
         return window.measurePerformance('change-rows-total', action, condition);
@@ -157,7 +157,7 @@ test('should change the amount of rows', async ({page}) => {
     const uiUpdateDurationPromise = page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '5002';
+            return grid && grid.getAttribute('aria-rowcount') === '5001';
         };
         return window.measureUiUpdatePerformance('change-rows-ui-update', condition);
     });
@@ -253,8 +253,8 @@ test('should filter the grid by firstname', async ({page}) => {
 
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            // Assuming initial row count is 1002, and filtering will result in fewer rows.
-            return grid && grid.getAttribute('aria-rowcount') !== '1002';
+            // Assuming initial row count is 1001, and filtering will result in fewer rows.
+            return grid && grid.getAttribute('aria-rowcount') !== '1001';
         };
 
         return window.measurePerformance('filter-grid', action, condition);
@@ -290,7 +290,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
 
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '100002';
+            return grid && grid.getAttribute('aria-rowcount') === '100001';
         };
         return window.measurePerformance('change-rows-100k-total', action, condition);
     });
@@ -302,7 +302,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     const rowsUiUpdateDurationPromise = page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '100002';
+            return grid && grid.getAttribute('aria-rowcount') === '100001';
         };
         return window.measureUiUpdatePerformance('change-rows-100k-ui-update', condition);
     });
