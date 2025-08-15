@@ -17,6 +17,7 @@ const lastnames = [
 ];
 
 const generateData = (amountRows, amountColumns) => {
+  const start = performance.now(); // Start timing
   console.log('Start creating data', { amountRows, amountColumns });
 
   const records = [];
@@ -38,6 +39,7 @@ const generateData = (amountRows, amountColumns) => {
     records.push(record);
   }
 
+  console.log(`Data creation total time: ${Math.round(performance.now() - start)}ms`); // Log total time
   return records;
 };
 

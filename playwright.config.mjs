@@ -130,7 +130,7 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
       },
       'react': {
-        command: 'npm --prefix apps/interactive-benchmark-react run dev',
+        command: `npm --prefix apps/${app === 'bigData' ? 'bigData/react' : 'interactive-benchmark-react'} run dev`,
         url: 'http://localhost:5174',
         reuseExistingServer: !process.env.CI,
       }

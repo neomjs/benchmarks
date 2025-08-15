@@ -58,6 +58,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [actualFilteredRowCount, setActualFilteredRowCount] = useState(0);
 
+  // Expose loading state to window for Playwright
+  window.appIsLoading = loading;
+
   const [showControls, setShowControls] = useState(false);
 
   const handleDataConfigChange = useCallback(async (config) => {

@@ -13,8 +13,21 @@ function getStandardDeviation(arr) {
     return Math.sqrt(arr.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
 }
 
-const resultsDir = './test-results-data/neo/big-data';
-const outputFile = 'BENCHMARK_RESULTS_NEO_BIG_DATA.md';
+import { argv } from 'process';
+import fs from 'fs-extra';
+import path from 'path';
+
+const args = argv.slice(2);
+let framework = 'neo'; // Default framework
+
+for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--framework=')) {
+        framework = args[i].split('=')[1];
+    }
+}
+
+const resultsDir = `./test-results-data/${framework}/big-data`;
+const outputFile = `BENCHMARK_RESULTS_${framework.toUpperCase()}_BIG_DATA.md`;
 
 async function generateReport() {
     const results = {}; // { 'change-rows': { 'chromium-dev': [1, 2, 3], ... } }
@@ -73,7 +86,7 @@ async function generateReport() {
     }
 
     // 3. Generate Markdown Report
-    let report = '# Neo.mjs Big Data Grid Benchmark Results\n\n';
+    let report = `# ${framework.charAt(0).toUpperCase() + framework.slice(1)} Big Data Grid Benchmark Results\n\n';
     let systemInfoSection = '';
 
     const groupedStats = {};
