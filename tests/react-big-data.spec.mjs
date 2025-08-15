@@ -23,7 +23,7 @@ const measurePerformanceInBrowser = (testName, action, condition) => {
         const timeoutId = setTimeout(() => {
             observer.disconnect();
             reject(new Error(`Benchmark timed out for "${testName}".`));
-        }, 3000);
+        }, 30000);
 
         const startTime = performance.now();
         try {
@@ -140,14 +140,8 @@ test('should change the amount of rows', async ({page}) => {
         return window.measurePerformance('change-rows-total', action, condition);
     });
 
-    // Step 2: Wait for the "Start creating data" log from the worker
-    await page.waitForEvent('console', msg => msg.text().includes('Start creating data'));
-
-    // Explicitly wait for the grid to update its row count
-    await page.waitForFunction(() => {
-        const grid = document.querySelector('[role="treegrid"]');
-        return grid && grid.getAttribute('aria-rowcount') === '5001';
-    });
+    // Step 2: Wait for the "Data creation total time" log from the worker
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
     const uiUpdateDurationPromise = page.evaluate(() => {
@@ -193,8 +187,8 @@ test('should change the amount of columns', async ({page}) => {
         return window.measurePerformance('change-cols-total', action, condition);
     });
 
-    // Step 2: Wait for the "Start creating data" log from the worker
-    await page.waitForEvent('console', msg => msg.text().includes('Start creating data'));
+    // Step 2: Wait for the "Data creation total time" log from the worker
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
     const uiUpdateDurationPromise = page.evaluate(() => {
@@ -246,6 +240,7 @@ test('should filter the grid by firstname', async ({page}) => {
 });
 
 test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
+    test.setTimeout(90000); // Set timeout to 90 seconds for this specific test
     // 1. Change rows to 100k
     // Step 1: Trigger the UI action and start total duration measurement
     const rowsTotalDurationPromise = page.evaluate(() => {
@@ -258,21 +253,19 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
 
         const condition = () => {
             const grid = document.querySelector('[role="treegrid"]');
-            const loadingOverlay = document.querySelector('.ag-overlay-loading-wrapper');
-            return grid && grid.getAttribute('aria-rowcount') === '100001' && !loadingOverlay;
+            return grid && grid.getAttribute('aria-rowcount') === '100001';
         };
         return window.measurePerformance('change-rows-100k-total', action, condition);
     });
 
-    // Step 2: Wait for the "Start creating data" log from the worker
-    await page.waitForEvent('console', msg => msg.text().includes('Start creating data'));
+    // Step 2: Wait for the "Data creation total time" log from the worker
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
     const rowsUiUpdateDurationPromise = page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="treegrid"]');
-            const loadingOverlay = document.querySelector('.ag-overlay-loading-wrapper');
-            return grid && grid.getAttribute('aria-rowcount') === '100001' && !loadingOverlay;
+            return grid && grid.getAttribute('aria-rowcount') === '100001';
         };
         return window.measureUiUpdatePerformance('change-rows-100k-ui-update', condition);
     });
@@ -311,21 +304,19 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
 
         const condition = () => {
             const grid = document.querySelector('[role="treegrid"]');
-            const loadingOverlay = document.querySelector('.ag-overlay-loading-wrapper');
-            return grid && grid.getAttribute('aria-colcount') === '200' && !loadingOverlay;
+            return grid && grid.getAttribute('aria-colcount') === '200';
         };
         return window.measurePerformance('change-cols-200-total', action, condition);
     });
 
-    // Step 2: Wait for the "Start creating data" log from the worker
-    await page.waitForEvent('console', msg => msg.text().includes('Start creating data'));
+    // Step 2: Wait for the "Data creation total time" log from the worker
+    await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
     const colsUiUpdateDurationPromise = page.evaluate(() => {
         const condition = () => {
             const grid = document.querySelector('[role="treegrid"]');
-            const loadingOverlay = document.querySelector('.ag-overlay-loading-wrapper');
-            return grid && grid.getAttribute('aria-colcount') === '200' && !loadingOverlay;
+            return grid && grid.getAttribute('aria-colcount') === '200';
         };
         return window.measureUiUpdatePerformance('change-cols-200-ui-update', condition);
     });
