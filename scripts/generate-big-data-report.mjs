@@ -1,18 +1,3 @@
-import fs from 'fs-extra';
-import path from 'path';
-
-/**
- * Calculates the standard deviation of an array of numbers.
- * @param {number[]} arr The array of numbers.
- * @returns {number} The standard deviation.
- */
-function getStandardDeviation(arr) {
-    if (arr.length < 2) return 0;
-    const n = arr.length;
-    const mean = arr.reduce((a, b) => a + b) / n;
-    return Math.sqrt(arr.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
-}
-
 import { argv } from 'process';
 import fs from 'fs-extra';
 import path from 'path';
@@ -28,6 +13,18 @@ for (let i = 0; i < args.length; i++) {
 
 const resultsDir = `./test-results-data/${framework}/big-data`;
 const outputFile = `BENCHMARK_RESULTS_${framework.toUpperCase()}_BIG_DATA.md`;
+
+/**
+ * Calculates the standard deviation of an array of numbers.
+ * @param {number[]} arr The array of numbers.
+ * @returns {number} The standard deviation.
+ */
+function getStandardDeviation(arr) {
+    if (arr.length < 2) return 0;
+    const n = arr.length;
+    const mean = arr.reduce((a, b) => a + b) / n;
+    return Math.sqrt(arr.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
+}
 
 async function generateReport() {
     const results = {}; // { 'change-rows': { 'chromium-dev': [1, 2, 3], ... } }
@@ -86,7 +83,7 @@ async function generateReport() {
     }
 
     // 3. Generate Markdown Report
-    let report = `# ${framework.charAt(0).toUpperCase() + framework.slice(1)} Big Data Grid Benchmark Results\n\n';
+    let report = `# ${framework.charAt(0).toUpperCase() + framework.slice(1)} Big Data Grid Benchmark Results\n\n`;
     let systemInfoSection = '';
 
     const groupedStats = {};
