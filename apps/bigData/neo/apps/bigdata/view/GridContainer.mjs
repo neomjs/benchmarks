@@ -45,9 +45,17 @@ class GridContainer extends BaseGridContainer {
      * Triggered after the amountColumns config got changed
      * @param {Number} value
      * @param {Number} oldValue
+     * @returns {Promise<void>}
      * @protected
      */
-    afterSetAmountColumns(value, oldValue) {
+    async afterSetAmountColumns(value, oldValue) {
+        let me = this;
+
+        // Silent update
+        me.store._amountColumns = value;
+        // Wait until the remote data generation is done
+        await me.store.afterSetAmountColumns(value, oldValue);
+
         let i       = 7,
             columns = [
                 {type: 'index', dataField: 'id', text: '#', width: 60},
@@ -67,9 +75,7 @@ class GridContainer extends BaseGridContainer {
             columns.push({dataField: 'number' + i, text: 'Number ' + i})
         }
 
-        this.store.amountColumns = value;
-
-        this.columns = columns
+        me.columns = columns
     }
 }
 

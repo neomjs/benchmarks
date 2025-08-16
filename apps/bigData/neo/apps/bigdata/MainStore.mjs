@@ -101,7 +101,7 @@ class MainStore extends Store {
         console.log('Start creating data', {amountRows, amountColumns});
 
         let start   = performance.now(),
-            records = await BigData.task.Helper.generateGridData({amountRows, amountColumns});
+            records = await BigData.task.Helper.generateGridData({amountRows, amountColumns}); // async remote method access
 
         console.log(`Data creation total time: ${Math.round(performance.now() - start)}ms`);
 
