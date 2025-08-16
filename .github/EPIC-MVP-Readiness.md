@@ -30,6 +30,10 @@
     -   [x] Sub-task: Create a `METHODOLOGY.md` file that explains the "why" behind the benchmark design, referencing the "Time to Valid State" and "High-Fidelity Scroll Measurement" concepts from the technical epic.
     -   [x] Sub-task: Create a `REPRODUCIBILITY.md` file with clear, step-by-step instructions on how to clone the repo, install dependencies, and run the benchmarks.
 
+-   [x] Task: Streamline Installation Process:
+    -   [x] Sub-task: Create a new Node.js script (e.g., `setup.mjs`) that automates the installation of nested dependencies for all benchmark applications (Angular, React, Neo.mjs).
+    -   [x] Sub-task: Ensure the script also calls `npm run build` or `npm run build-all` for the Neo.mjs applications to prepare them for execution.
+
 ## 3. Credibility and Promotion
 
 

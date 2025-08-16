@@ -17,36 +17,10 @@ git clone https://github.com/neomjs/benchmarks.git
 cd benchmarks
 ```
 
-Next, you need to install the dependencies for the main project and for each of the benchmark applications.
+Next, run the setup script to install all nested dependencies and build the Neo.mjs applications:
 
 ```bash
-# Install root dependencies (Playwright, reporting tools, etc.)
-npm install
-
-# Install dependencies for the Neo.mjs interactive app
-cd apps/interactive-benchmark-neo
-npm install
-cd ../..
-
-# Install dependencies for the React interactive app
-cd apps/interactive-benchmark-react
-npm install
-cd ../..
-
-# Install dependencies for the Angular interactive app
-cd apps/interactive-benchmark-angular
-npm install
-cd ../..
-
-# Install dependencies for the Neo.mjs big data app
-cd apps/bigData/neo
-npm install
-cd ../..
-
-# Install dependencies for the React big data app
-cd apps/bigData/react
-npm install
-cd ../..
+npm run setup
 ```
 
 ## 3. Running the Benchmarks
@@ -61,6 +35,8 @@ By default, each benchmark suite is run 5 times to gather multiple samples. You 
 ```bash
 npm run benchmark:accurate:all
 ```
+
+> **Note:** Running `benchmark:accurate:all` can take multiple hours to complete. For local development and testing, it is recommended to use more targeted benchmark scripts (e.g., `npm run benchmark:accurate:neo`).
 
 **Run all benchmark suites for Neo.mjs:**
 ```bash

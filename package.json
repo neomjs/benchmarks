@@ -28,7 +28,8 @@
         "benchmark:generate-report:neo-big-data": "node ./scripts/generate-big-data-report.mjs",
         "benchmark:generate-report:react-big-data": "node ./scripts/generate-big-data-report.mjs --framework=react",
         "benchmark:generate-report:combined"    : "node ./scripts/generate-combined-report.mjs",
-        "build:benchmark-app"                   : "npm --prefix apps/interactive-benchmark-neo run build-all"
+        "build:benchmark-app"                   : "npm --prefix apps/interactive-benchmark-neo run build-all",
+        "setup"                                 : "node scripts/setup.mjs"
     },
     "repository": {
         "type": "git",
