@@ -43,8 +43,30 @@ async function main() {
         }
     };
 
+    const serverPorts = {
+        neo: 8080,
+        react: 5174,
+        angular: 4200
+    };
+
     // 3. Loop through all frameworks and suites to run
     for (const fw of frameworksToRun) {
+        const port = serverPorts[fw];
+        if (port) {
+            console.log(`--- Ensuring port ${port} is free for ${fw} ---`);
+            try {
+                if (process.platform === 'win32') {
+                    execSync(`(for /f "tokens=5" %i in ('netstat -aon ^| findstr :${port}') do @taskkill /F /PID %i) >nul 2>nul`);
+                } else {
+                    execSync(`lsof -t -i:${port} | xargs kill -9`);
+                }
+                console.log(`Process on port ${port} killed.`);
+            } catch (error) {
+                // This command fails if no process is found, which is the desired state.
+                console.log(`Port ${port} is already free.`);
+            }
+        }
+
         for (const s of suitesToRun) {
             const filesToTest = specFiles[fw]?.[s];
             if (!filesToTest) {
@@ -59,7 +81,7 @@ async function main() {
             await fs.ensureDir(RESULTS_DIR);
             await fs.emptyDir(RESULTS_DIR);
 
-            let testCommand = `CI=true npx playwright test ${filesToTest}`;
+            let testCommand = `FRAMEWORK=${fw} CI=true npx playwright test ${filesToTest}`;
             if (s === 'big-data') {
                 testCommand = `APP=bigData ${testCommand}`;
             }

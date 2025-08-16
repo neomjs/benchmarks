@@ -50,10 +50,16 @@
     -   [ ] Sub-task: Perform a final review of all user-facing materials (reports, documentation) for clarity, accuracy, and typos.
     -   [ ] Sub-task: Get a final "go" from the project owner before public launch.
 -   [ ] Task: Refactor Big Data benchmark tests for clarity and scalability.
-    -   *Goal: Improve the credibility and maintainability of the tests by eliminating duplicated code and using a config-driven approach.*
-    -   [ ] Sub-task: Create a shared test runner utility for the big data scenarios.
-    -   [ ] Sub-task: Move framework-specific details (selectors, URLs) into separate configuration files.
-    -   [ ] Sub-task: Simplify the main spec files to simply invoke the runner with the appropriate config.
+    -   *Goal: Improve the credibility and maintainability of the tests by eliminating duplicated code. This will be done incrementally and safely, with verification at each step.*
+-   [ ] **Phase 1: Extract Shared Browser-Side Helper Functions**
+    -   [ ] Sub-task: Create a new file: `tests/utils/browser-test-helpers.mjs`.
+    -   [ ] Sub-task: **Move, Don't Change.** Move the identical definitions of `measurePerformanceInBrowser` and `measureUiUpdatePerformanceInBrowser` from `neo-big-data.spec.mjs` into this new file and export them.
+    -   [ ] Sub-task: Modify `neo-big-data.spec.mjs`. Remove the local definitions of these two functions. Instead, import them from the new utility file. The `addInitScript` call will now use these imported functions.
+    -   [ ] Sub-task: **Verification:** Run the Neo.mjs big data test suite to confirm that all tests still pass and the results are identical.
+    -   [ ] Sub-task: Repeat the process for `react-big-data.spec.mjs`: remove the local definitions and import them from the shared utility file.
+    -   [ ] Sub-task: **Verification:** Run the React big data test suite to confirm that all tests still pass.
+-   [ ] **Phase 2: Incrementally Centralize Test Actions (To be detailed after Phase 1)**
+-   [ ] **Phase 3: Final Cleanup (Optional, to be detailed after Phase 2)**
 
 ## 5. New Benchmark Scenarios
 -   [~] Task: Develop a "Big Data" benchmark scenario based on the existing `apps/bigData` application:
