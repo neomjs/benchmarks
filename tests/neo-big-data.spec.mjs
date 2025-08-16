@@ -10,12 +10,46 @@ const getNeoGridNames = () => {
     return names;
 };
 
+const selectComboboxItem = (labelText, itemText) => {
+    return new Promise((resolve, reject) => {
+        const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
+        const label = findLabel(labelText);
+        if (!label) {
+            return reject(new Error(`Label "${labelText}" not found.`));
+        }
+        const combobox = label.closest('.neo-combobox');
+        if (!combobox) {
+            return reject(new Error(`Combobox not found for label "${labelText}".`));
+        }
+        const trigger = combobox.querySelector('.fa-caret-down');
+        if (!trigger) {
+            return reject(new Error(`Combobox trigger not found for label "${labelText}".`));
+        }
+
+        const pickerObserver = new MutationObserver((mutations, observer) => {
+            const picker = document.querySelector('.neo-picker-container');
+            if (picker) {
+                const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === itemText);
+                if (item) {
+                    observer.disconnect();
+                    item.click();
+                    resolve();
+                }
+            }
+        });
+        pickerObserver.observe(document.body, { childList: true, subtree: true });
+
+        trigger.click();
+    });
+};
+
 test.beforeEach(async ({page}) => {
     await page.addInitScript({
         content: `
             window.getNeoGridNames            = ${getNeoGridNames.toString()};
             window.measurePerformance         = ${measurePerformanceInBrowser.toString()};
             window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
+            window.selectComboboxItem         = ${selectComboboxItem.toString()};
             window.consoleLogs                = [];
         `
     });
@@ -56,23 +90,7 @@ test('should change the amount of rows', async ({page}) => {
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Rows');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
-
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '5000');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
-                }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
+            window.selectComboboxItem('Amount Rows', '5000');
         };
 
         const condition = () => {
@@ -120,23 +138,7 @@ test('should change the amount of columns', async ({page}) => {
     // Step 1: Trigger the UI action and start total duration measurement
     const totalDurationPromise = page.evaluate((initial) => {
         const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Columns');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
-
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '75');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
-                }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
+            window.selectComboboxItem('Amount Columns', '75');
         };
 
         const condition = () => {
@@ -245,23 +247,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     // Step 1: Trigger the UI action and start total duration measurement
     const rowsTotalDurationPromise = page.evaluate(() => {
         const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Rows');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
-
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '100000');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
-                }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
+            window.selectComboboxItem('Amount Rows', '100000');
         };
 
         const condition = () => {
@@ -303,23 +289,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     // Step 1: Trigger the UI action and start total duration measurement
     const colsTotalDurationPromise = page.evaluate(() => {
         const action = () => {
-            const findLabel = (text) => Array.from(document.querySelectorAll('label')).find(l => l.textContent === text);
-            const label = findLabel('Amount Columns');
-            const combobox = label.closest('.neo-combobox');
-            const trigger = combobox.querySelector('.fa-caret-down');
-            trigger.click();
-
-            const pickerObserver = new MutationObserver(() => {
-                const picker = document.querySelector('.neo-picker-container');
-                if (picker) {
-                    const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === '200');
-                    if (item) {
-                        pickerObserver.disconnect();
-                        item.click();
-                    }
-                }
-            });
-            pickerObserver.observe(document.body, { childList: true, subtree: true });
+            window.selectComboboxItem('Amount Columns', '200');
         };
 
         const condition = () => {
