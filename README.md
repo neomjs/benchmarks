@@ -7,9 +7,14 @@ This repository hosts a modern performance benchmark suite designed to test the 
 Our goal is to create a fair, transparent, and community-driven environment for comparing different architectural approaches to front-end development. We aim to explore questions like:
 
 - How do different frameworks maintain UI fluidity (e.g., 60 FPS) while processing thousands of real-time updates?
-- What are the performance trade-offs between main-thread, worker-based, and server-side rendering architectures in complex, interactive applications?
+- What are the performance trade-offs between main-thread and worker-based architectures in complex, interactive applications?
 
 We are committed to using established best practices for each framework to ensure the comparisons are meaningful and accurate.
+
+## Documentation
+
+-   **[Benchmark Methodology](./METHODOLOGY.md)**: Explains the "why" behind our benchmark design, including our "Time to Valid State" and "High-Fidelity Scroll Measurement" concepts.
+-   **[Reproducing the Benchmarks](./REPRODUCIBILITY.md)**: Provides clear, step-by-step instructions on how to clone the repo, install dependencies, and run the benchmarks yourself.
 
 ## Call for Contributions
 
@@ -26,45 +31,12 @@ The harness is built with [Playwright](https://playwright.dev/) and is responsib
 - Extracting key performance metrics using the browser's `performance` API.
 - Generating structured reports with the benchmark results.
 
-### Getting Started
+## Getting Started
 
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
+For detailed instructions on how to set up the project and run the benchmarks, please see the **[Reproducing the Benchmarks](./REPRODUCIBILITY.md)** guide.
 
-2.  **Build the Benchmark Application:**
-    The tests can run against both a local development server and an optimized production build. To create the production build, run:
-    ```bash
-    npm run build:benchmark-app
-    ```
-
-### Running the Benchmarks
-
-It is critical to choose the correct script to run the tests, depending on your goal.
-
--   **For Quick Functional Testing (Parallel):**
-    This script is for **functional checks only** (i.e., "do the tests pass?"). It runs tests in parallel to finish quickly and **does not** generate a performance report.
-    ```bash
-    npm run benchmark:testing
-    ```
-    **Warning:** The purpose of this script is not performance measurement.
-
--   **For Accurate Performance Benchmarking (Serial):**
-    This is the **only valid mode for generating performance data**. It runs the entire test suite serially 5 times by default, aggregates the results, and generates a statistically robust report in `BENCHMARK_RESULTS.md`.
-    ```bash
-    # Run the suite 5 times (default)
-    npm run benchmark:accurate
-    ```
-    To specify a different number of runs, use the `--runs` flag:
-    ```bash
-    # Run the suite 10 times
-    npm run benchmark:accurate -- --runs=10
-    ```
-    **Note:** This process is slower but essential for producing accurate and reliable benchmark numbers.
-
-### Results
+## Results
 
 The raw output from Playwright (videos, traces) is generated in the `test-results/` and `playwright-report/` directories.
 
-The summarized, version-controlled benchmark data is automatically generated in `BENCHMARK_RESULTS.md` when you run the `benchmark:accurate` command.
+The summarized, version-controlled benchmark data is automatically generated in the root directory (e.g., `BENCHMARK_RESULTS_NEO.md`) when you run the report generation scripts. See the reproducibility guide for more details.
