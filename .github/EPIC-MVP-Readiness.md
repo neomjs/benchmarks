@@ -25,10 +25,10 @@
     -   [ ] Sub-task: Add a "User Experience" column with relatable descriptions (e.g., "Instant", "Sluggish").
     -   [ ] Sub-task: Add a section explaining the architectural "Why" behind the performance differences.
     -   [ ] Sub-task: Update the reporting scripts to automatically generate this new, richer format.
--   [ ] Task: Create Comprehensive Project Documentation:
-    -   [ ] Sub-task: Update the main `README.md` to be the central entry point for the project. It should clearly state the project's purpose and link to the benchmark results and methodology.
-    -   [ ] Sub-task: Create a `METHODOLOGY.md` file that explains the "why" behind the benchmark design, referencing the "Time to Valid State" and "High-Fidelity Scroll Measurement" concepts from the technical epic.
-    -   [ ] Sub-task: Create a `REPRODUCIBILITY.md` file with clear, step-by-step instructions on how to clone the repo, install dependencies, and run the benchmarks.
+-   [x] Task: Create Comprehensive Project Documentation:
+    -   [x] Sub-task: Update the main `README.md` to be the central entry point for the project. It should clearly state the project's purpose and link to the benchmark results and methodology.
+    -   [x] Sub-task: Create a `METHODOLOGY.md` file that explains the "why" behind the benchmark design, referencing the "Time to Valid State" and "High-Fidelity Scroll Measurement" concepts from the technical epic.
+    -   [x] Sub-task: Create a `REPRODUCIBILITY.md` file with clear, step-by-step instructions on how to clone the repo, install dependencies, and run the benchmarks.
 
 ## 3. Credibility and Promotion
 
