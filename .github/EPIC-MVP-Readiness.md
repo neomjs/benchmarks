@@ -58,8 +58,16 @@
     -   [x] Sub-task: **Verification:** Run the Neo.mjs big data test suite to confirm that all tests still pass and the results are identical.
     -   [x] Sub-task: Repeat the process for `react-big-data.spec.mjs`: remove the local definitions and import them from the shared utility file.
     -   [x] Sub-task: **Verification:** Run the React big data test suite to confirm that all tests still pass.
--   [ ] **Phase 2: Incrementally Centralize Test Actions (To be detailed after Phase 1)**
--   [ ] **Phase 3: Final Cleanup (Optional, to be detailed after Phase 2)**
+-   [x] **Phase 2: Unify Interactive & Scrolling Benchmark Helpers**
+    -   [x] Sub-task: Enhance `tests/utils/browser-test-helpers.mjs` to handle different timeout behaviors (reject vs. resolve with Infinity) and accept custom timeout durations.
+    -   [x] Sub-task: Refactor `tests/neo.spec.mjs` to remove its local `measurePerformanceInBrowser` and `measureJankInBrowser` and use the shared helpers.
+    -   [x] Sub-task: Refactor `tests/angular.spec.mjs` to use the shared helpers, preserving its original timeout behavior.
+    -   [x] Sub-task: Refactor `tests/react.spec.mjs` to use the shared helpers, preserving its original timeout behavior.
+    -   [x] Sub-task: Refactor `tests/neo-scrolling.spec.mjs` to use the shared helpers, preserving its browser-specific timeout logic.
+    -   [x] Sub-task: Refactor `tests/react-scrolling.spec.mjs` to use the shared helpers, preserving its browser-specific timeout logic.
+    -   [x] Sub-task: Refactor `tests/angular-scrolling.spec.mjs` to use the shared helpers, preserving its browser-specific timeout logic.
+-   [ ] **Phase 3: Incrementally Centralize Test Actions (To be detailed after Phase 2)**
+-   [ ] **Phase 4: Final Cleanup (Optional, to be detailed after Phase 3)**
 
 ## 5. New Benchmark Scenarios
 -   [~] Task: Develop a "Big Data" benchmark scenario based on the existing `apps/bigData` application:
