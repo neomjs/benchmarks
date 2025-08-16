@@ -1,7 +1,7 @@
 import Base from '../../../node_modules/neo.mjs/src/core/Base.mjs';
 
 /**
- This class contains a CPU-intensive task to be run in a dedicated Task Worker.
+ * This class contains a CPU-intensive task to be run in a dedicated Task Worker.
  * @class Benchmarks.worker.Task
  * @extends Neo.core.Base
  * @singleton

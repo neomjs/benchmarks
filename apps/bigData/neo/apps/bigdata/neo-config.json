@@ -4,5 +4,6 @@
     "environment"   : "development",
     "mainPath"      : "../node_modules/neo.mjs/src/Main.mjs",
     "themes"        : ["neo-theme-dark"],
+    "useTaskWorker" : true,
     "workerBasePath": "../../node_modules/neo.mjs/src/worker/"
 }

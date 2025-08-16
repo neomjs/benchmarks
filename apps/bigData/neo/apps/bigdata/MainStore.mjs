@@ -42,34 +42,17 @@ class MainStore extends Store {
         model: Model
     }
 
-    firstnames = [
-        'Amanda', 'Andrew', 'Anthony', 'Ashley', 'Barbara', 'Betty', 'Brian', 'Carol', 'Charles', 'Christopher',
-        'Daniel', 'David', 'Deborah', 'Donna', 'Elizabeth', 'Emily', 'George', 'Jack', 'James', 'Jennifer',
-        'Jessica', 'Joe', 'John', 'Joseph', 'Joshua', 'Karen', 'Kenneth', 'Kelly', 'Kevin', 'Kimberly',
-        'Linda', 'Lisa', 'Margaret', 'Mark', 'Mary', 'Matthew', 'Max', 'Melissa', 'Michael', 'Michelle',
-        'Nancy', 'Patricia', 'Paul', 'Richard', 'Robert', 'Ronald', 'Sam', 'Sandra', 'Sarah', 'Stephanie',
-        'Steven', 'Susan', 'Thomas', 'Timothy', 'Tobias', 'William'
-    ]
-
-    lastnames = [
-        'Adams', 'Allen', 'Anderson', 'Baker', 'Brown', 'Campbell', 'Carter', 'Clark', 'Davis', 'Flores',
-        'Garcia', 'Gonzales', 'Green', 'Hall', 'Harris', 'Hernandez', 'Hill', 'Jackson', 'Johnson', 'Jones',
-        'King', 'Lee', 'Lewis', 'Lopez', 'Martin', 'Martinez', 'Miller', 'Mitchell', 'Moore', 'Nelson',
-        'Nguyen', 'Perez', 'Rahder', 'Ramirez', 'Roberts', 'Rivera', 'Robinson', 'Rodriguez', 'Sanchez', 'Scott',
-        'Smith', 'Taylor', 'Thomas', 'Thompson', 'Torres', 'Uhlig', 'Walker', 'Waters', 'White', 'Williams',
-        'Wilson', 'Wright', 'Young'
-    ]
-
     /**
      * Triggered after the amountColumns config got changed
      * @param {Number} value
      * @param {Number} oldValue
+     * @returns {Promise<void>}
      * @protected
      */
-    afterSetAmountColumns(value, oldValue) {
+    async afterSetAmountColumns(value, oldValue) {
         if (oldValue !== undefined) {
             let me    = this,
-                data  = me.generateData(me.amountRows, value),
+                data  = await me.generateData(me.amountRows, value),
                 start = performance.now();
 
             me.model.amountColumns = value;
@@ -90,11 +73,12 @@ class MainStore extends Store {
      * Triggered after the amountRows config got changed
      * @param {Number} value
      * @param {Number} oldValue
+     * @returns {Promise<void>}
      * @protected
      */
-    afterSetAmountRows(value, oldValue) {
+    async afterSetAmountRows(value, oldValue) {
         let me    = this,
-            data  = me.generateData(value, me.amountColumns),
+            data  = await me.generateData(value, me.amountColumns),
             start = performance.now();
 
         console.log('Start generating data and adding to collection');
@@ -111,35 +95,13 @@ class MainStore extends Store {
     /**
      * @param {Number} amountRows
      * @param {Number} amountColumns
-     * @returns {Object[]}
+     * @returns {Promise<Object[]>}
      */
-    generateData(amountRows, amountColumns) {
+    async generateData(amountRows, amountColumns) {
         console.log('Start creating data', {amountRows, amountColumns});
 
-        let me               = this,
-            start            = performance.now(),
-            amountFirstnames = me.firstnames.length,
-            amountLastnames  = me.lastnames.length,
-            records          = [],
-            row              = 0,
-            column, record;
-
-        for (; row < amountRows; row++) {
-            column = 7;
-            record = {
-                id       : row + 1,
-                counter  : Math.round(Math.random() * 100),
-                firstname: me.firstnames[Math.floor(Math.random() * amountFirstnames)],
-                lastname : me.lastnames[ Math.floor(Math.random() * amountLastnames)],
-                progress : Math.round(Math.random() * 100)
-            };
-
-            for (; column <= amountColumns; column++) {
-                record['number' + column] = Math.round(Math.random() * 10000)
-            }
-
-            records.push(record)
-        }
+        let start   = performance.now(),
+            records = await BigData.task.Helper.generateGridData({amountRows, amountColumns});
 
         console.log(`Data creation total time: ${Math.round(performance.now() - start)}ms`);
 
