@@ -1,5 +1,5 @@
-// @ts-check
 import {test, expect} from '@playwright/test';
+import { measurePerformanceInBrowser, measureJankInBrowser } from './utils/browser-test-helpers.mjs';
 
 /**
  * A robust, observer-based function to wait for the grid to be ready for test setup.
@@ -17,110 +17,6 @@ async function waitForGridReady(page, expectedRowCount, timeout = 10000) {
         return rowCountCorrect && firstRowExists;
     }, expectedRowCount, {timeout});
 }
-
-// This function will be injected into the browser context.
-// It must be defined outside of any test or beforeEach block to be accessible for injection.
-const measurePerformanceInBrowser = (testName, action, condition, passThrough) => {
-    return new Promise((resolve, reject) => {
-        const observer = new MutationObserver(() => {
-            try {
-                if (condition(passThrough)) {
-                    const endTime = performance.now();
-                    observer.disconnect();
-                    clearTimeout(timeoutId);
-                    resolve(endTime - startTime);
-                }
-            } catch (e) {
-                observer.disconnect();
-                clearTimeout(timeoutId);
-                console.error(`Condition error in ${testName}:`, e);
-                reject(e);
-            }
-        });
-
-        observer.observe(document.body, {attributes: true, childList: true, subtree: true});
-
-        const timeoutId = setTimeout(() => {
-            observer.disconnect();
-            reject(new Error(`Benchmark timed out for "${testName}".`));
-        }, 30000);
-
-        const startTime = performance.now();
-        try {
-            action(passThrough);
-        } catch (e) {
-            console.error(`Action error in ${testName}:`, e);
-            observer.disconnect();
-            clearTimeout(timeoutId);
-            reject(e);
-            return; // Stop further execution if action fails synchronously
-        }
-
-        try {
-            if (condition(passThrough)) {
-                const endTime = performance.now();
-                observer.disconnect();
-                clearTimeout(timeoutId);
-                resolve(endTime - startTime);
-            }
-        } catch (e) {
-            observer.disconnect();
-            clearTimeout(timeoutId);
-            console.error(`Initial condition check error in ${testName}:`, e);
-            reject(e);
-        }
-    });
-};
-
-/**
- * Measures UI jank by collecting frame timings over a given duration.
- * This function will be injected into the browser context.
- * @param {number} duration - The duration in milliseconds to measure jank.
- * @returns {Promise<{averageFps: number, frameCount: number, longFrameCount: number, totalTime: number}>}
- */
-const measureJankInBrowser = (duration) => {
-    return new Promise(resolve => {
-        const frameTimes = [];
-        let longFrameCount = 0;
-        let startTime;
-
-        function frame(time) {
-            if (startTime === undefined) {
-                startTime = time;
-            }
-
-            const elapsed = time - startTime;
-            frameTimes.push(time);
-
-            if (elapsed < duration) {
-                requestAnimationFrame(frame);
-            } else {
-                // Start from the second frame to calculate deltas
-                for (let i = 1; i < frameTimes.length; i++) {
-                    const delta = frameTimes[i] - frameTimes[i - 1];
-                    // A long frame is arbitrarily defined as > 50ms (~20 FPS threshold)
-                    // This indicates significant main-thread blocking.
-                    if (delta > 50) {
-                        longFrameCount++;
-                    }
-                }
-
-                const totalTime = frameTimes[frameTimes.length - 1] - frameTimes[0];
-                // We have frameTimes.length - 1 frame intervals
-                const averageFps = totalTime > 0 ? (frameTimes.length - 1) / (totalTime / 1000) : 0;
-
-                resolve({
-                    averageFps: Math.round(averageFps),
-                    frameCount: frameTimes.length,
-                    longFrameCount,
-                    totalTime: Math.round(totalTime)
-                });
-            }
-        }
-
-        requestAnimationFrame(frame);
-    });
-};
 
 const getButtonByText = (text) => {
     return document.evaluate(`//button[normalize-space(.)='${text}']`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
@@ -339,7 +235,7 @@ test('Neo.mjs benchmark: Clear Rows', async ({page}) => {
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '2';
+            return grid && grid.getAttribute('aria-rowcount') === '1';
         };
         return window.measurePerformance('Clear Rows', action, condition);
     });
