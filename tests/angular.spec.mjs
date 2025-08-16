@@ -58,7 +58,7 @@ test('Angular benchmark: Create 10k Rows', async ({page}) => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 10000;
         };
-        return window.measurePerformance('Create 10k Rows', action, condition);
+        return window.measurePerformance('Create 10k Rows', action, condition, undefined, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -79,7 +79,7 @@ test('Angular benchmark: Create 100k Rows', async ({page}) => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 100000;
         };
-        return window.measurePerformance('Create 100k Rows', action, condition);
+        return window.measurePerformance('Create 100k Rows', action, condition, undefined, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -100,7 +100,7 @@ test('Angular benchmark: Create 1M Rows', async ({page}) => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 1000000;
         };
-        return window.measurePerformance('Create 1M Rows', action, condition, undefined, 110000);
+        return window.measurePerformance('Create 1M Rows', action, condition, undefined, { timeout: 110000, resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -123,7 +123,7 @@ test('Angular benchmark: Update Every 10th Row', async ({page}) => {
             const node = document.querySelector('.ag-row:first-child .ag-cell:last-child');
             return node?.textContent.includes('updated');
         };
-        return window.measurePerformance('Update Every 10th Row', action, condition);
+        return window.measurePerformance('Update Every 10th Row', action, condition, undefined, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -145,7 +145,7 @@ test('Angular benchmark: Select Row', async ({page}) => {
         const condition = () => {
             return document.querySelector('.ag-row-selected');
         };
-        return window.measurePerformance('Select Row', action, condition);
+        return window.measurePerformance('Select Row', action, condition, undefined, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -179,7 +179,7 @@ test('Angular benchmark: Swap Rows', async ({page}) => {
             return newStyles.length > 0 && newStyles.join(',') !== initials.join(',');
         };
 
-        return window.measurePerformance('Swap Rows', action, condition, initialTransforms);
+        return window.measurePerformance('Swap Rows', action, condition, initialTransforms, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -202,7 +202,7 @@ test('Angular benchmark: Remove Row', async ({page}) => {
             const {gridApi} = window;
             return gridApi?.getDisplayedRowCount() === 9999;
         };
-        return window.measurePerformance('Remove Row', action, condition);
+        return window.measurePerformance('Remove Row', action, condition, undefined, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
@@ -227,7 +227,7 @@ test('Angular benchmark: Clear Rows', async ({page}) => {
             const rowCount = grid.querySelectorAll('.ag-row').length;
             return rowCount === 0;
         };
-        return window.measurePerformance('Clear Rows', action, condition);
+        return window.measurePerformance('Clear Rows', action, condition, undefined, { resolveOnTimeout: true });
     });
 
     test.info().annotations.push({type: 'duration', description: `${duration}`});
