@@ -9,7 +9,6 @@
 -   [~] Task: Review and Finalize All Framework Implementations:
     -   [ ] Sub-task: Ensure the Angular, React, and Neo.mjs apps are using comparable, best-practice implementations for a fair comparison.
     -   [ ] Sub-task: Document the key libraries and versions used for each framework (e.g., React v18, Angular v17, TanStack Virtual v8).
-    -   [ ] Sub-task: For the Neo.mjs big data app, offload data generation to a dedicated task worker to prevent the app worker from freezing and ensure UI responsiveness during heavy computations. (The React implementation can be used as a blueprint).
 -   [x] Task: Add an AG Grid version of the React benchmark:
     -   [x] Sub-task: Implement an additional version of the React benchmark using AG Grid to provide a comparison with a feature-rich grid library. (Done for the Big Data benchmark)
     -   [x] Sub-task: Keep the existing TanStack Virtual benchmark for comparison with a lightweight, "headless" library. (The interactive benchmark uses TanStack)
