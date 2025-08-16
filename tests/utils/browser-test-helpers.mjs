@@ -1,4 +1,4 @@
-export const measurePerformanceInBrowser = (testName, action, condition, passThrough) => {
+export const measurePerformanceInBrowser = (testName, action, condition, passThrough, { timeout = 30000, resolveOnTimeout = false } = {}) => {
     return new Promise((resolve, reject) => {
         const observer = new MutationObserver(() => {
             try {
@@ -20,8 +20,12 @@ export const measurePerformanceInBrowser = (testName, action, condition, passThr
 
         const timeoutId = setTimeout(() => {
             observer.disconnect();
-            reject(new Error(`Benchmark timed out for "${testName}".`));
-        }, 30000);
+            if (resolveOnTimeout) {
+                resolve(Infinity);
+            } else {
+                reject(new Error(`Benchmark timed out for "${testName}".`));
+            }
+        }, timeout);
 
         const startTime = performance.now();
         try {
