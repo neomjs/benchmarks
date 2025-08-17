@@ -51,14 +51,6 @@ function parseResults(allRunsData) {
         const processSuite = (suite) => {
             if (suite.specs) {
                 suite.specs.forEach(spec => {
-                    function parseResults(allRunsData) {
-    const durationBenchmarks = {};
-    const responsivenessBenchmarks = {};
-
-    allRunsData.forEach(runData => {
-        const processSuite = (suite) => {
-            if (suite.specs) {
-                suite.specs.forEach(spec => {
                     const benchmarkName = spec.title.replace(/^(Neo\.mjs|React|Angular) benchmark: /, '');
 
                     if (!benchmarkName) {
@@ -75,7 +67,7 @@ function parseResults(allRunsData) {
                                 if (test.results.every(r => r.status === 'passed')) { // Keep status check for responsiveness
                                     const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
                                     const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
-                                    
+
                                     // New scrolling metrics annotations
                                     const avgTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'avgTimeToValidState');
                                     const maxTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'maxTimeToValidState');
@@ -111,64 +103,6 @@ function parseResults(allRunsData) {
                                         }
                                     }
                                 });
-                            }
-                        }
-                    });
-                });
-            }
-            if (suite.suites) {
-                suite.suites.forEach(processSuite);
-            }
-        };
-        runData.suites.forEach(processSuite);
-    });
-
-                    if (!benchmarkName) {
-                        return;
-                    }
-
-                    if (benchmarkName.endsWith(RESPONSIVENESS_TEST_SUFFIX)) {
-                        initializeBenchmark(responsivenessBenchmarks, benchmarkName);
-                    } else {
-                        initializeBenchmark(durationBenchmarks, benchmarkName);
-                    }
-
-                    spec.tests.forEach(test => {
-                        const mode = test.projectName.endsWith('-dev') ? 'dev' : 'prod';
-                        const browser = BROWSERS.find(b => test.projectName.startsWith(b));
-
-                        if (browser) {
-                            if (benchmarkName.endsWith(RESPONSIVENESS_TEST_SUFFIX)) {
-                                if (test.results.every(r => r.status === 'passed')) { // Keep status check for responsiveness
-                                    const fpsAnnotation = test.annotations.find(a => a.type === 'averageFps');
-                                    const longFrameAnnotation = test.annotations.find(a => a.type === 'longFrameCount');
-                                    
-                                    // New scrolling metrics annotations
-                                    const avgTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'avgTimeToValidState');
-                                    const maxTimeToValidStateAnnotation = test.annotations.find(a => a.type === 'maxTimeToValidState');
-                                    const updateSuccessRateAnnotation = test.annotations.find(a => a.type === 'updateSuccessRate');
-
-                                    const target = responsivenessBenchmarks[benchmarkName][mode][browser];
-
-                                    if (fpsAnnotation && longFrameAnnotation) {
-                                        target.fps = (target.fps || []).concat(parseFloat(fpsAnnotation.description));
-                                        target.longFrames = (target.longFrames || []).concat(parseFloat(longFrameAnnotation.description));
-                                    }
-
-                                    // Aggregate new scrolling metrics
-                                    if (avgTimeToValidStateAnnotation && maxTimeToValidStateAnnotation && updateSuccessRateAnnotation) {
-                                        target.avgTimeToValidState = (target.avgTimeToValidState || []).concat(parseFloat(avgTimeToValidStateAnnotation.description));
-                                        target.maxTimeToValidState = (target.maxTimeToValidState || []).concat(parseFloat(maxTimeToValidStateAnnotation.description));
-                                        target.updateSuccessRate = (target.updateSuccessRate || []).concat(parseFloat(updateSuccessRateAnnotation.description));
-                                    }
-                                }
-                            } else {
-                                const durationAnnotation = test.annotations.find(a => a.type === 'duration');
-                                if (durationAnnotation) {
-                                    const duration = parseFloat(durationAnnotation.description);
-                                    const target = durationBenchmarks[benchmarkName][mode][browser];
-                                    target.times = (target.times || []).concat(duration);
-                                }
                             }
                         }
                     });
