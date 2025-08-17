@@ -16,14 +16,15 @@
 
 ## 2. Polish Reporting and Documentation
 
--   [ ] Task: Enhance Benchmark Reports:
-    -   *Note: This task is blocked until the new benchmark scenarios (scrolling, real-time feed) are implemented, as the report structure will change significantly.*
-    -   [ ] Sub-task: Redesign the report structure to be more compelling and narrative-driven.
-    -   [ ] Sub-task: Add an "Executive Summary" with key takeaways at the top of each report.
-    -   [ ] Sub-task: In result tables, add a comparative "Neo.mjs Advantage" column (e.g., "X times faster").
-    -   [ ] Sub-task: Add a "User Experience" column with relatable descriptions (e.g., "Instant", "Sluggish").
-    -   [ ] Sub-task: Add a section explaining the architectural "Why" behind the performance differences.
-    -   [ ] Sub-task: Update the reporting scripts to automatically generate this new, richer format.
+-   [~] Task: Enhance Benchmark Reports for Publication (Two-Report Strategy):
+    -   *Goal: In a 5-hour sprint, create two separate, compelling summary reports to support the blog post: one for the "Big Data" showcase and one for the "Interactive" showcase.*
+    -   [ ] Sub-task: **Create `COMBINED_BIG_DATA_REPORT.md`**: This report will focus on the scalability showdown between Neo.mjs and React + AG Grid.
+    -   [ ] Sub-task: **Create `COMBINED_INTERACTIVE_REPORT.md`**: This report will focus on the UI resilience comparison between Neo.mjs, React + TanStack, and Angular under concurrent stress.
+    -   [ ] Sub-task: **Add "Executive Summaries"**: Write a short, impactful summary at the top of each report highlighting its key findings.
+    -   [ ] Sub-task: **Clarify Technology Stacks**: Ensure all tables are explicit about the technologies being compared (e.g., "React v18 + AG Grid v31").
+    -   [ ] Sub-task: **Add "Advantage" & "UX" Columns**: For key comparisons, add columns that calculate the performance multiplier (e.g., "7.5x Faster") and describe the user impact ("Fluid" vs. "UI Freeze" vs. "Browser Crash").
+    -   [ ] Sub-task: **Explain the "Why"**: Add a concise section in each report connecting the results back to the core architectural differences.
+    -   [ ] Sub-task: **Update Reporting Scripts**: Modify `generate-combined-report.mjs` (or create new scripts) to automate the creation of these two distinct, narrative-driven reports.
 -   [x] Task: Create Comprehensive Project Documentation:
     -   [x] Sub-task: Update the main `README.md` to be the central entry point for the project. It should clearly state the project's purpose and link to the benchmark results and methodology.
     -   [x] Sub-task: Create a `METHODOLOGY.md` file that explains the "why" behind the benchmark design, referencing the "Time to Valid State" and "High-Fidelity Scroll Measurement" concepts from the technical epic.
