@@ -66,9 +66,35 @@ By building this high-precision harness, we can now move beyond architectural th
 
 2.  **Extreme Loads Reveal Architectural Breaking Points:** We argued that the "memoization tax" is a workaround, not a solution, for performance under pressure. Our "Scrolling Under Duress" test (1 million rows with a live data feed) shows what happens when those workarounds are overwhelmed. The React/TanStack Virtual implementation doesn't just get slow—it crashes the browser tab. The Angular app remains barely usable, with over a second of lag. The worker-based app, which eliminates the need for such manual optimizations at an architectural level, stays responsive. This is the ultimate cost of a bottlenecked main thread: not just jank, but catastrophic failure.
 
+3.  **Best-in-Class Components Can't Escape the Architecture:** To prove our claims, our "Big Data Benchmark" pits a new Neo.mjs grid against the undisputed industry leader, AG Grid, running in React. We measured "UI Update Time"—the pure grid rendering performance—across several demanding scenarios. The results were not just a win; they were a confirmation of our architectural thesis.
+
+### True Performance Analysis (UI Update Times Only)
+
+#### 1. Large Column Operations (50→200 columns, 100k rows)
+
+| Browser | Neo.mjs UI Time | React AG Grid UI Time | Neo.mjs Advantage |
+| :--- | :--- | :--- | :--- |
+| **Chromium** | 380-404ms | 2,962-3,071ms | **7.5x faster** |
+| **Firefox** | 382-402ms | 4,328-4,460ms | **11x faster** |
+| **Webkit** | 380-483ms | 5,256-5,500ms | **10.9x faster** |
+
+**Architectural Implication**: Neo's off-main-thread rendering engine handles complex column layouts with dramatically less DOM manipulation overhead, resulting in an order-of-magnitude performance gain.
+
+#### 2. Large Row Operations (1,000→100,000 rows)
+
+| Browser | Neo.mjs UI Time | React AG Grid UI Time | Neo.mjs Advantage |
+| :--- | :--- | :--- | :--- |
+| **Chromium** | 150-225ms | 899-954ms | **~5x faster** |
+| **Firefox** | 104-154ms | 1,431-1,484ms | **~10x faster** |
+| **Webkit** | 115-165ms | 1,180-1,231ms | **~8x faster** |
+
+**Critical Finding**: Neo.mjs maintains sub-200ms UI updates even with a 100x increase in row count, an update speed that feels instant to the user. In contrast, the main-thread architecture of React + AG Grid degrades to 1+ second updates, which is a significant and noticeable lag.
+
+The data speaks for itself. AG Grid is the undisputed industry leader for feature-rich data grids, which makes these results even more significant. They provide powerful evidence of an architectural ceiling: even the most mature and heavily optimized component will eventually be bottlenecked by the single-threaded paradigm it operates in. The performance limitations are not a question of implementation detail, but of fundamental architectural constraints.
+
 ## An MVP at a Crossroads
 
-What you see today is the MVP of that effort—a robust foundation built on months of rigorous engineering to ensure the results are precise, credible, and reproducible. But it is just the beginning of what's possible.
+What you see today is the MVP of that effort—a robust foundation, built in a rapid, ten-day engineering sprint to ensure the results are precise, credible, and reproducible. But it is just the beginning of what's possible.
 
 The potential for this project is immense:
 -   **CI/CD Integration:** Imagine this suite running automatically in the cloud across diverse hardware configurations, providing a living, breathing dataset of framework performance.
@@ -84,8 +110,8 @@ So, the question we pose to the community is: is there an interest for more? If 
 
 The entire project, including all applications, test suites, and results, is publicly available on GitHub.
 
--   **Explore the code and results:** [Link to your GitHub Repo]
--   **Read our detailed methodology:** [Link to METHODOLOGY.md]
--   **Run the benchmarks yourself:** [Link to REPRODUCIBILITY.md]
+-   **Explore the code and results:** [https://github.com/neomjs/benchmarks](https://github.com/neomjs/benchmarks)
+-   **Read our detailed methodology:** [METHODOLOGY.md](../METHODOLOGY.md)
+-   **Run the benchmarks yourself:** [REPRODUCIBILITY.md](../REPRODUCIBILITY.md)
 
 Let's work together to define the future of frontend performance measurement.
