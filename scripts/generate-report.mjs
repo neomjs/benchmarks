@@ -252,7 +252,16 @@ function generateResponsivenessMarkdown(benchmarks) {
     let table = `| Benchmark                                   | Browser    | Dev Mode (FPS / Long Frames) | Prod Mode (FPS / Long Frames) |
 |---------------------------------------------|------------|------------------------------|-------------------------------|
 `;
-    const sortedKeys = Object.keys(benchmarks).sort();
+    const sortedKeys = Object.keys(benchmarks)
+        .filter(key => {
+            const result = benchmarks[key];
+            // Exclude benchmarks that have scrolling fluidity data
+            return !BROWSERS.some(browser =>
+                (result.dev[browser].avgTimeToValidStateAvg && Number.isFinite(result.dev[browser].avgTimeToValidStateAvg)) ||
+                (result.prod[browser].avgTimeToValidStateAvg && Number.isFinite(result.prod[browser].avgTimeToValidStateAvg))
+            );
+        })
+        .sort();
 
     for (const key of sortedKeys) {
         const result = benchmarks[key];
