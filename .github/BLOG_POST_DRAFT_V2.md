@@ -144,6 +144,10 @@ The path forward requires significant engagement, either through active communit
 
 So, the question we pose to the community is: is there an interest for more? If you believe in the need for a better, more honest way to benchmark the modern web, we invite you to get involved.
 
+Beyond the automated test results, all benchmark applications are fully functional. We encourage you to run them locally in your browser of choice to manually verify and experience the performance differences firsthand. For an immediate demonstration, an almost identical version of the Neo.mjs Big Data grid is deployed here:
+
+-   **Live Demo:** [Neo.mjs Big Data Grid](https://neomjs.com/dist/production/examples/grid/bigData/index.html)
+
 The entire project, including all applications, test suites, and results, is publicly available on GitHub.
 
 -   **Explore the code and results:** [https://github.com/neomjs/benchmarks](https://github.com/neomjs/benchmarks)
