@@ -263,10 +263,10 @@ function generateResponsivenessMarkdown(benchmarks) {
     const sortedKeys = Object.keys(benchmarks)
         .filter(key => {
             const result = benchmarks[key];
-            // Exclude benchmarks that have scrolling fluidity data
-            return !BROWSERS.some(browser =>
-                (result.dev[browser].avgTimeToValidStateAvg && Number.isFinite(result.dev[browser].avgTimeToValidStateAvg)) ||
-                (result.prod[browser].avgTimeToValidStateAvg && Number.isFinite(result.prod[browser].avgTimeToValidStateAvg))
+            // Include only benchmarks that have FPS data for at least one browser (i.e., not skipped responsiveness tests)
+            return BROWSERS.some(browser =>
+                (result.dev[browser].fps && result.dev[browser].fps.length > 0) ||
+                (result.prod[browser].fps && result.prod[browser].fps.length > 0)
             );
         })
         .sort();
