@@ -101,6 +101,14 @@ function parseResults(allRunsData) {
                                         } catch (e) {
                                             console.error(`Error parsing performance annotation for spec "${spec.title}":`, e);
                                         }
+                                    } else if (annotation.type === 'duration') {
+                                        // Handle single duration annotations (e.g., from Angular benchmarks)
+                                        const duration = parseFloat(annotation.description);
+                                        if (Number.isFinite(duration)) {
+                                            initializeBenchmark(durationBenchmarks, benchmarkName);
+                                            const target = durationBenchmarks[benchmarkName][mode][browser];
+                                            target.times = (target.times || []).concat(duration);
+                                        }
                                     }
                                 });
                             }
@@ -447,7 +455,9 @@ function generateKnownIssuesMarkdown() {
 async function main() {
     try {
         const RESULTS_DIR = path.resolve(process.cwd(), 'test-results-data', framework);
-        const resultFiles = glob.sync(`${RESULTS_DIR}/**/*.json`);
+        const globPattern = `${RESULTS_DIR}/{duration,scrolling}/**/*.json`;
+
+        const resultFiles = glob.sync(globPattern, { ignore: ['.gitkeep'], dot: true });
         if (resultFiles.length === 0) {
             console.error(`Error: No result files found in ${RESULTS_DIR}. Please run the tests first.`);
             process.exit(1);
