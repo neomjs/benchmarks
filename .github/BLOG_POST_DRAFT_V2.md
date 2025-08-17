@@ -2,11 +2,27 @@
 
 # Benchmarking Frontends in 2025: We Had to Break the Rules to Get It Right
 
-When we set out to build a new benchmark suite for modern frontend frameworks, our goal was simple: to measure the real-world, interactive performance of complex applications under stress. We knew that traditional tools like Lighthouse, while essential, primarily focus on the initial page load, leaving a critical gap in measuring the "lived-in" experience of an application.
+## The Two Worlds of Web Performance
 
-We chose Playwright as our harness for its power and cross-browser capabilities. We assumed that building the tests would be straightforward. We were wrong.
+For the better part of a decade, the web performance community has rightfully focused on one critical goal: making the initial page load faster. Driven by tools like Google's Lighthouse and the Core Web Vitals (CWV) initiative, we've become experts at optimizing for the "first-impression" web. This is the world of e-commerce, marketing sites, and news articles, where success is measured in milliseconds of Largest Contentful Paint (LCP) and a low Interaction to Next Paint (INP). For this half of the web, these tools are essential and have made the user experience immeasurably better.
 
-We quickly discovered that the standard "best practices" for automated testing were not just insufficient for performance measurement—they were actively hostile to it. To get clean, trustworthy data, we had to identify and overcome three fundamental challenges, forcing us to break the conventional rules and build a new kind of measurement tool from the ground up.
+But another half of the web has been quietly evolving, operating under a completely different set of pressures. This is the "lived-in" web: the complex, data-intensive applications where users spend their entire workday. Think of real-time trading dashboards, enterprise SaaS platforms, and data science tools. Here, the initial load is a distant memory. True performance is defined by what happens hours into a session: Can the UI handle a stream of 1,000 real-time updates per second without stuttering? Can a data grid ingest and render 100,000 new rows without freezing? Does the entire application grind to a halt during a heavy background calculation?
+
+## An Ecosystem Measuring Only Half the Story
+
+The uncomfortable truth is that our benchmarking ecosystem is still primarily designed to measure the "first-impression" web.
+
+Core Web Vitals are the gold standard, but their focus is, by definition, on the loading experience. LCP measures render speed, INP measures initial input delay, and CLS measures visual stability *as the page loads*. They are not designed to tell you if your application will suffer catastrophic jank ten minutes into a session under a heavy, concurrent load.
+
+The `js-framework-benchmark` (often called "krausest") was a vital step in the right direction, moving the focus to interactivity like creating, swapping, and deleting rows. It provides invaluable data on the raw speed of these atomic operations. But it tests them in a sterile lab, in isolation. It doesn't simulate the chaos of a real application where a user is scrolling *while* a background task is running *and* a WebSocket is pushing real-time updates.
+
+This leaves developers of complex applications flying blind. We are building a generation of incredibly demanding, "lived-in" applications but are forced to measure them with tools designed for a simpler, "first-impression" world.
+
+## The Need for a New Harness
+
+This is the gap we set out to fill. We needed to build a new kind of benchmark from the ground up—one that could simulate real-world concurrency and measure an application's resilience under sustained duress.
+
+To do this, we had to start from scratch. We needed a harness that could automate complex, multi-step interactions across all modern browsers and give us the low-level control to measure with scientific precision. That's why we chose Playwright as our foundation. But as we quickly learned, simply choosing a tool wasn't enough. We had to fundamentally rethink *how* to use it.
 
 ## Challenge 1: The Parallelism Trap
 
@@ -18,37 +34,19 @@ The very purpose of a benchmark is to push a browser and framework to its limits
 
 ## Challenge 2: The Latency Chasm and the Atomic Measurement
 
-With our tests running serially, we still saw unacceptable noise in the data. The problem was the "observer effect" caused by the constant back-and-forth communication between the Playwright test runner (living in a Node.js process) and the browser page. A typical Playwright script might look like this:
+With our tests running serially, we still saw unacceptable noise in the data. The problem was the "observer effect" caused by the constant back-and-forth communication between the Playwright test runner (living in a Node.js process) and the browser page. Each command and response adds milliseconds of unpredictable latency, completely separate from the framework's actual performance.
 
-1.  **[Node.js]** `page.click('#my-button')`
-2.  *(Network/IPC delay)*
-3.  **[Browser]** Clicks the button.
-4.  **[Node.js]** `page.waitForSelector('.new-element')`
-5.  *(Network/IPC delay)*
-6.  **[Browser]** Starts polling for the element.
-7.  ...
-
-Each of these steps adds milliseconds of unpredictable latency, completely separate from the framework's actual performance. To get scientifically accurate results, we had to eliminate this chatter.
-
-Our solution was to make each measurement **atomic**. The entire test—triggering an action, waiting for a specific condition to be met, and measuring the duration—had to be executed in a single, uninterrupted block of code *inside the browser's context*.
-
-We achieved this by combining two powerful Playwright features. First, we use `page.addInitScript()` to inject our custom measurement helpers (like `measurePerformanceInBrowser`) directly into the browser's `window` object. This is the recommended way to share code across tests, and it ensures our logic is always available without violating Content Security Policies (CSP).
-
-Second, every performance test is now wrapped in a single `page.evaluate()` call. This function effectively gives us a portal into the browser's own thread, allowing us to run our entire measurement logic atomically, from start to finish, without ever leaving the browser. Only the final, high-precision number is returned to the Node.js process.
+Our solution was to make each measurement **atomic**. The entire test—triggering an action, waiting for a specific condition to be met, and measuring the duration—had to be executed in a single, uninterrupted block of code *inside the browser's context*. We use `page.addInitScript()` to inject our measurement helpers into the page, then wrap each test in a single `page.evaluate()` call. This gives us a portal into the browser's own thread, allowing us to run our entire measurement logic atomically. Only the final, high-precision number is returned to the Node.js process.
 
 **Lesson 2: Eliminate test runner latency by performing all measurement logic atomically inside the browser.** This is the only way to be certain you are measuring the framework, not the harness.
 
 ## Challenge 3: The Polling Fallacy
 
-Even with atomic, in-browser measurements, one insidious problem remained. Our results for very short-duration tasks were wildly inconsistent. We'd try to measure a UI update that we knew should take around 20ms, but the benchmark would report numbers like 45ms, 32ms, or even 58ms. The deviation was so high that the data was meaningless.
+Even with atomic, in-browser measurements, our results for very short-duration tasks were wildly inconsistent. We discovered the reason the hard way: Playwright's `waitFor` helpers, like most automation "wait" functions, use long-polling, checking the DOM only every 30ms or more to avoid pegging the CPU.
 
-We discovered the reason the hard way: Playwright's `waitFor` helpers, and indeed most automation library "wait" functions, don't check the DOM continuously. To avoid pegging the CPU, they use long-polling, checking the condition only every 30ms or more.
+This is fine for functional testing, but for performance measurement, it's a fatal flaw. You cannot use a ruler with 30ms markings to accurately measure a 20ms event.
 
-This is perfectly fine for functional testing—you don't care if you wait an extra 20ms for a button to appear. But for performance measurement, it's a fatal flaw. You cannot use a ruler with 30ms markings to accurately measure a 20ms event.
-
-This realization forced us to throw out polling entirely and build our own high-precision waiting mechanism. The solution was the browser's native `MutationObserver`.
-
-Our `measurePerformanceInBrowser` function attaches a `MutationObserver` to the document body that listens for any and all DOM changes. After triggering an action, it checks our "pass" condition on every single DOM mutation, no matter how small. This allows us to stop the timer at the exact moment the UI reaches its desired state, giving us microsecond-level precision. It is the technical heart of our benchmark's credibility.
+This realization forced us to throw out polling entirely and build our own high-precision waiting mechanism using the browser's native `MutationObserver`. Our `measurePerformanceInBrowser` function attaches an observer that checks our pass condition on *every single DOM mutation*. This allows us to stop the timer at the exact moment the UI reaches its desired state, giving us microsecond-level precision. It is the technical heart of our benchmark's credibility.
 
 **Lesson 3: You can't trust polling-based "wait" functions for performance measurement.** For high-precision results, you must use a `MutationObserver` to react to DOM changes instantly.
 
