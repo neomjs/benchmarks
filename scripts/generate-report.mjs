@@ -463,6 +463,18 @@ async function main() {
             process.exit(1);
         }
 
+        // Calculate the actual number of runs based on the filenames
+        const runNumbers = resultFiles.map(file => {
+            const match = file.match(/test-results-run-(\d+)\.json$/);
+            return match ? parseInt(match[1], 10) : 0;
+        });
+        const runCount = runNumbers.length > 0 ? Math.max(...runNumbers) : 0;
+
+        if (runCount === 0) {
+            console.error(`Error: Could not determine run count from filenames in ${RESULTS_DIR}.`);
+            process.exit(1);
+        }
+
         const allRunsData = await Promise.all(resultFiles.map(file => fs.readJson(file)));
 
         let benchmarkSystemInfo = {};
@@ -489,10 +501,10 @@ async function main() {
         const markdown = `# Benchmark Performance Results
 
 This report compares the performance of the interactive benchmark application running in two different modes:
-- **Development Mode**: Served directly by the webpack dev server (${devPath}).
-- **Production Mode**: Using the optimized build output (${prodPath}).
+- **Development Mode**
+- **Production Mode**
 
-The data is aggregated over **${resultFiles.length} run(s)**. The value in parentheses (±) is the standard deviation.
+The data is aggregated over **${runCount} run(s)**. The value in parentheses (±) is the standard deviation.
 
 ## Duration Benchmarks
 

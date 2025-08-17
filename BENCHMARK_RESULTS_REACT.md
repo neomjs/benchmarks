@@ -1,10 +1,10 @@
 # Benchmark Performance Results
 
 This report compares the performance of the interactive benchmark application running in two different modes:
-- **Development Mode**: Served directly by the webpack dev server (`/apps/benchmarks/`).
-- **Production Mode**: Using the optimized build output (`/dist/production/apps/benchmarks/`).
+- **Development Mode**
+- **Production Mode**
 
-The data is aggregated over **10 run(s)**. The value in parentheses (±) is the standard deviation.
+The data is aggregated over **5 run(s)**. The value in parentheses (±) is the standard deviation.
 
 ## Duration Benchmarks
 
@@ -82,10 +82,6 @@ This table shows the average Frames Per Second (FPS) and the count of "Long Fram
 |                                             | firefox    | 10.0 (±0.0) / 40.4 (±0.5)    | 9.8 (±0.4) / 40.0 (±1.1)      |
 |                                             | webkit     | 30.0 (±0.6) / 5.2 (±1.9)     | 29.6 (±2.8) / 7.4 (±6.8)      |
 |---------------------------------------------|------------|------------------------------|-------------------------------|
-| **Scrolling Performance Under Duress 100k Rows**                            |            |                              |                               |
-|---------------------------------------------|------------|------------------------------|-------------------------------|
-| **Scrolling Performance Under Duress 10k Rows**                            |            |                              |                               |
-|---------------------------------------------|------------|------------------------------|-------------------------------|
 | **Scrolling Performance Under Duress 1M Rows**                            |            |                              |                               |
 |---------------------------------------------|------------|------------------------------|-------------------------------|
 
@@ -112,7 +108,7 @@ This table shows metrics related to how smoothly content updates during a scroll
 
 | Browser    | Version     |
 |------------|-------------|
-| Chrome     | Google Chrome 139.0.7258.67 |
+| Chrome     | Google Chrome 139.0.7258.128 |
 | Firefox    | Mozilla Firefox 141.0.3 |
 | Safari     | Safari kMDItemVersion = "18.5" |
 
