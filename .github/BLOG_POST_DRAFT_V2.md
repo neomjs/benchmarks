@@ -48,6 +48,42 @@ This is fine for functional testing, but for performance measurement, it's a fat
 
 This realization forced us to throw out polling entirely and build our own high-precision waiting mechanism using the browser's native `MutationObserver`. Our `measurePerformanceInBrowser` function attaches an observer that checks our pass condition on *every single DOM mutation*. This allows us to stop the timer at the exact moment the UI reaches its desired state, giving us microsecond-level precision. It is the technical heart of our benchmark's credibility.
 
+```javascript
+// The core of our high-precision, in-browser measurement utility
+export const measurePerformanceInBrowser = (testName, action, condition) => {
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+            // This condition check runs on every DOM change
+            if (condition()) {
+                const endTime = performance.now();
+                observer.disconnect();
+                clearTimeout(timeoutId);
+                resolve(endTime - startTime);
+            }
+        });
+
+        observer.observe(document.body, {attributes: true, childList: true, subtree: true});
+
+        const timeoutId = setTimeout(() => {
+            observer.disconnect();
+            reject(new Error(`Benchmark timed out for "${testName}".`));
+        }, 30000);
+
+        // Start the timer right before triggering the action
+        const startTime = performance.now();
+        action();
+
+        // Check condition immediately in case the action was synchronous
+        if (condition()) {
+            const endTime = performance.now();
+            observer.disconnect();
+            clearTimeout(timeoutId);
+            resolve(endTime - startTime);
+        }
+    });
+};
+```
+
 **Lesson 3: You can't trust polling-based "wait" functions for performance measurement.** For high-precision results, you must use a `MutationObserver` to react to DOM changes instantly.
 
 ## The Story Behind the Numbers: A Response to Skepticism
@@ -102,9 +138,9 @@ The potential for this project is immense:
 -   **Expanded Scope:** We could add more frameworks, more complex widgets (schedulers, Gantt charts), and entirely new metrics that push the boundaries of what we measure.
 -   **Better Onboarding:** We could create detailed specifications for each test, making it far easier for framework experts to contribute high-quality, best-practice implementations.
 
-This brings us to a crossroads. This project is intense. Its future depends on the community's response. It can either grow into a powerful, independent resource for the entire web ecosystem, or it can remain a targeted tool to prove a point.
+This project is more than just a report; it's a high-precision instrument that we are opening up to the entire web development community. We especially invite framework authors and component library vendors to use this harness. See how your tools perform under the kind of concurrent stress that your most demanding users face every day. Use it to identify hidden bottlenecks and validate optimizations. The data this benchmark provides goes beyond simple metrics; it reveals the deep, real-world impact of architectural choices. Perhaps it will confirm your current approach, or perhaps it will inspire you to explore new ones.
 
-The path to becoming a true community standard requires significant engagement, either through active contributions from framework experts or through corporate sponsorship. Without that support, this project will continue to serve its primary purpose: providing undeniable, data-backed proof of how and why a multi-threaded architecture is more powerful for the real-time, big-data applications of the "lived-in" web.
+The path forward requires significant engagement, either through active community contributions or through corporate sponsorship. Without that support, this project will continue to serve its primary purpose: providing undeniable, data-backed proof of how and why a multi-threaded architecture is more powerful for the real-time, big-data applications of the "lived-in" web.
 
 So, the question we pose to the community is: is there an interest for more? If you believe in the need for a better, more honest way to benchmark the modern web, we invite you to get involved.
 
