@@ -14,7 +14,11 @@ The uncomfortable truth is that our benchmarking ecosystem is still primarily de
 
 Core Web Vitals are the gold standard, but their focus is, by definition, on the loading experience. LCP measures render speed, INP measures initial input delay, and CLS measures visual stability *as the page loads*. They are not designed to tell you if your application will suffer catastrophic jank ten minutes into a session under a heavy, concurrent load.
 
-The `js-framework-benchmark` (often called "krausest") was a vital step in the right direction, moving the focus to interactivity like creating, swapping, and deleting rows. It provides invaluable data on the raw speed of these atomic operations. But it tests them in a sterile lab, in isolation. It doesn't simulate the chaos of a real application where a user is scrolling *while* a background task is running *and* a WebSocket is pushing real-time updates.
+The `js-framework-benchmark` (often called "krausest") was a vital step in the right direction, moving the focus to interactivity like creating, swapping, and deleting rows. However, it was designed with two specific limitations that make it unsuitable for the "lived-in" applications we target.
+
+First, **it explicitly forbids buffered rendering or virtualization.** The benchmark's goal is to measure how fast a framework can render *every single row* into the live DOM. This is a valid test for smaller datasets, but it's completely disconnected from how a real-world application must handle 100,000 rows or 20 million cells. It tests a scenario that is impossible at scale.
+
+Second, **it tests operations in a sterile lab, in isolation.** It doesn't simulate the chaos of a real application where a user is scrolling *while* a background task is running *and* a WebSocket is pushing real-time updates. There is no concept of duress or concurrent stress.
 
 This leaves developers of complex applications flying blind. We are building a generation of incredibly demanding, "lived-in" applications but are forced to measure them with tools designed for a simpler, "first-impression" world.
 
