@@ -92,19 +92,19 @@ export const measurePerformanceInBrowser = (testName, action, condition) => {
 
 ## The Story Behind the Numbers: A Response to Skepticism
 
-This project didn't start in a vacuum. It began as a direct response to the feedback from our v10 blog series. In those articles, we made some extraordinary claims: that the "memoization tax" in frameworks like React is an unnecessary burden, that the VDOM is not overhead but a necessity for multi-threading, and that the "tyranny of the main thread" is the single biggest bottleneck in modern web applications.
+This project didn't start in a vacuum. It began as a direct response to the feedback from our Neo.mjs v10 blog series. In those articles, we made some extraordinary claims: that the "memoization tax" in frameworks like React is an unnecessary burden, that our architecture, leveraging a virtual DOM-like approach, enables efficient multi-threading, and that the "tyranny of the main thread" is the single biggest bottleneck in modern web applications.
 
 The community's response was rightly skeptical: "I don't believe it's faster." "Where are the meaningful benchmarks?" "I don't believe off-main-thread architecture makes a real difference."
 
-This skepticism is understandable. In a world of hype cycles, extraordinary claims require extraordinary evidence. This project was built to be that evidence.
+This skepticism is understandable. In a world of hype cycles, extraordinary claims require extraordinary evidence. This project was built to be that evidence. The detailed benchmark reports, including standard deviations for each metric, are available on our GitHub repository, allowing for further statistical analysis of the variability and significance of the results.
 
 ## What We Can Finally See Clearly: The Evidence
 
-By building this high-precision harness, we can now move beyond architectural theory and into empirical proof. The results are not just a leaderboard; they are the direct validation of our claims.
+By building this high-precision harness, we can now move beyond architectural theory and into empirical proof. The results, aggregated from 5 independent test runs, are not just a leaderboard; they are the direct validation of our claims.
 
 1.  **The Main-Thread Bottleneck is Real and Severe:** We claimed that forcing all application logic onto a single main thread was a recipe for UI jank. Our "Heavy Calculation" test proves it. When a heavy task runs on the main thread, frameworks like React and Angular see their UI frame rates plummet to 30 FPS or even 0 FPS, causing visible freezing. In contrast, the worker-based architecture of Neo.mjs maintains a perfect 60 FPS because the UI thread is never blocked. This benchmark quantifies the "tyranny of the main thread" in lost frames.
 
-2.  **Extreme Loads Reveal Architectural Breaking Points:** We argued that the "memoization tax" is a workaround, not a solution, for performance under pressure. Our "Scrolling Under Duress" test (1 million rows with a live data feed) shows what happens when those workarounds are overwhelmed. The React/TanStack Virtual implementation doesn't just get slow—it crashes the browser tab. The Angular app remains barely usable, with over a second of lag. The worker-based app, which eliminates the need for such manual optimizations at an architectural level, stays responsive. This is the ultimate cost of a bottlenecked main thread: not just jank, but catastrophic failure.
+2.  **Extreme Loads Reveal Architectural Breaking Points:** We argued that the "memoization tax" (the performance overhead incurred by techniques like React.memo to prevent unnecessary re-renders) is a workaround, not a solution, for performance under pressure. Our "Scrolling Under Duress" test (1 million rows with a live data feed) shows what happens when those workarounds are overwhelmed. The React/TanStack Virtual implementation doesn't just get slow—it crashes the browser tab. The Angular app remains barely usable, with over a second of lag. The worker-based app, which eliminates the need for such manual optimizations at an architectural level, stays responsive. This is the ultimate cost of a bottlenecked main thread: not just jank, but catastrophic failure.
 
 3.  **Best-in-Class Components Can't Escape the Architecture:** To prove our claims, our "Big Data Benchmark" pits a new Neo.mjs grid against the undisputed industry leader, AG Grid, running in React. We measured "UI Update Time"—the pure grid rendering performance—across several demanding scenarios. The results were not just a win; they were a confirmation of our architectural thesis.
 
@@ -132,6 +132,8 @@ By building this high-precision harness, we can now move beyond architectural th
 
 The data speaks for itself. AG Grid is the undisputed industry leader for feature-rich data grids, which makes these results even more significant. They provide powerful evidence of an architectural ceiling: even the most mature and heavily optimized component will eventually be bottlenecked by the single-threaded paradigm it operates in. The performance limitations are not a question of implementation detail, but of fundamental architectural constraints.
 
+> *These results raise important questions about the relationship between architecture and performance at scale. If there's community interest, we plan to publish a detailed analysis exploring the architectural factors behind these performance differences and their implications for enterprise application development.*
+
 ## An MVP at a Crossroads
 
 What you see today is the MVP of that effort—a robust foundation, built in a rapid, ten-day engineering sprint to ensure the results are precise, credible, and reproducible. But it is just the beginning of what's possible.
@@ -144,7 +146,9 @@ The potential for this project is immense:
 
 This project is more than just a report; it's a high-precision instrument that we are opening up to the entire web development community. We especially invite framework authors and component library vendors to use this harness. See how your tools perform under the kind of concurrent stress that your most demanding users face every day. Use it to identify hidden bottlenecks and validate optimizations. The data this benchmark provides goes beyond simple metrics; it reveals the deep, real-world impact of architectural choices. Perhaps it will confirm your current approach, or perhaps it will inspire you to explore new ones.
 
-The path forward requires significant engagement, either through active community contributions or through corporate sponsorship. Without that support, this project will continue to serve its primary purpose: providing undeniable, data-backed proof of how and why a multi-threaded architecture is more powerful for the real-time, big-data applications of the "lived-in" web.
+> *Beyond framework authors, we see immense potential for enterprise decision-making. Imagine a consulting firm getting a client request: 'We need to handle 500,000 rows with real-time updates - which stack should we choose?' Today, that's answered with vendor marketing and gut instinct. Tomorrow, it could be answered with AI-generated reports that synthesize objective benchmark data into tailored architectural recommendations. The same precision we're bringing to measurement could revolutionize how teams make framework decisions.*
+
+The path forward requires significant engagement, either through active community contributions or through corporate sponsorship. We believe this project has immense potential to benefit the broader web development community, and your active participation can accelerate its growth and expand its impact. We invite you to join us in shaping the future of frontend performance measurement.
 
 So, the question we pose to the community is: is there an interest for more? If you believe in the need for a better, more honest way to benchmark the modern web, we invite you to get involved.
 
