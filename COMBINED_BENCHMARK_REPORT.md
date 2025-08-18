@@ -5,44 +5,69 @@
 | Benchmark | Browser | Neo (ms) | Angular (ms) | React (ms) |
 |---|---|---|---|---|
 | **Create 1M Rows** | | | | |
-| | chromium | ✅ 555.48 | 958.52 | ❌ 3776.56 |
-| | firefox | ✅ 696.00 | ❌ 3127.60 | N/A |
-| | webkit | ✅ 538.20 | 1899.80 | ❌ 4426.20 |
+| | chromium | ✅ 553.54 | 962.26 | ❌ 3531.90 |
+| | firefox | ✅ 706.00 | ❌ 3101.20 | N/A |
+| | webkit | ✅ 515.80 | 1880.80 | ❌ 4573.80 |
 |---|---|---|---|---|
 | **Create 100k Rows** | | | | |
-| | chromium | ✅ 70.54 | 134.36 | ❌ 397.74 |
-| | firefox | ✅ 71.60 | 313.60 | ❌ 992.80 |
-| | webkit | ✅ 81.40 | 227.00 | ❌ 395.00 |
+| | chromium | ✅ 66.34 | 132.84 | ❌ 403.48 |
+| | firefox | ✅ 69.60 | 311.20 | ❌ 987.00 |
+| | webkit | ✅ 76.80 | 226.60 | ❌ 397.40 |
 |---|---|---|---|---|
 | **Create 10k Rows** | | | | |
-| | chromium | ✅ 25.26 | 37.42 | ❌ 65.26 |
-| | firefox | ✅ 20.20 | 60.00 | ❌ 124.40 |
-| | webkit | ✅ 29.00 | ❌ 70.60 | 58.60 |
+| | chromium | ✅ 17.98 | 37.32 | ❌ 65.16 |
+| | firefox | ✅ 22.20 | 59.40 | ❌ 124.60 |
+| | webkit | ✅ 32.80 | ❌ 70.00 | 60.60 |
 |---|---|---|---|---|
 | **Clear Rows** | | | | |
-| | chromium | ❌ 11.30 | 6.36 | ✅ 3.06 |
-| | firefox | 12.60 | ❌ 13.60 | ✅ 3.60 |
-| | webkit | 11.20 | ❌ 11.40 | ✅ 3.60 |
+| | chromium | ❌ 9.22 | 6.18 | ✅ 3.22 |
+| | firefox | 10.00 | ❌ 13.20 | ✅ 3.60 |
+| | webkit | 8.20 | ❌ 11.00 | ✅ 3.40 |
 |---|---|---|---|---|
 | **Remove Row** | | | | |
-| | chromium | ✅ 10.38 | 12.78 | ❌ 47.88 |
-| | firefox | ✅ 10.20 | 19.20 | ❌ 64.80 |
-| | webkit | ✅ 7.60 | 17.80 | ❌ 45.20 |
+| | chromium | ✅ 0.64 | 12.94 | ❌ 55.28 |
+| | firefox | ✅ 0.60 | 19.80 | ❌ 62.80 |
+| | webkit | ✅ 1.00 | 18.20 | ❌ 45.80 |
 |---|---|---|---|---|
 | **Select Row** | | | | |
-| | chromium | ❌ 11.34 | ✅ 4.06 | 8.28 |
-| | firefox | ❌ 12.80 | ✅ 4.60 | 5.40 |
-| | webkit | ❌ 7.80 | 4.40 | ✅ 4.00 |
+| | chromium | ❌ 13.62 | ✅ 4.14 | 9.02 |
+| | firefox | ❌ 11.60 | 7.40 | ✅ 5.80 |
+| | webkit | ❌ 6.80 | ✅ 3.00 | 4.60 |
+|---|---|---|---|---|
+| **should change the amount of columns** | | | | |
+| | chromium | N/A | N/A | N/A |
+| | firefox | N/A | N/A | N/A |
+| | webkit | N/A | N/A | N/A |
+|---|---|---|---|---|
+| **should change the amount of rows** | | | | |
+| | chromium | N/A | N/A | N/A |
+| | firefox | N/A | N/A | N/A |
+| | webkit | N/A | N/A | N/A |
+|---|---|---|---|---|
+| **should filter the grid by firstname** | | | | |
+| | chromium | N/A | N/A | N/A |
+| | firefox | N/A | N/A | N/A |
+| | webkit | N/A | N/A | N/A |
+|---|---|---|---|---|
+| **should handle large data changes: 100k rows then 200 cols** | | | | |
+| | chromium | N/A | N/A | N/A |
+| | firefox | N/A | N/A | N/A |
+| | webkit | N/A | N/A | N/A |
+|---|---|---|---|---|
+| **should load the app and display the initial grid data** | | | | |
+| | chromium | N/A | N/A | N/A |
+| | firefox | N/A | N/A | N/A |
+| | webkit | N/A | N/A | N/A |
 |---|---|---|---|---|
 | **Swap Rows** | | | | |
-| | chromium | 18.34 | ✅ 12.64 | ❌ 52.98 |
-| | firefox | ✅ 16.00 | 19.00 | ❌ 63.80 |
-| | webkit | ✅ 11.40 | 17.20 | ❌ 44.80 |
+| | chromium | 17.84 | ✅ 12.72 | ❌ 52.52 |
+| | firefox | ✅ 15.80 | 18.60 | ❌ 62.40 |
+| | webkit | ✅ 6.20 | 16.80 | ❌ 44.80 |
 |---|---|---|---|---|
 | **Update Every 10th Row** | | | | |
-| | chromium | 25.78 | ✅ 18.16 | ❌ 51.88 |
-| | firefox | 29.40 | ✅ 24.60 | ❌ 70.20 |
-| | webkit | 31.20 | ✅ 22.20 | ❌ 44.60 |
+| | chromium | 29.10 | ✅ 18.46 | ❌ 54.04 |
+| | firefox | 39.00 | ✅ 24.80 | ❌ 62.20 |
+| | webkit | 30.60 | ✅ 22.20 | ❌ 47.00 |
 |---|---|---|---|---|
 
 ## UI Responsiveness Benchmarks
@@ -52,17 +77,17 @@
 | **Heavy Calculation (Task Worker) UI Responsiveness** | | | | |
 | | chromium | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 |
 | | firefox | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 |
-| | webkit | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ❌ 0.2 |
+| | webkit | ❌ 59.8 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 |
 |---|---|---|---|---|
 | **Heavy Calculation UI Responsiveness** | | | | |
-| | chromium | ✅ 60.0 / ✅ 0.0 | 34.0 / ❌ 1.0 | ❌ 31.4 / ❌ 1.0 |
+| | chromium | ✅ 60.0 / ✅ 0.0 | 34.2 / ❌ 1.0 | ❌ 32.0 / ❌ 1.0 |
 | | firefox | ✅ 60.0 / ✅ 0.0 | ❌ 0.0 / ❌ 1.0 | ❌ 0.0 / ❌ 1.0 |
-| | webkit | ✅ 60.0 / ✅ 0.0 | 33.6 / ❌ 1.0 | ❌ 31.4 / ❌ 1.0 |
+| | webkit | ✅ 60.0 / ✅ 0.2 | 33.8 / ❌ 1.0 | ❌ 31.4 / ❌ 1.0 |
 |---|---|---|---|---|
 | **Real-time Feed UI Responsiveness** | | | | |
-| | chromium | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 | ❌ 49.4 / ❌ 2.4 |
-| | firefox | ✅ 60.0 / ✅ 0.0 | 13.0 / ❌ 49.8 | ❌ 9.8 / 40.0 |
-| | webkit | ✅ 60.0 / ✅ 0.0 | 46.2 / 0.2 | ❌ 29.6 / ❌ 7.4 |
+| | chromium | ✅ 60.0 / ✅ 0.0 | ✅ 60.0 / ✅ 0.0 | ❌ 51.2 / ❌ 1.0 |
+| | firefox | ✅ 60.0 / ✅ 0.0 | 55.0 / 1.8 | ❌ 10.0 / ❌ 40.6 |
+| | webkit | ✅ 60.0 / ✅ 0.2 | 45.8 / ✅ 0.2 | ❌ 30.0 / ❌ 5.4 |
 |---|---|---|---|---|
 
 ## Scrolling Fluidity Benchmarks (Time to Valid State)
@@ -72,19 +97,19 @@ Lower is better.
 | Benchmark | Browser | Neo (ms) | Angular (ms) | React (ms) |
 |---|---|---|---|---|
 | **Scrolling Performance Under Duress 1M Rows** | | | | |
-| | chromium | ✅ 66.71 / 87.50 | ❌ 1135.84 / 1258.03 | Browser Crash |
+| | chromium | ✅ 67.06 / 83.28 | ❌ 359.58 / 479.16 | Browser Crash |
 | | firefox | N/A | N/A | N/A |
-| | webkit | ✅ 207.77 / 263.00 | ❌ 254.53 / 1770.40 | Browser Crash |
+| | webkit | ❌ 198.61 / 239.80 | ✅ 114.07 / 735.20 | Browser Crash |
 |---|---|---|---|---|
 | **Scrolling Performance Under Duress 100k Rows** | | | | |
-| | chromium | 40.36 / 50.68 | ✅ 28.29 / 122.92 | ❌ 348.05 / 850.94 |
-| | firefox | ✅ 44.61 / 50.40 | ❌ 252.57 / 303.60 | N/A |
-| | webkit | ✅ 54.15 / 79.40 | 92.75 / 183.60 | ❌ 321.12 / 833.80 |
+| | chromium | ✅ 41.95 / 49.92 | 43.09 / 61.58 | ❌ 325.66 / 820.98 |
+| | firefox | ✅ 46.19 / 66.60 | ❌ 164.80 / 193.80 | N/A |
+| | webkit | ✅ 52.09 / 73.20 | 54.13 / 82.80 | ❌ 289.67 / 750.60 |
 |---|---|---|---|---|
 | **Scrolling Performance Under Duress 10k Rows** | | | | |
-| | chromium | 33.68 / 47.22 | ✅ 16.32 / 28.10 | ❌ 38.32 / 64.64 |
-| | firefox | ✅ 36.77 / 50.20 | 52.76 / 84.60 | ❌ 89.65 / 170.80 |
-| | webkit | ❌ 46.81 / 63.40 | ✅ 21.46 / 36.80 | 37.82 / 123.20 |
+| | chromium | 33.76 / 49.76 | ✅ 20.51 / 26.52 | ❌ 40.22 / 79.12 |
+| | firefox | ✅ 37.09 / 49.60 | 43.11 / 65.80 | ❌ 91.14 / 168.80 |
+| | webkit | ❌ 46.56 / 53.60 | ✅ 25.39 / 49.60 | 37.43 / 102.40 |
 |---|---|---|---|---|
 
 
