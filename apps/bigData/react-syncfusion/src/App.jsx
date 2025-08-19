@@ -51,7 +51,7 @@ const generateColumns = (amountColumns) => {
 
 function App() {
   const [allData, setAllData] = useState([]);
-  const [columns, setColumns] = useState([]);
+  const [columns, setColumns] = useState(generateColumns(50));
   const [theme, setTheme] = useState('material');
   const [firstnameFilter, setFirstnameFilter] = useState('');
   const [lastnameFilter, setLastnameFilter] = useState('');

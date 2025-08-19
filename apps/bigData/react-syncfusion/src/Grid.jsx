@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { GridComponent, Inject, Sort, Filter } from '@syncfusion/ej2-react-grids';
+import { GridComponent, Inject, Sort, Filter, VirtualScroll } from '@syncfusion/ej2-react-grids';
 import '@syncfusion/ej2-buttons/styles/material.css';
 import '@syncfusion/ej2-calendars/styles/material.css';
 import '@syncfusion/ej2-dropdowns/styles/material.css';
@@ -54,12 +54,14 @@ function Grid({ rowData, columnDefs, selectionModel, rowSelectionType, loading, 
       allowSorting={true}
       allowFiltering={true}
       allowGrouping={false}
+      enableVirtualization={true}
+      enableColumnVirtualization={true}
       height="100%"
       selectionSettings={selectionSettings}
       filterSettings={{ type: 'Excel' }}
       actionComplete={actionComplete}
     >
-      <Inject services={[Sort, Filter]} />
+      <Inject services={[Filter, Sort, VirtualScroll]} />
     </GridComponent>
   );
 }
