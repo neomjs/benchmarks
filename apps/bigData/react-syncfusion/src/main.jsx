@@ -1,4 +1,3 @@
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerLicense } from '@syncfusion/ej2-base';
 import { syncfusionLicenseKey } from '../license.js';
@@ -9,7 +8,5 @@ import App from './App.jsx';
 registerLicense(syncfusionLicenseKey);
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
     <App />
-  </StrictMode>,
-)
+);

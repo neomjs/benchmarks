@@ -54,7 +54,6 @@ function Grid({ rowData, columnDefs, selectionModel, rowSelectionType, loading, 
       allowSorting={true}
       allowFiltering={true}
       allowGrouping={false}
-      allowScrolling={true}
       height="100%"
       selectionSettings={selectionSettings}
       filterSettings={{ type: 'Excel' }}
