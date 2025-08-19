@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ColumnDirective, ColumnsDirective, GridComponent, Inject, Sort, Filter, Resize } from '@syncfusion/ej2-react-grids';
+import { GridComponent, Inject, Sort, Filter } from '@syncfusion/ej2-react-grids';
 import '@syncfusion/ej2-buttons/styles/material.css';
 import '@syncfusion/ej2-calendars/styles/material.css';
 import '@syncfusion/ej2-dropdowns/styles/material.css';
@@ -49,22 +49,18 @@ function Grid({ rowData, columnDefs, selectionModel, rowSelectionType, loading, 
     <GridComponent
       ref={gridRef}
       dataSource={rowData}
+      columns={columnDefs}
       allowPaging={false}
       allowSorting={true}
       allowFiltering={true}
       allowGrouping={false}
-      allowResizing={true}
       allowScrolling={true}
       height="100%"
-      width="100%"
       selectionSettings={selectionSettings}
       filterSettings={{ type: 'Excel' }}
       actionComplete={actionComplete}
     >
-      <ColumnsDirective>
-        {columnDefs.map(col => <ColumnDirective key={col.field} {...col} />)}
-      </ColumnsDirective>
-      <Inject services={[Sort, Filter, Resize]} />
+      <Inject services={[Sort, Filter]} />
     </GridComponent>
   );
 }

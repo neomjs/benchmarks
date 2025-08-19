@@ -7,9 +7,9 @@ import { generateDataAsync } from './data.jsx';
 // Function to generate column definitions
 const generateColumns = (amountColumns) => {
   const columns = [
-    { field: 'id', headerText: '#', width: 60 },
+    { field: 'id',        headerText: '#', width: 60 },
     { field: 'firstname', headerText: 'Firstname', width: 150, filter: { type: 'Excel' } },
-    { field: 'lastname', headerText: 'Lastname', width: 150, filter: { type: 'Excel' } },
+    { field: 'lastname',  headerText: 'Lastname', width: 150, filter: { type: 'Excel' } },
     {
       field: 'countAction',
       headerText: 'Increase Counter',
