@@ -1,0 +1,155 @@
+.App {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden; /* Hide overflow during slide */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.controls {
+  padding: 20px;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Add some gap between label and input */
+}
+
+.control-group label {
+  /* Removed display: block; margin-bottom: 5px; */
+  width: 100px; /* Fixed width for labels */
+  flex-shrink: 0; /* Prevent label from shrinking */
+  color: #eee; /* Light text for dark background */
+}
+
+.control-group select,
+.control-group input {
+  flex: 1; /* Take up remaining space */
+  padding: 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #444; /* Darker background for inputs */
+  color: #eee; /* Light text for inputs */
+  max-width: 148px;
+}
+
+.controls button {
+  padding: 10px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.controls button:hover {
+  background-color: #0056b3;
+}
+
+.hamburger-button {
+  position: absolute;
+  top: 0.2em; /* Adjusted from 10px */
+  right: 10px; /* Initial position */
+  border-radius: 8px;
+  box-shadow: 0 5px 10px rgba(75, 75, 75, 0.3);
+  display: flex;
+  height: 35px;
+  min-width: 35px;
+  width: 35px;
+  align-items: center;
+  justify-content: center;
+  background-color: #3c3f41; /* From --button-background-color */
+  color: #bbb; /* From --button-text-color */
+  border: 1px solid #2b2b2b; /* From --button-border */
+  cursor: pointer;
+  z-index: 1000;
+  transition: right 0.3s ease-in-out; /* Transition for smooth movement */
+}
+
+.hamburger-button.shifted {
+  right: 310px; /* Move to the left when controls are open (300px panel + 10px offset) */
+}
+
+.hamburger-button:hover {
+  background-color: #3a3c3e; /* From --button-background-color-hover */
+}
+
+.controls-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 300px; /* Adjust width as needed */
+  background-color: #2c2c2c; /* Dark background for controls panel */
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease-in-out;
+  transform: translateX(100%); /* Start off-screen */
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+}
+
+.controls-panel.open {
+  transform: translateX(0); /* Slide in */
+}
+
+.tab-headers {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.tab-headers button {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #555;
+  border-bottom: none;
+  background-color: #3a3a3a; /* Darker background for inactive tabs */
+  color: #eee; /* Light text for tabs */
+  cursor: pointer;
+}
+
+.tab-headers button.active {
+  background-color: #2c2c2c; /* Background matching controls-panel for active tab */
+  border-bottom: 1px solid #2c2c2c;
+}
+
+.tab-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden; /* Hide horizontal overflow */
+}
+
+.settings-tab-content,
+.selection-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.grid-container {
+  flex: 1 1 auto;
+  position: relative; /* For grid to fill it */
+  margin: 3.5em 1em 1em 1em; /* From Neo.mjs example */
+}
+
+.main-grid {
+  height: 100%;
+  width: 100%;
+  /* Removed margin */
+}
+
+.ag-header-cell-text {
+  font-size: 11px;
+}
