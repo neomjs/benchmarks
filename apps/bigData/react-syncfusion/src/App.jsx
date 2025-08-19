@@ -7,13 +7,14 @@ import { generateDataAsync } from './data.jsx';
 // Function to generate column definitions
 const generateColumns = (amountColumns) => {
   const columns = [
-    { field: 'id',        headerText: '#', width: 60 },
+    { field: 'id', headerText: '#', width: 60, allowFiltering: false },
     { field: 'firstname', headerText: 'Firstname', width: 150, filter: { type: 'Excel' } },
-    { field: 'lastname',  headerText: 'Lastname', width: 150, filter: { type: 'Excel' } },
+    { field: 'lastname', headerText: 'Lastname', width: 150, filter: { type: 'Excel' } },
     {
       field: 'countAction',
       headerText: 'Increase Counter',
       width: 150,
+      allowFiltering: false,
       template: (props) => {
         const onClick = () => {
           // This is a placeholder. Syncfusion grid does not have a direct equivalent of AG Grid's node.setDataValue.
@@ -23,11 +24,12 @@ const generateColumns = (amountColumns) => {
         return <button onClick={onClick}>{props.firstname} ++</button>;
       },
     },
-    { field: 'counter', headerText: 'Counter', width: 100 },
+    { field: 'counter', headerText: 'Counter', width: 100, allowFiltering: false },
     {
       field: 'progress',
       headerText: 'Progress',
       width: 150,
+      allowFiltering: false,
       template: (props) => (
         <div
           style={{
@@ -41,7 +43,7 @@ const generateColumns = (amountColumns) => {
   ];
 
   for (let i = 7; i <= amountColumns; i++) {
-    columns.push({ field: 'number' + i, headerText: 'Number ' + i, width: 100 });
+    columns.push({ field: 'number' + i, headerText: 'Number ' + i, width: 100, allowFiltering: false });
   }
 
   return columns;
