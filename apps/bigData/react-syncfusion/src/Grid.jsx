@@ -1,3 +1,4 @@
+import './Grid.css';
 import { useEffect, useRef } from 'react';
 import { GridComponent, Inject, Sort, Filter, VirtualScroll } from '@syncfusion/ej2-react-grids';
 import '@syncfusion/ej2-buttons/styles/material.css';
@@ -56,6 +57,7 @@ function Grid({ rowData, columnDefs, selectionModel, rowSelectionType, loading, 
       allowGrouping={false}
       enableVirtualization={true}
       enableColumnVirtualization={true}
+      pageSettings={{ pageSize: 50 }}
       height="100%"
       selectionSettings={selectionSettings}
       filterSettings={{ type: 'Excel' }}
