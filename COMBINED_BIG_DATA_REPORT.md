@@ -13,30 +13,44 @@ Here, we compare the average production mode `UI Update Time` in milliseconds (m
 ### Change Columns from 50 to 200 (with 100k rows)
 | Browser | Neo.mjs UI Time (ms) | React AG Grid UI Time (ms) | Neo.mjs Advantage |
 |:---|---:|---:|:---:|
-| **Chromium** | **395.26** | 2966.30 | **7.5x faster** |
-| **Firefox** | **390.60** | 4710.00 | **12.1x faster** |
-| **Webkit** | **419.20** | 5406.00 | **12.9x faster** |
+| **Chromium** | **364.72** | 1074.66 | **2.9x faster** |
 
 ### Change Rows from 1,000 to 100,000
 | Browser | Neo.mjs UI Time (ms) | React AG Grid UI Time (ms) | Neo.mjs Advantage |
 |:---|---:|---:|:---:|
-| **Chromium** | **169.48** | 899.30 | **5.3x faster** |
-| **Firefox** | **122.00** | 1818.00 | **14.9x faster** |
-| **Webkit** | **140.00** | 1200.00 | **8.6x faster** |
+| **Chromium** | **264.84** | 337.96 | **1.3x faster** |
 
 ### Change Columns from 50 to 75
 | Browser | Neo.mjs UI Time (ms) | React AG Grid UI Time (ms) | Neo.mjs Advantage |
 |:---|---:|---:|:---:|
-| **Chromium** | **28.18** | 123.20 | **4.4x faster** |
-| **Firefox** | **31.60** | 73.00 | **2.3x faster** |
-| **Webkit** | **47.00** | 106.00 | **2.3x faster** |
+| **Chromium** | **42.62** | 40.14 | **0.9x faster** |
 
 ### Change Rows from 1,000 to 5,000
 | Browser | Neo.mjs UI Time (ms) | React AG Grid UI Time (ms) | Neo.mjs Advantage |
 |:---|---:|---:|:---:|
-| **Chromium** | **25.28** | 139.40 | **5.5x faster** |
-| **Firefox** | **36.40** | 129.00 | **3.5x faster** |
-| **Webkit** | **50.00** | 113.00 | **2.3x faster** |
+| **Chromium** | **36.26** | 47.26 | **1.3x faster** |
+
+## Interactive Filtering Performance (Total Time to Valid State)
+Average production mode `Total Time` in milliseconds (ms) across consecutive filter operations on the active dataset. Lower is better.
+
+| Operation | Browser | Neo.mjs (ms) | React AG Grid (ms) | Neo.mjs Advantage |
+|:---|:---|---:|---:|:---:|
+| **filter-grid (first)** | **Chromium** | **15.94** | 341.96 | **21.5x faster** |
+| **filter-grid (second)** | **Chromium** | **16.10** | 411.62 | **25.6x faster** |
+| **filter-grid (clear)** | **Chromium** | **13.22** | 34.84 | **2.6x faster** |
+
+## Main-Thread Responsiveness Probe (Max RAF Delta & Long-Task Blocking)
+Measured concurrently via `requestAnimationFrame` delta tracking and `PerformanceObserver({ type: 'longtask' })` while the grid processes large data updates (`16.7 ms` = 60fps; `0 ms` Long-Task Blocking = zero main-thread freeze).
+
+| Scenario | Browser | Neo.mjs Max RAF (ms) | React AG Grid Max RAF (ms) | Neo.mjs Long-Task Block (ms) | React AG Grid Long-Task Block (ms) |
+|:---|:---|---:|---:|---:|---:|
+| **Change Columns from 50 to 200 (with 100k rows)** | **Chromium** | **16.80** | 358.18 | **0.00** | 312.40 |
+| **Change Rows from 1,000 to 100,000** | **Chromium** | **16.78** | 93.30 | **0.00** | 58.00 |
+| **Change Columns from 50 to 75** | **Chromium** | **16.72** | 50.79 | **0.00** | 0.00 |
+| **Change Rows from 1,000 to 5,000** | **Chromium** | **16.70** | 34.76 | **0.00** | 0.00 |
+| **filter-grid (first)** | **Chromium** | **14.30** | 14.86 | **0.00** | 0.00 |
+| **filter-grid (second)** | **Chromium** | **14.58** | 23.38 | **0.00** | 0.80 |
+| **filter-grid (clear)** | **Chromium** | **12.00** | 33.86 | **0.00** | 0.00 |
 
 ---
 # Detailed Side-by-Side Results
@@ -45,120 +59,190 @@ Here, we compare the average production mode `UI Update Time` in milliseconds (m
 
 | Browser | Mode | Framework | Total Time (ms) | UI Update Time (ms) |
 | :--- | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 2979.26 ± 11.24 | 386.78 ± 7.58 |
-| Chromium | dev | React + AG Grid | 5461.30 ± 0.00 | 2958.80 ± 0.00 |
-| Chromium | prod | Neo.mjs | 3043.60 ± 72.15 | 395.26 ± 7.65 |
-| Chromium | prod | React + AG Grid | 5446.40 ± 0.00 | 2966.30 ± 0.00 |
-| Firefox | dev | Neo.mjs | 2170.20 ± 29.49 | 386.80 ± 3.66 |
-| Firefox | dev | React + AG Grid | 6275.00 ± 0.00 | 4478.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 2171.00 ± 17.85 | 390.60 ± 6.53 |
-| Firefox | prod | React + AG Grid | 6530.00 ± 0.00 | 4710.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 2892.20 ± 67.46 | 405.40 ± 14.35 |
-| Webkit | dev | React + AG Grid | 8088.00 ± 0.00 | 5396.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 2896.40 ± 70.56 | 419.20 ± 40.88 |
-| Webkit | prod | React + AG Grid | 8192.00 ± 0.00 | 5406.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 1210.52 ± 62.50 | 361.68 ± 18.57 |
+| Chromium | dev | React + AG Grid | 1836.24 ± 23.65 | 1067.30 ± 16.65 |
+| Chromium | prod | Neo.mjs | 1204.16 ± 30.62 | 364.72 ± 9.02 |
+| Chromium | prod | React + AG Grid | 1860.66 ± 16.80 | 1074.66 ± 25.24 |
+
+## Change Columns from 50 to 200 (with 100k rows) (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 310.40 ± 7.68 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 312.40 ± 7.61 |
+
+## Change Columns from 50 to 200 (with 100k rows) (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 16.80 ± 0.00 |
+| Chromium | dev | React + AG Grid | 346.66 ± 6.68 |
+| Chromium | prod | Neo.mjs | 16.80 ± 0.00 |
+| Chromium | prod | React + AG Grid | 358.18 ± 14.70 |
 
 ## Change Columns from 50 to 75
 
 | Browser | Mode | Framework | Total Time (ms) | UI Update Time (ms) |
 | :--- | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 77.64 ± 4.93 | 27.60 ± 2.13 |
-| Chromium | dev | React + AG Grid | 219.50 ± 0.00 | 121.40 ± 0.00 |
-| Chromium | prod | Neo.mjs | 78.32 ± 5.06 | 28.18 ± 2.04 |
-| Chromium | prod | React + AG Grid | 220.60 ± 0.00 | 123.20 ± 0.00 |
-| Firefox | dev | Neo.mjs | 94.80 ± 4.26 | 33.60 ± 2.87 |
-| Firefox | dev | React + AG Grid | 221.00 ± 0.00 | 72.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 91.80 ± 4.12 | 31.60 ± 1.02 |
-| Firefox | prod | React + AG Grid | 219.00 ± 0.00 | 73.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 112.40 ± 13.43 | 43.80 ± 8.61 |
-| Webkit | dev | React + AG Grid | 159.00 ± 0.00 | 106.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 119.80 ± 11.62 | 47.00 ± 8.17 |
-| Webkit | prod | React + AG Grid | 161.00 ± 0.00 | 106.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 86.02 ± 5.77 | 46.22 ± 5.42 |
+| Chromium | dev | React + AG Grid | 59.36 ± 2.33 | 39.30 ± 0.40 |
+| Chromium | prod | Neo.mjs | 82.48 ± 2.07 | 42.62 ± 0.97 |
+| Chromium | prod | React + AG Grid | 59.52 ± 2.04 | 40.14 ± 0.52 |
+
+## Change Columns from 50 to 75 (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 0.00 ± 0.00 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 0.00 ± 0.00 |
+
+## Change Columns from 50 to 75 (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 16.74 ± 0.05 |
+| Chromium | dev | React + AG Grid | 50.31 ± 4.79 |
+| Chromium | prod | Neo.mjs | 16.72 ± 0.04 |
+| Chromium | prod | React + AG Grid | 50.79 ± 5.32 |
 
 ## Change Rows from 1,000 to 100,000
 
 | Browser | Mode | Framework | Total Time (ms) | UI Update Time (ms) |
 | :--- | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 835.48 ± 5.85 | 161.02 ± 2.46 |
-| Chromium | dev | React + AG Grid | 1543.10 ± 0.00 | 914.50 ± 0.00 |
-| Chromium | prod | Neo.mjs | 871.20 ± 62.70 | 169.48 ± 28.04 |
-| Chromium | prod | React + AG Grid | 1528.20 ± 0.00 | 899.30 ± 0.00 |
-| Firefox | dev | Neo.mjs | 688.00 ± 17.03 | 137.80 ± 13.91 |
-| Firefox | dev | React + AG Grid | 1928.00 ± 0.00 | 1478.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 656.40 ± 17.42 | 122.00 ± 12.70 |
-| Firefox | prod | React + AG Grid | 2275.00 ± 0.00 | 1818.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 453.60 ± 14.32 | 130.60 ± 3.56 |
-| Webkit | dev | React + AG Grid | 1517.00 ± 0.00 | 1202.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 455.20 ± 15.71 | 140.00 ± 18.68 |
-| Webkit | prod | React + AG Grid | 1535.00 ± 0.00 | 1200.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 484.74 ± 19.79 | 251.44 ± 9.90 |
+| Chromium | dev | React + AG Grid | 535.68 ± 9.93 | 347.06 ± 8.74 |
+| Chromium | prod | Neo.mjs | 500.80 ± 42.04 | 264.84 ± 28.67 |
+| Chromium | prod | React + AG Grid | 521.16 ± 6.10 | 337.96 ± 6.07 |
+
+## Change Rows from 1,000 to 100,000 (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 60.00 ± 1.90 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 58.00 ± 1.90 |
+
+## Change Rows from 1,000 to 100,000 (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 16.78 ± 0.04 |
+| Chromium | dev | React + AG Grid | 90.16 ± 8.04 |
+| Chromium | prod | Neo.mjs | 16.78 ± 0.04 |
+| Chromium | prod | React + AG Grid | 93.30 ± 8.17 |
 
 ## Change Rows from 1,000 to 5,000
 
 | Browser | Mode | Framework | Total Time (ms) | UI Update Time (ms) |
 | :--- | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 98.04 ± 1.43 | 25.54 ± 1.25 |
-| Chromium | dev | React + AG Grid | 248.90 ± 0.00 | 137.90 ± 0.00 |
-| Chromium | prod | Neo.mjs | 98.58 ± 1.40 | 25.28 ± 0.78 |
-| Chromium | prod | React + AG Grid | 251.20 ± 0.00 | 139.40 ± 0.00 |
-| Firefox | dev | Neo.mjs | 105.60 ± 4.59 | 35.60 ± 1.02 |
-| Firefox | dev | React + AG Grid | 268.00 ± 0.00 | 130.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 103.20 ± 4.35 | 36.40 ± 1.36 |
-| Firefox | prod | React + AG Grid | 268.00 ± 0.00 | 129.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 118.40 ± 7.00 | 41.40 ± 9.58 |
-| Webkit | dev | React + AG Grid | 189.00 ± 0.00 | 111.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 128.60 ± 11.74 | 50.00 ± 10.43 |
-| Webkit | prod | React + AG Grid | 190.00 ± 0.00 | 113.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 80.40 ± 1.33 | 35.96 ± 0.36 |
+| Chromium | dev | React + AG Grid | 69.86 ± 0.95 | 46.46 ± 4.23 |
+| Chromium | prod | Neo.mjs | 79.28 ± 0.71 | 36.26 ± 1.17 |
+| Chromium | prod | React + AG Grid | 69.66 ± 1.89 | 47.26 ± 4.42 |
+
+## Change Rows from 1,000 to 5,000 (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 0.00 ± 0.00 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 0.00 ± 0.00 |
+
+## Change Rows from 1,000 to 5,000 (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 16.70 ± 0.00 |
+| Chromium | dev | React + AG Grid | 32.44 ± 1.12 |
+| Chromium | prod | Neo.mjs | 16.70 ± 0.00 |
+| Chromium | prod | React + AG Grid | 34.76 ± 5.27 |
 
 ## filter-grid (clear)
 
 | Browser | Mode | Framework | Total Time (ms) |
 | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 28.12 ± 2.69 |
-| Chromium | dev | React + AG Grid | 127.20 ± 0.00 |
-| Chromium | prod | Neo.mjs | 28.54 ± 3.07 |
-| Chromium | prod | React + AG Grid | 123.70 ± 0.00 |
-| Firefox | dev | Neo.mjs | 38.00 ± 6.13 |
-| Firefox | dev | React + AG Grid | 144.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 31.80 ± 14.27 |
-| Firefox | prod | React + AG Grid | 153.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 37.20 ± 4.26 |
-| Webkit | dev | React + AG Grid | 94.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 47.80 ± 13.01 |
-| Webkit | prod | React + AG Grid | 93.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 15.98 ± 0.42 |
+| Chromium | dev | React + AG Grid | 36.34 ± 4.58 |
+| Chromium | prod | Neo.mjs | 13.22 ± 5.86 |
+| Chromium | prod | React + AG Grid | 34.84 ± 2.80 |
+
+## filter-grid (clear) (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 0.00 ± 0.00 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 0.00 ± 0.00 |
+
+## filter-grid (clear) (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 14.80 ± 0.30 |
+| Chromium | dev | React + AG Grid | 35.62 ± 3.61 |
+| Chromium | prod | Neo.mjs | 12.00 ± 5.26 |
+| Chromium | prod | React + AG Grid | 33.86 ± 2.69 |
 
 ## filter-grid (first)
 
 | Browser | Mode | Framework | Total Time (ms) |
 | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 66.52 ± 9.47 |
-| Chromium | dev | React + AG Grid | 112.60 ± 0.00 |
-| Chromium | prod | Neo.mjs | 67.34 ± 7.99 |
-| Chromium | prod | React + AG Grid | 133.60 ± 0.00 |
-| Firefox | dev | Neo.mjs | 56.00 ± 1.79 |
-| Firefox | dev | React + AG Grid | 139.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 55.00 ± 5.02 |
-| Firefox | prod | React + AG Grid | 136.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 101.60 ± 9.99 |
-| Webkit | dev | React + AG Grid | 107.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 95.40 ± 8.14 |
-| Webkit | prod | React + AG Grid | 124.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 16.70 ± 0.95 |
+| Chromium | dev | React + AG Grid | 431.16 ± 2.72 |
+| Chromium | prod | Neo.mjs | 15.94 ± 0.74 |
+| Chromium | prod | React + AG Grid | 341.96 ± 167.43 |
+
+## filter-grid (first) (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 0.00 ± 0.00 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 0.00 ± 0.00 |
+
+## filter-grid (first) (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 15.30 ± 0.81 |
+| Chromium | dev | React + AG Grid | 16.80 ± 0.00 |
+| Chromium | prod | Neo.mjs | 14.30 ± 0.47 |
+| Chromium | prod | React + AG Grid | 14.86 ± 3.88 |
 
 ## filter-grid (second)
 
 | Browser | Mode | Framework | Total Time (ms) |
 | :--- | :--- | :--- | :--- |
-| Chromium | dev | Neo.mjs | 25.58 ± 3.01 |
-| Chromium | dev | React + AG Grid | 133.50 ± 0.00 |
-| Chromium | prod | Neo.mjs | 27.34 ± 2.45 |
-| Chromium | prod | React + AG Grid | 108.40 ± 0.00 |
-| Firefox | dev | Neo.mjs | 38.40 ± 8.78 |
-| Firefox | dev | React + AG Grid | 111.00 ± 0.00 |
-| Firefox | prod | Neo.mjs | 38.40 ± 7.50 |
-| Firefox | prod | React + AG Grid | 135.00 ± 0.00 |
-| Webkit | dev | Neo.mjs | 66.00 ± 2.28 |
-| Webkit | dev | React + AG Grid | 114.00 ± 0.00 |
-| Webkit | prod | Neo.mjs | 55.00 ± 12.57 |
-| Webkit | prod | React + AG Grid | 131.00 ± 0.00 |
+| Chromium | dev | Neo.mjs | 16.02 ± 0.29 |
+| Chromium | dev | React + AG Grid | 406.62 ± 0.47 |
+| Chromium | prod | Neo.mjs | 16.10 ± 0.46 |
+| Chromium | prod | React + AG Grid | 411.62 ± 10.50 |
+
+## filter-grid (second) (Long Task Block)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | dev | React + AG Grid | 0.00 ± 0.00 |
+| Chromium | prod | Neo.mjs | 0.00 ± 0.00 |
+| Chromium | prod | React + AG Grid | 0.80 ± 1.60 |
+
+## filter-grid (second) (Max RAF Delta)
+
+| Browser | Mode | Framework | Total Time (ms) |
+| :--- | :--- | :--- | :--- |
+| Chromium | dev | Neo.mjs | 14.70 ± 0.30 |
+| Chromium | dev | React + AG Grid | 17.26 ± 0.61 |
+| Chromium | prod | Neo.mjs | 14.58 ± 0.25 |
+| Chromium | prod | React + AG Grid | 23.38 ± 13.31 |
 
 
 The data is aggregated over **5 run(s)**.
@@ -168,21 +252,21 @@ The data is aggregated over **5 run(s)**.
 | Property   | Value       |
 |------------|-------------|
 | OS Name    | macOS |
-| OS Version | 15.5 |
-| Total RAM  | 64GB |
-| CPU Cores  | 16 |
-| Node.js    | v22.3.0 |
-| Playwright | 1.54.2 |
+| OS Version | 27.0.1 |
+| Total RAM  | 128GB |
+| CPU Cores  | 18 |
+| Node.js    | v25.9.0 |
+| Playwright | 1.64.1 |
 | Platform   | darwin |
-| Architecture | x64 |
+| Architecture | arm64 |
 
 ## Browser Versions
 
 | Browser    | Version     |
 |------------|-------------|
-| Chrome     | Google Chrome 139.0.7258.128 |
-| Firefox    | Mozilla Firefox 141.0.3 |
-| Safari     | Safari kMDItemVersion = "18.5" |
+| Chrome     | Google Chrome 155.0.8059.85 |
+| Firefox    | Not found |
+| Safari     | Safari kMDItemVersion = "27.0.1" |
 
 ---
-*This file is auto-generated on Sun, 17 Aug 2025 13:21:14 GMT. Do not edit manually.*
+*This file is auto-generated on Sun, 25 Oct 2026 23:53:07 GMT. Do not edit manually.*

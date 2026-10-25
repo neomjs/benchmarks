@@ -133,3 +133,96 @@ export const measureJankInBrowser = (duration) => {
         requestAnimationFrame(frame);
     });
 };
+
+/**
+ * @summary Measures main-thread responsiveness (max RAF frame delta, long frames >50ms, LongTask blocking)
+ * alongside Total Time to Valid State (TVS) while `action(passThrough)` settles `condition(passThrough)`.
+ * @param {string} testName - Identifier for error and timeout reporting.
+ * @param {Function} action - Synchronous or async function that triggers the UI mutation.
+ * @param {Function} condition - Predicate returning true once the DOM reaches valid target state.
+ * @param {*} [passThrough] - Optional payload forwarded to `action` and `condition`.
+ * @param {Object} [options] - Timeout configuration (`{ timeout = 30000 }`).
+ * @returns {Promise<{tvsMs: number, maxRafDeltaMs: number, longFrameCount: number, longTaskCount: number, longTaskTotalBlockingMs: number, frameCount: number}>}
+ */
+export const measureMainThreadProbeInBrowser = (testName, action, condition, passThrough, { timeout = 30000 } = {}) => {
+    return new Promise((resolve, reject) => {
+        const frameDeltas = [];
+        let lastFrameTime = performance.now();
+        let rafActive = true;
+        let longTaskCount = 0;
+        let longTaskTotalBlockingMs = 0;
+        let longTaskObserver = null;
+
+        if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+            longTaskObserver = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    longTaskCount++;
+                    longTaskTotalBlockingMs += Math.max(0, entry.duration - 50);
+                }
+            });
+            longTaskObserver.observe({ type: 'longtask', buffered: false });
+        }
+
+        function tick(now) {
+            if (!rafActive) return;
+            frameDeltas.push(now - lastFrameTime);
+            lastFrameTime = now;
+            requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+
+        const cleanup = () => {
+            rafActive = false;
+            observer.disconnect();
+            longTaskObserver?.disconnect();
+            clearTimeout(timeoutId);
+        };
+
+        const finish = (endTime) => {
+            const finalGap = endTime - lastFrameTime;
+            if (finalGap > 0) frameDeltas.push(finalGap);
+            cleanup();
+            const maxRafDeltaMs = frameDeltas.length > 0 ? Math.max(...frameDeltas) : 0;
+            const longFrameCount = frameDeltas.filter(d => d > 50).length;
+            resolve({
+                tvsMs                  : Math.round((endTime - startTime) * 100) / 100,
+                maxRafDeltaMs          : Math.round(maxRafDeltaMs * 100) / 100,
+                longFrameCount,
+                longTaskCount,
+                longTaskTotalBlockingMs: Math.round(longTaskTotalBlockingMs * 100) / 100,
+                frameCount             : frameDeltas.length
+            });
+        };
+
+        const observer = new MutationObserver(() => {
+            try {
+                if (condition(passThrough)) {
+                    finish(performance.now());
+                }
+            } catch (e) {
+                cleanup();
+                reject(e);
+            }
+        });
+
+        observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+
+        const timeoutId = setTimeout(() => {
+            cleanup();
+            reject(new Error(`Main-thread probe timed out for "${testName}".`));
+        }, timeout);
+
+        const startTime = performance.now();
+        lastFrameTime = startTime;
+
+        try {
+            action(passThrough);
+            if (condition(passThrough)) {
+                finish(performance.now());
+            }
+        } catch (e) {
+            cleanup();
+            reject(e);
+        }
+    });
+};

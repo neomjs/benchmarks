@@ -5,93 +5,177 @@
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 2963.70 | 2997.50 | 2979.26 ± 11.24 | 380.20 | 400.90 | 386.78 ± 7.58 |
-| Chromium | prod | 2974.60 | 3172.90 | 3043.60 ± 72.15 | 384.90 | 403.50 | 395.26 ± 7.65 |
-| Firefox | dev | 2142.00 | 2222.00 | 2170.20 ± 29.49 | 382.00 | 391.00 | 386.80 ± 3.66 |
-| Firefox | prod | 2154.00 | 2204.00 | 2171.00 ± 17.85 | 383.00 | 402.00 | 390.60 ± 6.53 |
-| Webkit | dev | 2765.00 | 2962.00 | 2892.20 ± 67.46 | 382.00 | 424.00 | 405.40 ± 14.35 |
-| Webkit | prod | 2799.00 | 3015.00 | 2896.40 ± 70.56 | 380.00 | 483.00 | 419.20 ± 40.88 |
+| Chromium | dev | 1164.60 | 1330.90 | 1210.52 ± 62.50 | 343.60 | 396.30 | 361.68 ± 18.57 |
+| Chromium | prod | 1181.00 | 1263.60 | 1204.16 ± 30.62 | 354.20 | 377.90 | 364.72 ± 9.02 |
+
+## Change Columns from 50 to 200 (with 100k rows) (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## Change Columns from 50 to 200 (with 100k rows) (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 16.80 | 16.80 | 16.80 ± 0.00 |
+| Chromium | prod | 16.80 | 16.80 | 16.80 ± 0.00 |
 
 ## Change Columns from 50 to 75
 
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 75.00 | 87.50 | 77.64 ± 4.93 | 25.70 | 31.60 | 27.60 ± 2.13 |
-| Chromium | prod | 75.20 | 88.40 | 78.32 ± 5.06 | 26.40 | 32.10 | 28.18 ± 2.04 |
-| Firefox | dev | 90.00 | 102.00 | 94.80 ± 4.26 | 31.00 | 39.00 | 33.60 ± 2.87 |
-| Firefox | prod | 84.00 | 96.00 | 91.80 ± 4.12 | 30.00 | 33.00 | 31.60 ± 1.02 |
-| Webkit | dev | 95.00 | 124.00 | 112.40 ± 13.43 | 29.00 | 51.00 | 43.80 ± 8.61 |
-| Webkit | prod | 98.00 | 133.00 | 119.80 ± 11.62 | 32.00 | 57.00 | 47.00 ± 8.17 |
+| Chromium | dev | 82.50 | 97.50 | 86.02 ± 5.77 | 42.90 | 57.00 | 46.22 ± 5.42 |
+| Chromium | prod | 79.50 | 85.00 | 82.48 ± 2.07 | 41.20 | 44.10 | 42.62 ± 0.97 |
+
+## Change Columns from 50 to 75 (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## Change Columns from 50 to 75 (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 16.70 | 16.80 | 16.74 ± 0.05 |
+| Chromium | prod | 16.70 | 16.80 | 16.72 ± 0.04 |
 
 ## Change Rows from 1,000 to 100,000
 
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 830.90 | 847.00 | 835.48 ± 5.85 | 157.80 | 163.90 | 161.02 ± 2.46 |
-| Chromium | prod | 832.80 | 996.00 | 871.20 ± 62.70 | 149.70 | 225.20 | 169.48 ± 28.04 |
-| Firefox | dev | 662.00 | 706.00 | 688.00 ± 17.03 | 112.00 | 154.00 | 137.80 ± 13.91 |
-| Firefox | prod | 629.00 | 675.00 | 656.40 ± 17.42 | 104.00 | 137.00 | 122.00 ± 12.70 |
-| Webkit | dev | 440.00 | 480.00 | 453.60 ± 14.32 | 126.00 | 136.00 | 130.60 ± 3.56 |
-| Webkit | prod | 434.00 | 476.00 | 455.20 ± 15.71 | 115.00 | 165.00 | 140.00 ± 18.68 |
+| Chromium | dev | 464.10 | 515.20 | 484.74 ± 19.79 | 238.40 | 263.10 | 251.44 ± 9.90 |
+| Chromium | prod | 464.70 | 579.60 | 500.80 ± 42.04 | 238.30 | 317.70 | 264.84 ± 28.67 |
+
+## Change Rows from 1,000 to 100,000 (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## Change Rows from 1,000 to 100,000 (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 16.70 | 16.80 | 16.78 ± 0.04 |
+| Chromium | prod | 16.70 | 16.80 | 16.78 ± 0.04 |
 
 ## Change Rows from 1,000 to 5,000
 
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 96.10 | 100.10 | 98.04 ± 1.43 | 23.90 | 27.50 | 25.54 ± 1.25 |
-| Chromium | prod | 96.10 | 100.30 | 98.58 ± 1.40 | 24.10 | 26.10 | 25.28 ± 0.78 |
-| Firefox | dev | 100.00 | 112.00 | 105.60 ± 4.59 | 34.00 | 37.00 | 35.60 ± 1.02 |
-| Firefox | prod | 98.00 | 110.00 | 103.20 ± 4.35 | 35.00 | 38.00 | 36.40 ± 1.36 |
-| Webkit | dev | 109.00 | 126.00 | 118.40 ± 7.00 | 30.00 | 53.00 | 41.40 ± 9.58 |
-| Webkit | prod | 112.00 | 143.00 | 128.60 ± 11.74 | 31.00 | 60.00 | 50.00 ± 10.43 |
+| Chromium | dev | 78.00 | 81.90 | 80.40 ± 1.33 | 35.30 | 36.30 | 35.96 ± 0.36 |
+| Chromium | prod | 78.80 | 80.70 | 79.28 ± 0.71 | 34.10 | 37.60 | 36.26 ± 1.17 |
+
+## Change Rows from 1,000 to 5,000 (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## Change Rows from 1,000 to 5,000 (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 16.70 | 16.70 | 16.70 ± 0.00 |
+| Chromium | prod | 16.70 | 16.70 | 16.70 ± 0.00 |
 
 ## filter-grid (clear)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 26.00 | 33.30 | 28.12 ± 2.69 |
-| Chromium | prod | 25.00 | 33.30 | 28.54 ± 3.07 |
-| Firefox | dev | 33.00 | 50.00 | 38.00 ± 6.13 |
-| Firefox | prod | 5.00 | 48.00 | 31.80 ± 14.27 |
-| Webkit | dev | 30.00 | 43.00 | 37.20 ± 4.26 |
-| Webkit | prod | 35.00 | 70.00 | 47.80 ± 13.01 |
+| Chromium | dev | 15.60 | 16.70 | 15.98 ± 0.42 |
+| Chromium | prod | 1.50 | 16.40 | 13.22 ± 5.86 |
+
+## filter-grid (clear) (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## filter-grid (clear) (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 14.30 | 15.10 | 14.80 ± 0.30 |
+| Chromium | prod | 1.50 | 15.30 | 12.00 ± 5.26 |
 
 ## filter-grid (first)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 58.50 | 78.80 | 66.52 ± 9.47 |
-| Chromium | prod | 58.40 | 80.50 | 67.34 ± 7.99 |
-| Firefox | dev | 54.00 | 59.00 | 56.00 ± 1.79 |
-| Firefox | prod | 45.00 | 58.00 | 55.00 ± 5.02 |
-| Webkit | dev | 89.00 | 115.00 | 101.60 ± 9.99 |
-| Webkit | prod | 87.00 | 110.00 | 95.40 ± 8.14 |
+| Chromium | dev | 15.30 | 17.80 | 16.70 ± 0.95 |
+| Chromium | prod | 14.80 | 17.00 | 15.94 ± 0.74 |
+
+## filter-grid (first) (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## filter-grid (first) (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 14.30 | 16.60 | 15.30 ± 0.81 |
+| Chromium | prod | 13.60 | 15.00 | 14.30 ± 0.47 |
 
 ## filter-grid (second)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 22.70 | 31.10 | 25.58 ± 3.01 |
-| Chromium | prod | 22.80 | 29.60 | 27.34 ± 2.45 |
-| Firefox | dev | 29.00 | 50.00 | 38.40 ± 8.78 |
-| Firefox | prod | 32.00 | 49.00 | 38.40 ± 7.50 |
-| Webkit | dev | 63.00 | 70.00 | 66.00 ± 2.28 |
-| Webkit | prod | 38.00 | 74.00 | 55.00 ± 12.57 |
+| Chromium | dev | 15.60 | 16.40 | 16.02 ± 0.29 |
+| Chromium | prod | 15.50 | 16.90 | 16.10 ± 0.46 |
+
+## filter-grid (second) (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## filter-grid (second) (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 14.40 | 15.10 | 14.70 ± 0.30 |
+| Chromium | prod | 14.30 | 15.00 | 14.58 ± 0.25 |
 
 
 
 The data is aggregated over **5 run(s)**.
 
 ## System Information
-* **OS:** macOS 15.5 (x64)
-* **CPU:** Intel(R) Xeon(R) W-2140B CPU @ 3.20GHz (16 cores @ 3.2GHz)
-* **Memory:** 64GB
-* **Node.js:** v22.3.0
-* **Playwright:** 1.54.2
+* **OS:** macOS 27.0.1 (arm64)
+* **CPU:** Apple M5 Max (18 cores @ UnknownGHz)
+* **Memory:** 128GB
+* **Node.js:** v25.9.0
+* **Playwright:** 1.64.1
 

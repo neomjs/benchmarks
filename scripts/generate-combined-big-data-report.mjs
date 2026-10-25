@@ -96,12 +96,61 @@ function generateNarrativeReport(allStats) {
             if (neoTime && reactTime) {
                 const advantage = (reactTime / neoTime).toFixed(1) + 'x faster';
                 md.push(`| **${browserName}** | **${neoTime.toFixed(2)}** | ${reactTime.toFixed(2)} | **${advantage}** |`);
-            } else {
-                md.push(`| **${browserName}** | N/A | N/A | N/A |`);
             }
         }
         md.push('');
     }
+
+    md.push('## Interactive Filtering Performance (Total Time to Valid State)');
+    md.push('Average production mode `Total Time` in milliseconds (ms) across consecutive filter operations on the active dataset. Lower is better.\n');
+    md.push('| Operation | Browser | Neo.mjs (ms) | React AG Grid (ms) | Neo.mjs Advantage |');
+    md.push('|:---|:---|---:|---:|:---:|');
+
+    const filterBenchmarks = ['filter-grid (first)', 'filter-grid (second)', 'filter-grid (clear)'];
+    for (const filterName of filterBenchmarks) {
+        for (const browser of BROWSERS) {
+            const browserMode = `${browser}-prod`;
+            const browserName = browser.charAt(0).toUpperCase() + browser.slice(1);
+            const neoTime = parseFloat(allStats.neo[filterName]?.[browserMode]?.avg);
+            const reactTime = parseFloat(allStats.react[filterName]?.[browserMode]?.avg);
+
+            if (neoTime && reactTime) {
+                const advantage = (reactTime / neoTime).toFixed(1) + 'x faster';
+                md.push(`| **${filterName}** | **${browserName}** | **${neoTime.toFixed(2)}** | ${reactTime.toFixed(2)} | **${advantage}** |`);
+            }
+        }
+    }
+    md.push('');
+
+    md.push('## Main-Thread Responsiveness Probe (Max RAF Delta & Long-Task Blocking)');
+    md.push('Measured concurrently via `requestAnimationFrame` delta tracking and `PerformanceObserver({ type: \'longtask\' })` while the grid processes large data updates (`16.7 ms` = 60fps; `0 ms` Long-Task Blocking = zero main-thread freeze).\n');
+    md.push('| Scenario | Browser | Neo.mjs Max RAF (ms) | React AG Grid Max RAF (ms) | Neo.mjs Long-Task Block (ms) | React AG Grid Long-Task Block (ms) |');
+    md.push('|:---|:---|---:|---:|---:|---:|');
+
+    const probeScenarios = [
+        'Change Columns from 50 to 200 (with 100k rows)',
+        'Change Rows from 1,000 to 100,000',
+        'Change Columns from 50 to 75',
+        'Change Rows from 1,000 to 5,000',
+        'filter-grid (first)',
+        'filter-grid (second)',
+        'filter-grid (clear)'
+    ];
+    for (const scenario of probeScenarios) {
+        for (const browser of BROWSERS) {
+            const browserMode = `${browser}-prod`;
+            const browserName = browser.charAt(0).toUpperCase() + browser.slice(1);
+            const neoRaf = allStats.neo[`${scenario} (Max RAF Delta)`]?.[browserMode]?.avg;
+            const reactRaf = allStats.react[`${scenario} (Max RAF Delta)`]?.[browserMode]?.avg;
+            const neoBlock = allStats.neo[`${scenario} (Long Task Block)`]?.[browserMode]?.avg;
+            const reactBlock = allStats.react[`${scenario} (Long Task Block)`]?.[browserMode]?.avg;
+
+            if (neoRaf !== undefined && reactRaf !== undefined) {
+                md.push(`| **${scenario}** | **${browserName}** | **${neoRaf}** | ${reactRaf} | **${neoBlock ?? '0.00'}** | ${reactBlock ?? '0.00'} |`);
+            }
+        }
+    }
+    md.push('');
     return md.join('\n');
 }
 
@@ -139,6 +188,7 @@ function generateCombinedDetailedReport(allStats) {
                         totalData = allStats[framework]?.[groupName]?.[browserMode];
                     }
                     const uiUpdateData = allStats[framework]?.[`${groupName} (UI Update)`]?.[browserMode];
+                    if (!totalData && !uiUpdateData) continue;
 
                     const totalTimeString = totalData ? `${totalData.avg} ± ${totalData.stdDev}` : 'N/A';
                     const frameworkName = FRAMEWORK_DISPLAY_NAMES[framework];
