@@ -1,6 +1,6 @@
 {
     "name": "neo.mjs-benchmarks",
-    "version": "10.5.3",
+    "version": "13.3.1",
     "description": "Neo.mjs: Benchmarks",
     "type": "module",
     "scripts": {
@@ -43,7 +43,7 @@
     },
     "homepage": "https://neomjs.com/",
     "dependencies": {
-        "@playwright/test": "^1.54.2",
+        "@playwright/test": "^1.63.0",
         "fs-extra": "^11.3.0",
         "glob": "^11.0.3"
     },

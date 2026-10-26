@@ -23,6 +23,10 @@ class MainStore extends Store {
          */
         amountRows_: 1000,
         /**
+         * @member {Boolean} autoInitRecords=false
+         */
+        autoInitRecords: false,
+        /**
          * @member {Object[]} filters
          * @reactive
          */
@@ -61,6 +65,16 @@ class MainStore extends Store {
     ]
 
     /**
+     * @param {Object} config
+     * @returns {Neo.collection.Base}
+     * @protected
+     */
+    createAllItems(config) {
+        config.preventDataGeneration = true;
+        return super.createAllItems(config)
+    }
+
+    /**
      * Triggered after the amountColumns config got changed
      * @param {Number} value
      * @param {Number} oldValue
@@ -77,10 +91,12 @@ class MainStore extends Store {
             console.log('Start generating data and adding to collection');
 
             if (me.items?.length > 0) {
-                me.clear()
+                me.clear(false)
             }
 
-            me.add(data);
+            // Turbo Mode: Passing false as the 2nd argument disables the eager Record creation.
+            // This enables the Store to use the lazy-load chunking mechanism for massive performance gains.
+            me.add(data, false);
 
             console.log(`Data generation and collection add total time: ${Math.round(performance.now() - start)}ms`)
         }
@@ -93,6 +109,10 @@ class MainStore extends Store {
      * @protected
      */
     afterSetAmountRows(value, oldValue) {
+        if (this.preventDataGeneration) {
+            return
+        }
+
         let me    = this,
             data  = me.generateData(value, me.amountColumns),
             start = performance.now();
@@ -100,10 +120,12 @@ class MainStore extends Store {
         console.log('Start generating data and adding to collection');
 
         if (me.items?.length > 0) {
-            me.clear()
+            me.clear(false)
         }
 
-        me.add(data);
+        // Turbo Mode: Passing false as the 2nd argument disables the eager Record creation.
+        // This enables the Store to use the lazy-load chunking mechanism for massive performance gains.
+        me.add(data, false);
 
         console.log(`Data generation and collection add total time: ${Math.round(performance.now() - start)}ms`)
     }

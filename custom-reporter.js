@@ -6,11 +6,13 @@ class BenchmarkSystemReporter {
   onBegin(config, suite) {
     const systemInfo = this.getSystemInfo();
     const browserInfo = this.getBrowserInfo();
+    const libraryInfo = this.getLibraryInfo();
 
     // Store comprehensive system info
     const fullSystemInfo = {
       ...systemInfo,
       browsers: browserInfo,
+      libraries: libraryInfo,
       benchmarkRun: {
         timestamp: new Date().toISOString(),
         playwrightProjects: config.projects?.map(p => p.name) || [],
@@ -119,6 +121,29 @@ class BenchmarkSystemReporter {
     }
 
     return browsers;
+  }
+
+  getLibraryInfo() {
+    const readVersion = (pkgPath, fallbackPkgPath, depName) => {
+      try {
+        return fs.readJsonSync(pkgPath, 'utf8').version;
+      } catch (e) {
+        try {
+          const pkg = fs.readJsonSync(fallbackPkgPath, 'utf8');
+          const raw = pkg.dependencies?.[depName] || pkg.devDependencies?.[depName] || 'Unknown';
+          return raw.replace(/^[\^~]/, '');
+        } catch (err) {
+          return 'Unknown';
+        }
+      }
+    };
+
+    return {
+      neo: readVersion('./apps/bigData/neo/node_modules/neo.mjs/package.json', './apps/bigData/neo/package.json', 'neo.mjs'),
+      react: readVersion('./apps/bigData/react/node_modules/react/package.json', './apps/bigData/react/package.json', 'react'),
+      agGridCommunity: readVersion('./apps/bigData/react/node_modules/ag-grid-community/package.json', './apps/bigData/react/package.json', 'ag-grid-community'),
+      agGridReact: readVersion('./apps/bigData/react/node_modules/ag-grid-react/package.json', './apps/bigData/react/package.json', 'ag-grid-react')
+    };
   }
 
   getOSName() {

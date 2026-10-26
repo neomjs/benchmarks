@@ -1,7 +1,10 @@
+import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
 import { useRef, useEffect, useCallback } from 'react';
 import 'ag-grid-community/styles/ag-grid.css'; // Core grid CSS
 import 'ag-grid-community/styles/ag-theme-alpine.css'; // Light & Dark Theme
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bufferRowRange, bufferColumnRange, loading, firstnameFilter, lastnameFilter, onFilteredRowsChanged }) {
   const gridRef = useRef(null);
@@ -56,6 +59,8 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
     <div className={`ag-theme-${theme}`} style={{ height: '100%', width: '100%' }}>
       <AgGridReact
         ref={gridRef}
+        theme="legacy"
+        animateRows={false}
         rowData={rowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}

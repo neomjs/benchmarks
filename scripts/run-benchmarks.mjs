@@ -44,15 +44,15 @@ async function main() {
     };
 
     const serverPorts = {
-        neo: 8080,
-        react: 5174,
-        angular: 4200
+        neo: [8080],
+        react: [5174, 4173],
+        angular: [4200]
     };
 
     // 3. Loop through all frameworks and suites to run
     for (const fw of frameworksToRun) {
-        const port = serverPorts[fw];
-        if (port) {
+        const ports = serverPorts[fw] || [];
+        for (const port of ports) {
             console.log(`--- Ensuring port ${port} is free for ${fw} ---`);
             try {
                 if (process.platform === 'win32') {

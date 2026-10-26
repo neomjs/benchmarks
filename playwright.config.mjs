@@ -7,6 +7,10 @@ import { defineConfig, devices } from '@playwright/test';
  */
 // require('dotenv').config();
 
+const isReact = process.env.FRAMEWORK === 'react';
+const devBaseURL = isReact ? 'http://localhost:5174' : 'http://localhost:8080';
+const prodBaseURL = isReact ? 'http://localhost:4173' : 'http://localhost:8080/dist/production/';
+
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
@@ -29,7 +33,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:8080',
+    baseURL: devBaseURL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -43,36 +47,45 @@ export default defineConfig({
     // Development environment
     {
       name: 'chromium-dev',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: devBaseURL,
+      },
     },
     {
       name: 'firefox-dev',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        baseURL: devBaseURL,
+      },
     },
     {
       name: 'webkit-dev',
-      use: { ...devices['Desktop Safari'] },
+      use: {
+        ...devices['Desktop Safari'],
+        baseURL: devBaseURL,
+      },
     },
     // Production environment
     {
       name: 'chromium-prod',
       use: {
         ...devices['Desktop Chrome'],
-        baseURL: 'http://localhost:8080/dist/production/',
+        baseURL: prodBaseURL,
       },
     },
     {
       name: 'firefox-prod',
       use: {
         ...devices['Desktop Firefox'],
-        baseURL: 'http://localhost:8080/dist/production/',
+        baseURL: prodBaseURL,
       },
     },
     {
       name: 'webkit-prod',
       use: {
         ...devices['Desktop Safari'],
-        baseURL: 'http://localhost:8080/dist/production/',
+        baseURL: prodBaseURL,
       },
     },
     {
@@ -129,8 +142,19 @@ export default defineConfig({
         url: 'http://localhost:8080',
         reuseExistingServer: !process.env.CI,
       },
-      'react': {
-        command: `npm --prefix apps/${app === 'bigData' ? 'bigData/react' : 'interactive-benchmark-react'} run dev`,
+      'react': app === 'bigData' ? [
+        {
+          command: 'npm --prefix apps/bigData/react run dev',
+          url: 'http://localhost:5174',
+          reuseExistingServer: !process.env.CI,
+        },
+        {
+          command: 'npm --prefix apps/bigData/react run build && npm --prefix apps/bigData/react run preview',
+          url: 'http://localhost:4173',
+          reuseExistingServer: !process.env.CI,
+        }
+      ] : {
+        command: 'npm --prefix apps/interactive-benchmark-react run dev',
         url: 'http://localhost:5174',
         reuseExistingServer: !process.env.CI,
       }
@@ -141,6 +165,6 @@ export default defineConfig({
     }
 
     // If no framework is specified, or for 'all', run all servers.
-    return Object.values(servers);
+    return Object.values(servers).flat();
   })(),
 });
