@@ -60,6 +60,7 @@ function Grid({ rowData, columnDefs, theme, selectionModel, rowSelectionType, bu
       <AgGridReact
         ref={gridRef}
         theme="legacy"
+        animateRows={false}
         rowData={rowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}

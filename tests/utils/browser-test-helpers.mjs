@@ -142,18 +142,21 @@ export const measureJankInBrowser = (duration) => {
  * @param {Function} condition - Predicate returning true once the DOM reaches valid target state.
  * @param {*} [passThrough] - Optional payload forwarded to `action` and `condition`.
  * @param {Object} [options] - Timeout configuration (`{ timeout = 30000 }`).
- * @returns {Promise<{tvsMs: number, maxRafDeltaMs: number, longFrameCount: number, longTaskCount: number, longTaskTotalBlockingMs: number, frameCount: number}>}
+ * @returns {Promise<{tvsMs: number, maxRafDeltaMs: number, longFrameCount: number, longTaskCount: number|null, longTaskTotalBlockingMs: number|null, frameCount: number}>}
  */
 export const measureMainThreadProbeInBrowser = (testName, action, condition, passThrough, { timeout = 30000 } = {}) => {
     return new Promise((resolve, reject) => {
         const frameDeltas = [];
         let lastFrameTime = performance.now();
         let rafActive = true;
-        let longTaskCount = 0;
-        let longTaskTotalBlockingMs = 0;
+        const longTaskSupported = typeof PerformanceObserver !== 'undefined' &&
+            Array.isArray(PerformanceObserver.supportedEntryTypes) &&
+            PerformanceObserver.supportedEntryTypes.includes('longtask');
+        let longTaskCount = longTaskSupported ? 0 : null;
+        let longTaskTotalBlockingMs = longTaskSupported ? 0 : null;
         let longTaskObserver = null;
 
-        if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+        if (longTaskSupported) {
             longTaskObserver = new PerformanceObserver((list) => {
                 for (const entry of list.getEntries()) {
                     longTaskCount++;
@@ -189,7 +192,7 @@ export const measureMainThreadProbeInBrowser = (testName, action, condition, pas
                 maxRafDeltaMs          : Math.round(maxRafDeltaMs * 100) / 100,
                 longFrameCount,
                 longTaskCount,
-                longTaskTotalBlockingMs: Math.round(longTaskTotalBlockingMs * 100) / 100,
+                longTaskTotalBlockingMs: longTaskTotalBlockingMs !== null ? Math.round(longTaskTotalBlockingMs * 100) / 100 : null,
                 frameCount             : frameDeltas.length
             });
         };

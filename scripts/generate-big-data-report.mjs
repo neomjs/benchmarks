@@ -145,7 +145,7 @@ async function generateReport() {
         report += '\n'; // Add a newline after each group table
     }
 
-    // Add system info
+    // Add system info and library versions
     try {
         const systemInfo = await fs.readJson('./benchmark-system-info.json');
         systemInfoSection += '## System Information\n';
@@ -154,6 +154,13 @@ async function generateReport() {
         systemInfoSection += `* **Memory:** ${systemInfo.totalMemory}GB\n`;
         systemInfoSection += `* **Node.js:** ${systemInfo.nodeVersion}\n`;
         systemInfoSection += `* **Playwright:** ${systemInfo.playwrightVersion}\n\n`;
+
+        if (systemInfo.libraries) {
+            systemInfoSection += '## Library Versions\n';
+            systemInfoSection += `* **Neo.mjs:** ${systemInfo.libraries.neo}\n`;
+            systemInfoSection += `* **React:** ${systemInfo.libraries.react}\n`;
+            systemInfoSection += `* **AG Grid Community / React:** ${systemInfo.libraries.agGridCommunity}\n\n`;
+        }
     } catch (e) {
         systemInfoSection += 'Could not load system information.\n\n';
     }

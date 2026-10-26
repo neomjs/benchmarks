@@ -38,7 +38,7 @@ test.beforeEach(async ({page}) => {
         }
     });
 
-    await page.goto('http://localhost:5174/');
+    await page.goto('/');
     await page.waitForFunction(() => {
         const grid = document.querySelector('[role="grid"]');
         return grid && !grid.classList.contains('ag-root-wrapper-loading');
@@ -114,7 +114,9 @@ test('should change the amount of rows', async ({page}) => {
             [totalMetricName]: totalDuration,
             [uiUpdateMetricName]: uiUpdateDuration,
             'Change Rows from 1,000 to 5,000 (Max RAF Delta)': totalProbe.maxRafDeltaMs,
-            'Change Rows from 1,000 to 5,000 (Long Task Block)': totalProbe.longTaskTotalBlockingMs
+            ...(totalProbe.longTaskTotalBlockingMs !== null ? {
+                'Change Rows from 1,000 to 5,000 (Long Task Block)': totalProbe.longTaskTotalBlockingMs
+            } : {})
         })
     });
     console.log(`[Benchmark] ${totalMetricName}: ${totalDuration.toFixed(2)} ms`);
@@ -180,7 +182,9 @@ test('should change the amount of columns', async ({page}) => {
             [totalMetricName]: totalDuration,
             [uiUpdateMetricName]: uiUpdateDuration,
             'Change Columns from 50 to 75 (Max RAF Delta)': totalProbe.maxRafDeltaMs,
-            'Change Columns from 50 to 75 (Long Task Block)': totalProbe.longTaskTotalBlockingMs
+            ...(totalProbe.longTaskTotalBlockingMs !== null ? {
+                'Change Columns from 50 to 75 (Long Task Block)': totalProbe.longTaskTotalBlockingMs
+            } : {})
         })
     });
     console.log(`[Benchmark] ${totalMetricName}: ${totalDuration.toFixed(2)} ms`);
@@ -223,19 +227,24 @@ test('should filter the grid by firstname', async ({page}) => {
         };
 
         const initialFirstCellContent = getFirstCellContent();
+        const firstTarget  = initialFirstCellContent === 'Amanda' ? 'Andrew'  : 'Amanda';
+        const secondTarget = initialFirstCellContent === 'John'   ? 'Jessica' : 'John';
+        if (initialFirstCellContent === firstTarget || initialFirstCellContent === secondTarget) {
+            throw new Error(`Pre-match guard failed: initialFirstCellContent="${initialFirstCellContent}"`);
+        }
 
         // 1. First filter
         const probe1 = await measureProbe('filter-grid-first', () => {
-            changeInputValue('Amanda');
+            changeInputValue(firstTarget);
         }, () => {
-            return getFirstCellContent() === 'Amanda';
+            return getFirstCellContent() === firstTarget;
         });
 
         // 2. Second filter
         const probe2 = await measureProbe('filter-grid-second', () => {
-            changeInputValue('John');
+            changeInputValue(secondTarget);
         }, () => {
-            return getFirstCellContent() === 'John';
+            return getFirstCellContent() === secondTarget;
         });
 
         // 3. Clear filter
@@ -254,13 +263,19 @@ test('should filter the grid by firstname', async ({page}) => {
         description: JSON.stringify({
             'filter-grid (first)'                    : probes.probe1.tvsMs,
             'filter-grid (first) (Max RAF Delta)'    : probes.probe1.maxRafDeltaMs,
-            'filter-grid (first) (Long Task Block)'  : probes.probe1.longTaskTotalBlockingMs,
+            ...(probes.probe1.longTaskTotalBlockingMs !== null ? {
+                'filter-grid (first) (Long Task Block)' : probes.probe1.longTaskTotalBlockingMs
+            } : {}),
             'filter-grid (second)'                   : probes.probe2.tvsMs,
             'filter-grid (second) (Max RAF Delta)'   : probes.probe2.maxRafDeltaMs,
-            'filter-grid (second) (Long Task Block)' : probes.probe2.longTaskTotalBlockingMs,
+            ...(probes.probe2.longTaskTotalBlockingMs !== null ? {
+                'filter-grid (second) (Long Task Block)' : probes.probe2.longTaskTotalBlockingMs
+            } : {}),
             'filter-grid (clear)'                    : probes.probe3.tvsMs,
             'filter-grid (clear) (Max RAF Delta)'    : probes.probe3.maxRafDeltaMs,
-            'filter-grid (clear) (Long Task Block)'  : probes.probe3.longTaskTotalBlockingMs
+            ...(probes.probe3.longTaskTotalBlockingMs !== null ? {
+                'filter-grid (clear) (Long Task Block)' : probes.probe3.longTaskTotalBlockingMs
+            } : {})
         })
     });
 
@@ -322,7 +337,9 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             [rowsMetricName]: rowsProbe.tvsMs,
             [rowsUiUpdateMetricName]: rowsUiUpdateDuration,
             'Change Rows from 1,000 to 100,000 (Max RAF Delta)': rowsProbe.maxRafDeltaMs,
-            'Change Rows from 1,000 to 100,000 (Long Task Block)': rowsProbe.longTaskTotalBlockingMs
+            ...(rowsProbe.longTaskTotalBlockingMs !== null ? {
+                'Change Rows from 1,000 to 100,000 (Long Task Block)': rowsProbe.longTaskTotalBlockingMs
+            } : {})
         })
     });
     console.log(`[Benchmark] ${rowsMetricName}: ${rowsProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${rowsProbe.maxRafDeltaMs.toFixed(2)} ms)`);
@@ -388,7 +405,9 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             [colsMetricName]: colsProbe.tvsMs,
             [colsUiUpdateMetricName]: colsUiUpdateDuration,
             'Change Columns from 50 to 200 (with 100k rows) (Max RAF Delta)': colsProbe.maxRafDeltaMs,
-            'Change Columns from 50 to 200 (with 100k rows) (Long Task Block)': colsProbe.longTaskTotalBlockingMs
+            ...(colsProbe.longTaskTotalBlockingMs !== null ? {
+                'Change Columns from 50 to 200 (with 100k rows) (Long Task Block)': colsProbe.longTaskTotalBlockingMs
+            } : {})
         })
     });
     console.log(`[Benchmark] ${colsMetricName}: ${colsProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${colsProbe.maxRafDeltaMs.toFixed(2)} ms)`);
