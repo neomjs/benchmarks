@@ -44,26 +44,41 @@ export function resolveArmFrameworkVersion(arm) {
 }
 
 /**
- * @summary Unpacks `mcp__<server>__<tool>` tool names emitted by Claude Code and Codex MCP bridges.
- * @param {{serverName?: String, toolName?: String, input?: Object}} call
- * @returns {{server: String, tool: String, input: Object}}
+ * @summary Splits `mcp__<server>__<tool>` tool names emitted by Claude Code and Codex MCP bridges into `{serverName, toolName}`.
+ * @param {String} [serverName='']
+ * @param {String} [toolName='']
+ * @returns {{serverName: String, toolName: String}}
  */
-function normalizeToolCall({serverName = '', toolName = '', input = {}} = {}) {
-    let server = String(serverName || '').toLowerCase(),
-        tool   = String(toolName || '');
+export function splitMcpToolName(serverName = '', toolName = '') {
+    let server = String(serverName || ''),
+        tool   = String(toolName   || '');
 
     if (tool.startsWith('mcp__')) {
         const parts = tool.slice(5).split('__');
         if (parts.length >= 2) {
-            server = parts[0].toLowerCase();
+            server = parts[0];
             tool   = parts.slice(1).join('__');
         }
     }
 
     return {
-        server,
-        tool : tool.toLowerCase(),
-        input: input && typeof input === 'object' ? input : {}
+        serverName: server,
+        toolName  : tool
+    };
+}
+
+/**
+ * @summary Unpacks `mcp__<server>__<tool>` tool names emitted by Claude Code and Codex MCP bridges.
+ * @param {{serverName?: String, toolName?: String, input?: Object}} call
+ * @returns {{server: String, tool: String, input: Object}}
+ */
+function normalizeToolCall({serverName = '', toolName = '', input = {}} = {}) {
+    const split = splitMcpToolName(serverName, toolName);
+
+    return {
+        server: split.serverName.toLowerCase(),
+        tool  : split.toolName.toLowerCase(),
+        input : input && typeof input === 'object' ? input : {}
     };
 }
 
@@ -80,6 +95,7 @@ export function classifyToolCall(call = {}) {
 
     if (
         server.includes('neural-link') ||
+        server.includes('neural_link') ||
         tool.includes('inspect_store') ||
         tool.includes('get_component_tree') ||
         tool.includes('get_window_topology') ||
@@ -144,7 +160,7 @@ export function classifyToolCall(call = {}) {
 /**
  * @summary Per-harness JSONL line adapter normalizing Claude Code, Codex CLI, and generic transcript entries.
  * @param {Object} entry Parsed JSONL line.
- * @returns {{harness: String|null, harnessVersion: String|null, model: String|null, timestamp: String|null, usage: {inputTokens: Number, outputTokens: Number, cachedTokens: Number}|null, toolCalls: Array<{serverName: String, toolName: String, input: Object}>, verificationRun: {timestamp: String|null, pass: Boolean}|null}}
+ * @returns {{harness: String|null, harnessVersion: String|null, model: String|null, timestamp: String|null, usageId: String|null, usage: {inputTokens: Number, outputTokens: Number, cachedTokens: Number}|null, toolCalls: Array<{serverName: String, toolName: String, input: Object}>, verificationRun: {timestamp: String|null, pass: Boolean}|null}}
  */
 export function adaptTranscriptEntry(entry = {}) {
     const timestamp = entry.timestamp || entry.created_at || entry.payload?.timestamp || null;
@@ -156,17 +172,19 @@ export function adaptTranscriptEntry(entry = {}) {
             harnessVersion : null,
             model          : null,
             timestamp,
+            usageId        : null,
             usage          : null,
             toolCalls      : [],
             verificationRun: {timestamp, pass: entry.pass}
         };
     }
 
-    // 2. Claude Code JSONL (`message.usage` + `message.content` `tool_use` blocks)
+    // 2. Claude Code JSONL (`message.id`, `message.usage` + `message.content` `tool_use` blocks)
     if (entry.message && typeof entry.message === 'object') {
-        const msg   = entry.message,
-              u     = msg.usage,
-              usage = u ? {
+        const msg     = entry.message,
+              u       = msg.usage,
+              usageId = msg.id || null,
+              usage   = u ? {
                   inputTokens : Number(u.input_tokens || 0),
                   outputTokens: Number(u.output_tokens || 0),
                   cachedTokens: Number((u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0))
@@ -174,17 +192,21 @@ export function adaptTranscriptEntry(entry = {}) {
               content   = Array.isArray(msg.content) ? msg.content : [],
               toolCalls = content
                   .filter(block => block && block.type === 'tool_use')
-                  .map(block => ({
-                      serverName: '',
-                      toolName  : block.name || '',
-                      input     : block.input || {}
-                  }));
+                  .map(block => {
+                      const {serverName, toolName} = splitMcpToolName('', block.name || '');
+                      return {
+                          serverName,
+                          toolName,
+                          input: block.input || {}
+                      };
+                  });
 
         return {
             harness        : 'claude-code',
             harnessVersion : entry.version || null,
             model          : msg.model || null,
             timestamp,
+            usageId,
             usage,
             toolCalls,
             verificationRun: null
@@ -210,10 +232,11 @@ export function adaptTranscriptEntry(entry = {}) {
         const toolCalls = [];
         if (entry.item && typeof entry.item === 'object') {
             if (entry.item.type === 'mcp_tool_call') {
+                const {serverName, toolName} = splitMcpToolName(entry.item.server || '', entry.item.tool || '');
                 toolCalls.push({
-                    serverName: entry.item.server || '',
-                    toolName  : entry.item.tool   || '',
-                    input     : entry.item.arguments || {}
+                    serverName,
+                    toolName,
+                    input: entry.item.arguments || {}
                 });
             } else if (entry.item.type === 'command_execution') {
                 toolCalls.push({
@@ -235,10 +258,11 @@ export function adaptTranscriptEntry(entry = {}) {
             } else if (entry.payload.arguments && typeof entry.payload.arguments === 'object') {
                 parsedArgs = entry.payload.arguments;
             }
+            const {serverName, toolName} = splitMcpToolName('', entry.payload.name || '');
             toolCalls.push({
-                serverName: '',
-                toolName  : entry.payload.name || '',
-                input     : parsedArgs
+                serverName,
+                toolName,
+                input: parsedArgs
             });
         }
 
@@ -247,6 +271,7 @@ export function adaptTranscriptEntry(entry = {}) {
             harnessVersion : entry.cli_version || entry.payload?.cli_version || entry.version || null,
             model          : entry.model || entry.payload?.model || null,
             timestamp,
+            usageId        : entry.id || null,
             usage,
             toolCalls,
             verificationRun: null
@@ -262,11 +287,17 @@ export function adaptTranscriptEntry(entry = {}) {
           } : null;
 
     const rawCalls  = entry.toolCalls || entry.tool_calls || [],
-          toolCalls = rawCalls.map(call => ({
-              serverName: call.serverName || call.Arguments?.ServerName || '',
-              toolName  : call.toolName   || call.Arguments?.ToolName   || call.name || '',
-              input     : call.input      || call.Arguments             || {}
-          }));
+          toolCalls = rawCalls.map(call => {
+              const {serverName, toolName} = splitMcpToolName(
+                  call.serverName || call.Arguments?.ServerName || '',
+                  call.toolName   || call.Arguments?.ToolName   || call.name || ''
+              );
+              return {
+                  serverName,
+                  toolName,
+                  input: call.input || call.Arguments || {}
+              };
+          });
 
     let verificationRun = null;
     if (entry.verificationPassed === true) {
@@ -280,6 +311,7 @@ export function adaptTranscriptEntry(entry = {}) {
         harnessVersion: entry.harnessVersion || entry.version || null,
         model         : entry.model || null,
         timestamp,
+        usageId       : entry.id || null,
         usage,
         toolCalls,
         verificationRun
@@ -319,7 +351,8 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         outputTokens       = 0,
         cachedTokens       = 0;
 
-    const collectedVerifications = [];
+    const collectedVerifications = [],
+          seenUsageIds           = new Set();
 
     const toolCallsByServer = {
         docsKbQueries         : 0,
@@ -353,9 +386,14 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         }
 
         if (adapted.usage) {
-            inputTokens  += adapted.usage.inputTokens;
-            outputTokens += adapted.usage.outputTokens;
-            cachedTokens += adapted.usage.cachedTokens;
+            if (!adapted.usageId || !seenUsageIds.has(adapted.usageId)) {
+                if (adapted.usageId) {
+                    seenUsageIds.add(adapted.usageId);
+                }
+                inputTokens  += adapted.usage.inputTokens;
+                outputTokens += adapted.usage.outputTokens;
+                cachedTokens += adapted.usage.cachedTokens;
+            }
         }
 
         if (adapted.verificationRun) {

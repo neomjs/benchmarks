@@ -7,6 +7,7 @@ import path                  from 'path';
 import {generateRows}        from './tasks/grid-100k-multi-window/data/generateRows.mjs';
 import {
     ARMS,
+    adaptTranscriptEntry,
     classifyToolCall,
     parseTranscriptTelemetry,
     buildComparisonReport,
@@ -254,10 +255,31 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(classifyToolCall({toolName: 'mcp__ag-mcp__search_docs'})).toBe('docsKbQueries');
         expect(classifyToolCall({toolName: 'Read', input: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}})).toBe('docsKbQueries');
         expect(classifyToolCall({toolName: 'mcp__neural-link__inspect_store'})).toBe('neuralLinkRuntimeCalls');
+        expect(classifyToolCall({toolName: 'mcp__neural-link__call_method'})).toBe('neuralLinkRuntimeCalls');
+        expect(classifyToolCall({toolName: 'mcp__neural-link__query_component'})).toBe('neuralLinkRuntimeCalls');
+        expect(classifyToolCall({toolName: 'mcp__neural-link__simulate_event'})).toBe('neuralLinkRuntimeCalls');
         expect(classifyToolCall({toolName: 'Write'})).toBe('fileEdits');
         expect(classifyToolCall({toolName: 'Bash'})).toBe('shellTestRuns');
 
-        // 1. Trimmed real Claude Code session transcript + runner verification runs (1 fail, 1 pass, followed by post-green summary)
+        // Verify adaptTranscriptEntry splits mcp__<server>__<tool> into serverName + toolName directly
+        const adaptedLine = adaptTranscriptEntry({
+            type   : 'assistant',
+            message: {
+                id     : 'msg_01_test',
+                model  : 'claude-opus-4-7',
+                usage  : {input_tokens: 500, output_tokens: 100},
+                content: [{type: 'tool_use', id: 'toolu_nl', name: 'mcp__neural-link__call_method', input: {method: 'sort'}}]
+            }
+        });
+        expect(adaptedLine.usageId).toBe('msg_01_test');
+        expect(adaptedLine.toolCalls).toEqual([
+            {serverName: 'neural-link', toolName: 'call_method', input: {method: 'sort'}}
+        ]);
+
+        // 1. Trimmed real Claude Code session transcript (multi-line per message.id repeating message.usage)
+        //    + runner verification runs (1 fail, 1 pass, followed by post-green summary)
+        const msg1Usage = {input_tokens: 1200, output_tokens: 300, cache_read_input_tokens: 300, cache_creation_input_tokens: 100};
+        const msg2Usage = {input_tokens: 1500, output_tokens: 250, cache_read_input_tokens: 800, cache_creation_input_tokens: 0};
         const claudeCodeTranscript = [
             JSON.stringify({
                 type     : 'user',
@@ -266,18 +288,19 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 timestamp: '2026-10-26T16:00:00.000Z',
                 message  : {role: 'user', content: 'Implement grid-100k-multi-window task'}
             }),
+            // Response msg_01A spans 2 JSONL lines (1 per content block) repeating identical msg1Usage
             JSON.stringify({
                 type     : 'assistant',
                 sessionId: 'cc-session-01',
                 version  : '2.1.12',
                 timestamp: '2026-10-26T16:01:00.000Z',
                 message  : {
+                    id     : 'msg_01A',
                     model  : 'claude-opus-4-7',
                     role   : 'assistant',
-                    usage  : {input_tokens: 1200, output_tokens: 300, cache_read_input_tokens: 300, cache_creation_input_tokens: 100},
+                    usage  : msg1Usage,
                     content: [
-                        {type: 'tool_use', id: 'toolu_1', name: 'Read', input: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}},
-                        {type: 'tool_use', id: 'toolu_2', name: 'Write', input: {file_path: 'apps/gridbench/view/Viewport.mjs'}}
+                        {type: 'tool_use', id: 'toolu_1', name: 'Read', input: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}}
                     ]
                 }
             }),
@@ -285,14 +308,59 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 type     : 'assistant',
                 sessionId: 'cc-session-01',
                 version  : '2.1.12',
-                timestamp: '2026-10-26T16:02:10.000Z',
+                timestamp: '2026-10-26T16:01:02.000Z',
                 message  : {
+                    id     : 'msg_01A',
                     model  : 'claude-opus-4-7',
                     role   : 'assistant',
-                    usage  : {input_tokens: 1500, output_tokens: 250, cache_read_input_tokens: 800, cache_creation_input_tokens: 0},
+                    usage  : msg1Usage,
                     content: [
-                        {type: 'tool_use', id: 'toolu_3', name: 'mcp__neural-link__get_component_tree', input: {}},
-                        {type: 'tool_use', id: 'toolu_4', name: 'mcp__neural-link__inspect_store', input: {}},
+                        {type: 'tool_use', id: 'toolu_2', name: 'Write', input: {file_path: 'apps/gridbench/view/Viewport.mjs'}}
+                    ]
+                }
+            }),
+            // Response msg_01B spans 3 JSONL lines (including call_method & query_component) repeating identical msg2Usage
+            JSON.stringify({
+                type     : 'assistant',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
+                timestamp: '2026-10-26T16:02:10.000Z',
+                message  : {
+                    id     : 'msg_01B',
+                    model  : 'claude-opus-4-7',
+                    role   : 'assistant',
+                    usage  : msg2Usage,
+                    content: [
+                        {type: 'tool_use', id: 'toolu_3', name: 'mcp__neural-link__call_method', input: {}}
+                    ]
+                }
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
+                timestamp: '2026-10-26T16:02:11.000Z',
+                message  : {
+                    id     : 'msg_01B',
+                    model  : 'claude-opus-4-7',
+                    role   : 'assistant',
+                    usage  : msg2Usage,
+                    content: [
+                        {type: 'tool_use', id: 'toolu_4', name: 'mcp__neural-link__query_component', input: {}}
+                    ]
+                }
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
+                timestamp: '2026-10-26T16:02:12.000Z',
+                message  : {
+                    id     : 'msg_01B',
+                    model  : 'claude-opus-4-7',
+                    role   : 'assistant',
+                    usage  : msg2Usage,
+                    content: [
                         {type: 'tool_use', id: 'toolu_5', name: 'Bash', input: {command: 'npm run server-start:headless'}}
                     ]
                 }
@@ -303,6 +371,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 version  : '2.1.12',
                 timestamp: '2026-10-26T16:02:45.000Z',
                 message  : {
+                    id     : 'msg_01C',
                     model  : 'claude-opus-4-7',
                     role   : 'assistant',
                     usage  : {input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 0, cache_creation_input_tokens: 0},
