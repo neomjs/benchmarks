@@ -7,8 +7,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 // require('dotenv').config();
 
-const isReact     = process.env.FRAMEWORK === 'react';
-const devBaseURL  = isReact ? 'http://localhost:5174' : 'http://localhost:8080';
+const isReact = process.env.FRAMEWORK === 'react';
+const devBaseURL = isReact ? 'http://localhost:5174' : 'http://localhost:8080';
 const prodBaseURL = isReact ? 'http://localhost:4173' : 'http://localhost:8080/dist/production/';
 
 /**
@@ -47,21 +47,21 @@ export default defineConfig({
     // Development environment
     {
       name: 'chromium-dev',
-      use : {
+      use: {
         ...devices['Desktop Chrome'],
         baseURL: devBaseURL,
       },
     },
     {
       name: 'firefox-dev',
-      use : {
+      use: {
         ...devices['Desktop Firefox'],
         baseURL: devBaseURL,
       },
     },
     {
       name: 'webkit-dev',
-      use : {
+      use: {
         ...devices['Desktop Safari'],
         baseURL: devBaseURL,
       },
@@ -69,37 +69,37 @@ export default defineConfig({
     // Production environment
     {
       name: 'chromium-prod',
-      use : {
+      use: {
         ...devices['Desktop Chrome'],
         baseURL: prodBaseURL,
       },
     },
     {
       name: 'firefox-prod',
-      use : {
+      use: {
         ...devices['Desktop Firefox'],
         baseURL: prodBaseURL,
       },
     },
     {
       name: 'webkit-prod',
-      use : {
+      use: {
         ...devices['Desktop Safari'],
         baseURL: prodBaseURL,
       },
     },
     {
-      name     : 'angular',
+      name: 'angular',
       testMatch: /angular\.spec\.mjs/,
-      use      : {
+      use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:4200',
       },
     },
     {
-      name     : 'react',
+      name: 'react',
       testMatch: /react\.spec\.mjs/,
-      use      : {
+      use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:5174',
       },
@@ -133,29 +133,29 @@ export default defineConfig({
 
     const servers = {
       'angular': {
-        command            : 'npm --prefix apps/interactive-benchmark-angular run start',
-        url                : 'http://localhost:4200',
+        command: 'npm --prefix apps/interactive-benchmark-angular run start',
+        url: 'http://localhost:4200',
         reuseExistingServer: !process.env.CI,
       },
       'neo': {
-        command            : `npm --prefix apps/${app === 'bigData' ? 'bigData/neo' : 'interactive-benchmark-neo'} run server-start:headless`,
-        url                : 'http://localhost:8080',
+        command: `npm --prefix apps/${app === 'bigData' ? 'bigData/neo' : 'interactive-benchmark-neo'} run server-start:headless`,
+        url: 'http://localhost:8080',
         reuseExistingServer: !process.env.CI,
       },
       'react': app === 'bigData' ? [
         {
-          command            : 'npm --prefix apps/bigData/react run dev',
-          url                : 'http://localhost:5174',
+          command: 'npm --prefix apps/bigData/react run dev',
+          url: 'http://localhost:5174',
           reuseExistingServer: !process.env.CI,
         },
         {
-          command            : 'npm --prefix apps/bigData/react run build && npm --prefix apps/bigData/react run preview',
-          url                : 'http://localhost:4173',
+          command: 'npm --prefix apps/bigData/react run build && npm --prefix apps/bigData/react run preview',
+          url: 'http://localhost:4173',
           reuseExistingServer: !process.env.CI,
         }
       ] : {
-        command            : 'npm --prefix apps/interactive-benchmark-react run dev',
-        url                : 'http://localhost:5174',
+        command: 'npm --prefix apps/interactive-benchmark-react run dev',
+        url: 'http://localhost:5174',
         reuseExistingServer: !process.env.CI,
       }
     };

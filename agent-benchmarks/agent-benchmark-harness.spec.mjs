@@ -11,7 +11,8 @@ import {
     parseTranscriptTelemetry,
     buildComparisonReport,
     formatComparisonMarkdown,
-    runArmVerification
+    runArmVerification,
+    readVerificationRuns
 } from './runner/runAgentBenchmark.mjs';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
@@ -249,41 +250,83 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         });
     });
 
-    test('parseTranscriptTelemetry and buildComparisonReport emit structured JSON and Markdown telemetry', () => {
-        expect(classifyToolCall({serverName: 'ag-mcp', toolName: 'search_docs'})).toBe('docsKbQueries');
-        expect(classifyToolCall({serverName: 'neo-mjs-knowledge-base', toolName: 'ask_knowledge_base'})).toBe('docsKbQueries');
-        expect(classifyToolCall({serverName: 'neo-mjs-neural-link', toolName: 'inspect_store'})).toBe('neuralLinkRuntimeCalls');
-        expect(classifyToolCall({toolName: 'write_file'})).toBe('fileEdits');
-        expect(classifyToolCall({toolName: 'run_command'})).toBe('shellTestRuns');
+    test('parseTranscriptTelemetry adapts Claude Code and Codex JSONL transcripts and runner verification logs', () => {
+        expect(classifyToolCall({toolName: 'mcp__ag-mcp__search_docs'})).toBe('docsKbQueries');
+        expect(classifyToolCall({toolName: 'Read', input: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}})).toBe('docsKbQueries');
+        expect(classifyToolCall({toolName: 'mcp__neural-link__inspect_store'})).toBe('neuralLinkRuntimeCalls');
+        expect(classifyToolCall({toolName: 'Write'})).toBe('fileEdits');
+        expect(classifyToolCall({toolName: 'Bash'})).toBe('shellTestRuns');
 
-        const sampleTranscript = [
+        // 1. Trimmed real Claude Code session transcript + runner verification runs (1 fail, 1 pass, followed by post-green summary)
+        const claudeCodeTranscript = [
             JSON.stringify({
+                type     : 'user',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
                 timestamp: '2026-10-26T16:00:00.000Z',
-                usage    : {inputTokens: 1200, outputTokens: 300, cachedTokens: 400},
-                toolCalls: [
-                    {serverName: 'neo-mjs-knowledge-base', toolName: 'ask_knowledge_base'},
-                    {toolName: 'write_file'}
-                ]
+                message  : {role: 'user', content: 'Implement grid-100k-multi-window task'}
             }),
             JSON.stringify({
-                timestamp         : '2026-10-26T16:02:30.000Z',
-                usage             : {inputTokens: 1500, outputTokens: 250, cachedTokens: 800},
-                verificationPassed: true,
-                toolCalls         : [
-                    {serverName: 'neo-mjs-neural-link', toolName: 'get_component_tree'},
-                    {serverName: 'neo-mjs-neural-link', toolName: 'inspect_store'},
-                    {toolName: 'run_command'}
-                ]
+                type     : 'assistant',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
+                timestamp: '2026-10-26T16:01:00.000Z',
+                message  : {
+                    model  : 'claude-opus-4-7',
+                    role   : 'assistant',
+                    usage  : {input_tokens: 1200, output_tokens: 300, cache_read_input_tokens: 300, cache_creation_input_tokens: 100},
+                    content: [
+                        {type: 'tool_use', id: 'toolu_1', name: 'Read', input: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}},
+                        {type: 'tool_use', id: 'toolu_2', name: 'Write', input: {file_path: 'apps/gridbench/view/Viewport.mjs'}}
+                    ]
+                }
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
+                timestamp: '2026-10-26T16:02:10.000Z',
+                message  : {
+                    model  : 'claude-opus-4-7',
+                    role   : 'assistant',
+                    usage  : {input_tokens: 1500, output_tokens: 250, cache_read_input_tokens: 800, cache_creation_input_tokens: 0},
+                    content: [
+                        {type: 'tool_use', id: 'toolu_3', name: 'mcp__neural-link__get_component_tree', input: {}},
+                        {type: 'tool_use', id: 'toolu_4', name: 'mcp__neural-link__inspect_store', input: {}},
+                        {type: 'tool_use', id: 'toolu_5', name: 'Bash', input: {command: 'npm run server-start:headless'}}
+                    ]
+                }
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                sessionId: 'cc-session-01',
+                version  : '2.1.12',
+                timestamp: '2026-10-26T16:02:45.000Z',
+                message  : {
+                    model  : 'claude-opus-4-7',
+                    role   : 'assistant',
+                    usage  : {input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 0, cache_creation_input_tokens: 0},
+                    content: [{type: 'text', text: 'All checks passed.'}]
+                }
             })
         ].join('\n');
 
-        const telemetry = parseTranscriptTelemetry(sampleTranscript, {arm: 'arm-c-neo-kb-neural-link'});
+        const claudeTelemetry = parseTranscriptTelemetry(claudeCodeTranscript, {
+            arm             : 'arm-c-neo-kb-neural-link',
+            verificationRuns: [
+                {timestamp: '2026-10-26T16:01:15.000Z', pass: false, durationMs: 4200},
+                {timestamp: '2026-10-26T16:02:30.000Z', pass: true,  durationMs: 4500}
+            ]
+        });
 
-        expect(telemetry).toEqual({
+        expect(claudeTelemetry).toEqual({
             arm              : 'arm-c-neo-kb-neural-link',
+            harness          : 'claude-code',
+            model            : 'claude-opus-4-7',
+            versions         : {harnessVersion: '2.1.12', frameworkVersion: 'neo.mjs@13.3.1'},
             pass             : true,
             timeToGreenMs    : 150000,
-            totalTokens      : {inputTokens: 2700, outputTokens: 550, cachedTokens: 1200, total: 3250},
+            totalTokens      : {inputTokens: 2800, outputTokens: 600, cachedTokens: 1200, total: 3400},
             toolCallsByServer: {
                 docsKbQueries         : 1,
                 neuralLinkRuntimeCalls: 2,
@@ -291,16 +334,73 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 shellTestRuns         : 1,
                 other                 : 0
             },
-            verificationFailures: 0
+            verificationFailures: 1
         });
 
-        const report   = buildComparisonReport([telemetry]),
+        // 2. Trimmed real Codex CLI JSONL transcript with no passing verification -> timeToGreenMs is null
+        const codexTranscript = [
+            JSON.stringify({
+                type       : 'session_meta',
+                timestamp  : '2026-10-26T17:00:00.000Z',
+                cli_version: '0.48.0',
+                model      : 'gpt-5.4'
+            }),
+            JSON.stringify({
+                type     : 'item.completed',
+                timestamp: '2026-10-26T17:00:30.000Z',
+                item     : {type: 'mcp_tool_call', server: 'ag-mcp', tool: 'search_docs', arguments: {query: 'column group'}}
+            }),
+            JSON.stringify({
+                type     : 'item.completed',
+                timestamp: '2026-10-26T17:01:00.000Z',
+                item     : {type: 'file_change', changes: [{path: 'src/App.jsx'}]}
+            }),
+            JSON.stringify({
+                type     : 'item.completed',
+                timestamp: '2026-10-26T17:01:20.000Z',
+                item     : {type: 'command_execution', command: 'npm run dev'}
+            }),
+            JSON.stringify({
+                type     : 'turn.completed',
+                timestamp: '2026-10-26T17:01:30.000Z',
+                usage    : {input_tokens: 2000, output_tokens: 400, cached_input_tokens: 500}
+            })
+        ].join('\n');
+
+        const codexTelemetry = parseTranscriptTelemetry(codexTranscript, {
+            arm             : 'arm-a-react-ag-grid-mcp',
+            verificationRuns: [
+                {timestamp: '2026-10-26T17:01:25.000Z', pass: false, durationMs: 3100}
+            ]
+        });
+
+        expect(codexTelemetry).toEqual({
+            arm              : 'arm-a-react-ag-grid-mcp',
+            harness          : 'codex',
+            model            : 'gpt-5.4',
+            versions         : {harnessVersion: '0.48.0', frameworkVersion: 'ag-grid-community@36.2.0'},
+            pass             : false,
+            timeToGreenMs    : null,
+            totalTokens      : {inputTokens: 2000, outputTokens: 400, cachedTokens: 500, total: 2400},
+            toolCallsByServer: {
+                docsKbQueries         : 1,
+                neuralLinkRuntimeCalls: 0,
+                fileEdits             : 1,
+                shellTestRuns         : 1,
+                other                 : 0
+            },
+            verificationFailures: 1
+        });
+
+        const report   = buildComparisonReport([claudeTelemetry, codexTelemetry]),
               markdown = formatComparisonMarkdown(report);
 
-        expect(report.arms).toHaveLength(1);
-        expect(markdown).toContain('arm-c-neo-kb-neural-link');
+        expect(report.arms).toHaveLength(2);
+        expect(markdown).toContain('claude-code');
+        expect(markdown).toContain('claude-opus-4-7');
+        expect(markdown).toContain('neo.mjs@13.3.1');
         expect(markdown).toContain('150000');
-        expect(markdown).toContain('3250');
+        expect(markdown).toContain('N/A');
     });
 
     test('verify.spec.mjs fails on starter shell, no-op-sort, and counter-only-filter mutations, and passes against a compliant 100k multi-window server', async () => {
