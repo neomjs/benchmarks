@@ -1,0 +1,3 @@
+[mcp_servers.neural-link]
+command = "npx"
+args    = ["-y", "neo-neural-link"]

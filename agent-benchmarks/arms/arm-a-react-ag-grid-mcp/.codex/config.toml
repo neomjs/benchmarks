@@ -1,0 +1,3 @@
+[mcp_servers.ag-mcp]
+command = "npx"
+args    = ["-y", "ag-mcp"]
