@@ -1,8 +1,10 @@
-import {test, expect} from '@playwright/test';
-import fs             from 'fs-extra';
-import http           from 'node:http';
-import path           from 'path';
-import {generateRows} from '../agent-benchmarks/tasks/grid-100k-multi-window/data/generateRows.mjs';
+import {test, expect}        from '@playwright/test';
+import {spawn, execFileSync} from 'node:child_process';
+import fs                    from 'fs-extra';
+import http                  from 'node:http';
+import net                   from 'node:net';
+import path                  from 'path';
+import {generateRows}        from './tasks/grid-100k-multi-window/data/generateRows.mjs';
 import {
     ARMS,
     classifyToolCall,
@@ -10,9 +12,137 @@ import {
     buildComparisonReport,
     formatComparisonMarkdown,
     runArmVerification
-} from '../agent-benchmarks/runner/runAgentBenchmark.mjs';
+} from './runner/runAgentBenchmark.mjs';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
+
+/**
+ * @summary Allocates an ephemeral free TCP port on 127.0.0.1.
+ * @returns {Promise<Number>}
+ */
+async function getFreePort() {
+    return new Promise((resolve, reject) => {
+        const srv = net.createServer();
+        srv.listen(0, '127.0.0.1', () => {
+            const {port} = srv.address();
+            srv.close(err => err ? reject(err) : resolve(port));
+        });
+    });
+}
+
+/**
+ * @summary Sends a JSON-RPC 2.0 `initialize` request to a stdio MCP server command and returns the parsed response.
+ * @param {{command: String, args: String[], cwd: String}} config
+ * @returns {Promise<Object>}
+ */
+async function probeMcpInitialize({command, args, cwd}) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, {cwd, stdio: ['pipe', 'pipe', 'pipe']}),
+              timer = setTimeout(() => {
+                  child.kill('SIGTERM');
+                  reject(new Error(`MCP initialize timed out for ${command} ${args.join(' ')}`));
+              }, 15000);
+        let stdout = '';
+
+        child.stdout.on('data', chunk => {
+            stdout += chunk.toString('utf8');
+            for (const line of stdout.split('\n')) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('{') && trimmed.includes('"jsonrpc"')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        if (parsed.id === 1 && parsed.result) {
+                            clearTimeout(timer);
+                            child.kill('SIGTERM');
+                            resolve(parsed);
+                            return;
+                        }
+                    } catch {
+                        // wait for complete line
+                    }
+                }
+            }
+        });
+
+        child.on('error', err => {
+            clearTimeout(timer);
+            reject(err);
+        });
+
+        const req = JSON.stringify({
+            jsonrpc: '2.0',
+            id     : 1,
+            method : 'initialize',
+            params : {
+                protocolVersion: '2024-11-05',
+                capabilities   : {},
+                clientInfo     : {name: 'agent-benchmark-self-test', version: '1.0.0'}
+            }
+        }) + '\n';
+
+        child.stdin.write(req);
+    });
+}
+
+/**
+ * @summary Ensures `node_modules` is available in an arm workspace (using sibling benchmark install or `npm install`),
+ * boots its dev server on a free port, verifies HTTP 200 on the given paths, and tears down the server.
+ * @param {{armDir: String, seedNodeModulesDir: String, scriptArgs: String[], env?: Object, checkPaths: String[]}} options
+ */
+async function verifyArmDevServerAnswers({armDir, seedNodeModulesDir, scriptArgs, env = {}, checkPaths}) {
+    const armNodeModules = path.join(armDir, 'node_modules');
+    let   createdSymlink = false;
+
+    if (!await fs.pathExists(armNodeModules)) {
+        if (await fs.pathExists(seedNodeModulesDir)) {
+            await fs.ensureSymlink(seedNodeModulesDir, armNodeModules, 'dir');
+            createdSymlink = true;
+        } else {
+            execFileSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], {
+                cwd  : armDir,
+                stdio: 'inherit'
+            });
+        }
+    }
+
+    const port  = await getFreePort(),
+          child = spawn('npm', scriptArgs.map(a => a.replace('{PORT}', String(port))), {
+              cwd  : armDir,
+              env  : {...process.env, PORT: String(port), ...env},
+              stdio: ['ignore', 'pipe', 'pipe']
+          });
+
+    try {
+        const baseUrl  = `http://localhost:${port}`,
+              deadline = Date.now() + 20000;
+        let ready = false;
+
+        while (Date.now() < deadline) {
+            try {
+                const res = await fetch(`${baseUrl}${checkPaths[0]}`);
+                if (res.status === 200) {
+                    ready = true;
+                    break;
+                }
+            } catch {
+                // server still booting
+            }
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        expect(ready, `Dev server in ${armDir} did not answer 200 on ${checkPaths[0]}`).toBe(true);
+
+        for (const checkPath of checkPaths) {
+            const res = await fetch(`${baseUrl}${checkPath}`);
+            expect(res.status, `Expected 200 for ${checkPath} in ${armDir}`).toBe(200);
+        }
+    } finally {
+        child.kill('SIGTERM');
+        if (createdSymlink) {
+            await fs.remove(armNodeModules);
+        }
+    }
+}
 
 test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
     test('generateRows produces 100,000 deterministic records with pinned canonical rows', () => {
@@ -41,26 +171,82 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(rowsA[99999]).toEqual(rowsB[99999]);
     });
 
-    test('all three arm workspaces carry isolated starter trees and distinct MCP configurations', async () => {
+    test('all three arm workspaces carry isolated starter trees, launchable MCP servers, and serving dev servers', async () => {
+        test.setTimeout(60000);
+
         expect(ARMS).toEqual([
             'arm-a-react-ag-grid-mcp',
             'arm-b-neo-kb-only',
             'arm-c-neo-kb-neural-link'
         ]);
 
-        const armAMcp = await fs.readJson(path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-a-react-ag-grid-mcp/.mcp.json')),
-              armBMcp = await fs.readJson(path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-b-neo-kb-only/.mcp.json')),
-              armCMcp = await fs.readJson(path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link/.mcp.json'));
+        const armADir = path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-a-react-ag-grid-mcp'),
+              armBDir = path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-b-neo-kb-only'),
+              armCDir = path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link');
+
+        const armAMcp = await fs.readJson(path.join(armADir, '.mcp.json')),
+              armBMcp = await fs.readJson(path.join(armBDir, '.mcp.json')),
+              armCMcp = await fs.readJson(path.join(armCDir, '.mcp.json'));
 
         expect(Object.keys(armAMcp.mcpServers)).toEqual(['ag-mcp']);
-        expect(Object.keys(armBMcp.mcpServers)).toEqual(['neo-mjs-knowledge-base']);
-        expect(Object.keys(armCMcp.mcpServers)).toEqual(['neo-mjs-knowledge-base', 'neural-link']);
+        expect(Object.keys(armBMcp.mcpServers)).toEqual([]);
+        expect(Object.keys(armCMcp.mcpServers)).toEqual(['neural-link']);
 
-        const armBNeoConfig = await fs.readJson(path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-b-neo-kb-only/apps/gridbench/neo-config.json')),
-              armCNeoConfig = await fs.readJson(path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link/apps/gridbench/neo-config.json'));
+        const armAPkg = await fs.readJson(path.join(armADir, 'package.json'));
+        for (const ver of [...Object.values(armAPkg.dependencies), ...Object.values(armAPkg.devDependencies)]) {
+            expect(ver).not.toMatch(/^[\^~]/);
+        }
+
+        const armAAgentsMd = await fs.readFile(path.join(armADir, 'AGENTS.md'), 'utf8'),
+              armBAgentsMd = await fs.readFile(path.join(armBDir, 'AGENTS.md'), 'utf8'),
+              armCAgentsMd = await fs.readFile(path.join(armCDir, 'AGENTS.md'), 'utf8');
+
+        expect(armAAgentsMd).toContain('## Verify in the running app before you call a change done');
+        expect(armBAgentsMd).toContain('## Verify in the running app before you call a change done');
+        expect(armCAgentsMd).toContain('## Verify in the running app before you call a change done');
+
+        const armBNeoConfig = await fs.readJson(path.join(armBDir, 'apps/gridbench/neo-config.json')),
+              armCNeoConfig = await fs.readJson(path.join(armCDir, 'apps/gridbench/neo-config.json'));
 
         expect(armBNeoConfig.useAiClient).toBe(false);
         expect(armCNeoConfig.useAiClient).toBe('development');
+
+        // Verify every configured MCP server starts and answers JSON-RPC initialize over stdio
+        const agMcpInit = await probeMcpInitialize({
+            command: armAMcp.mcpServers['ag-mcp'].command,
+            args   : armAMcp.mcpServers['ag-mcp'].args,
+            cwd    : armADir
+        });
+        expect(agMcpInit.result?.serverInfo?.name).toBe('ag-grid-mcp');
+
+        const nlMcpInit = await probeMcpInitialize({
+            command: armCMcp.mcpServers['neural-link'].command,
+            args   : armCMcp.mcpServers['neural-link'].args,
+            cwd    : armCDir
+        });
+        expect(nlMcpInit.result?.serverInfo?.name).toBe('neo-neural-link');
+
+        // Verify all three arm starter workspaces boot their dev servers and serve 200 OK
+        await verifyArmDevServerAnswers({
+            armDir            : armADir,
+            seedNodeModulesDir: path.join(ROOT_DIR, 'apps/bigData/react/node_modules'),
+            scriptArgs        : ['run', 'dev', '--', '--port', '{PORT}', '--host', '127.0.0.1'],
+            checkPaths        : ['/', '/src/main.jsx']
+        });
+
+        await verifyArmDevServerAnswers({
+            armDir            : armBDir,
+            seedNodeModulesDir: path.join(ROOT_DIR, 'apps/bigData/neo/node_modules'),
+            scriptArgs        : ['run', 'server-start:headless'],
+            checkPaths        : ['/apps/gridbench/index.html', '/src/MicroLoader.mjs', '/node_modules/neo.mjs/src/Main.mjs']
+        });
+
+        await verifyArmDevServerAnswers({
+            armDir            : armCDir,
+            seedNodeModulesDir: path.join(ROOT_DIR, 'apps/bigData/neo/node_modules'),
+            scriptArgs        : ['run', 'server-start:headless'],
+            checkPaths        : ['/apps/gridbench/index.html', '/src/MicroLoader.mjs', '/node_modules/neo.mjs/src/Main.mjs']
+        });
     });
 
     test('parseTranscriptTelemetry and buildComparisonReport emit structured JSON and Markdown telemetry', () => {
