@@ -71,10 +71,10 @@ class GridContainer extends BaseGridContainer {
 
         this.store.amountColumns = value;
 
-        // Stand-in for the follow-up commit `056f5493c2` of `neomjs/neo#20116` (which moved runtime column-swap
-        // measurement into `grid.Container#afterSetColumns`), so both an unpatched `npm install` of `neo.mjs@13.3.1`
-        // and the `c3fb7a56e4` patched build (`src/collection/Base.mjs` + `src/grid/Container.mjs`) measure on swap.
-        // Removable once the next `neo.mjs` npm release carrying `#20116` is published.
+        // Stand-in for the squash merge commit `056f5493c2` (PR commit `c5116c6408`) of `neomjs/neo#20116` (which moved
+        // runtime column-swap measurement into `grid.Container#afterSetColumns`), so both an unpatched `npm install` of
+        // `neo.mjs@13.3.1` and the `patches/neo.mjs-13.3.1-bigdata-hotpath.patch` build (`src/collection/Base.mjs` +
+        // `src/grid/Container.mjs`) measure on swap. Removable once the next `neo.mjs` npm release carrying `#20116` ships.
         if (this.headerToolbar && this.body?.columnPositions?.count !== value) {
             this.headerToolbar.passSizeToBody()
         }

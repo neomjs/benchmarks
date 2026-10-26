@@ -252,7 +252,7 @@ The data is aggregated over **5 run(s)**.
 * **Playwright:** 1.64.1
 
 ## Library Versions
-* **Neo.mjs:** 13.3.1 (npm) + app-level sync + src/collection/Base.mjs & src/grid/Container.mjs from neomjs/neo#20116 (c3fb7a56e4) patched into apps/bigData/neo/node_modules/neo.mjs/src/ before npm run build
+* **Neo.mjs:** 13.3.1 (npm) + app-level sync + patches/neo.mjs-13.3.1-bigdata-hotpath.patch (src/collection/Base.mjs & src/grid/Container.mjs from neomjs/neo#20116) applied before npm run build
 * **React:** 19.1.1
 * **AG Grid Community / React:** 36.2.0
 
