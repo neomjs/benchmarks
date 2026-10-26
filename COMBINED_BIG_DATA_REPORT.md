@@ -1,7 +1,7 @@
 # Big Data Showdown: Neo.mjs vs. React + AG Grid
 
 ## Executive Summary
-This report benchmarks the rendering performance and main-thread responsiveness of the **Neo.mjs** grid (`neo.mjs 13.3.1` from npm + the app-level sync and `src/collection/Base.mjs` / `src/grid/Container.mjs` / `src/grid/Row.mjs` hot-path sync from [`neomjs/neo#20116`](https://github.com/neomjs/neo/pull/20116) at `056f5493c2`; the engine half lands on npm with the next `neo.mjs` release) against **React** (`19.1.1`) + **AG Grid Community** (`36.2.0`, `animateRows={false}`, tested against a `vite build` + `vite preview` production bundle). By pairing **UI Update Time** with concurrent **`requestAnimationFrame` delta** and **`PerformanceObserver({ type: 'longtask' })` main-thread blocking** probes, we measure both time-to-valid-DOM and UI responsiveness under load.
+This report benchmarks the rendering performance and main-thread responsiveness of the **Neo.mjs** grid (`neo.mjs 13.3.1` from npm + the app-level `MainStore.mjs` / `GridContainer.mjs` sync and `src/collection/Base.mjs` + `src/grid/Container.mjs` from [`neomjs/neo#20116`](https://github.com/neomjs/neo/pull/20116) at `c3fb7a56e4` patched into `apps/bigData/neo/node_modules/neo.mjs/src/` before `npm --prefix apps/bigData/neo run build`; to reproduce from a fresh clone before the next `neo.mjs` npm release, copy those two files from `neomjs/neo@c3fb7a56e4` into `apps/bigData/neo/node_modules/neo.mjs/src/` prior to `npm run build`, while `GridContainer.mjs` also retains a `passSizeToBody()` stand-in for `056f5493c2` so an unpatched `npm install` runs out of the box) against **React** (`19.1.1`) + **AG Grid Community** (`36.2.0`, `animateRows={false}`, tested against a `vite build` + `vite preview` production bundle). By pairing **UI Update Time** with concurrent **`requestAnimationFrame` delta** and **`PerformanceObserver({ type: 'longtask' })` main-thread blocking** probes, we measure both time-to-valid-DOM and UI responsiveness under load.
 
 In heavy, large-scale mutations, Neo.mjs's multi-threaded Off-Main-Thread (OMT) architecture delivers **7.2x faster UI updates** when expanding from 50 to 200 columns at 100,000 rows (150.26 ms vs. 1082.58 ms) and **3.0x faster UI updates** when scaling from 1,000 to 100,000 rows (109.30 ms vs. 327.04 ms). Crucially, Neo.mjs maintains **0.00 ms of Long-Task main-thread blocking** and a steady **16.80 ms Max RAF delta (~60fps)** across every scenario, whereas single-threaded React + AG Grid incurs **328.80 ms of Long-Task blocking** (a **378.44 ms** frame stall) during the 200-column / 100k-row update. On smaller mutations (50 to 75 columns at 1,000 rows) and 1,000-row interactive filtering with row animations disabled, both engines complete in a couple of frames (< 45 ms).
 
@@ -360,7 +360,7 @@ The data is aggregated over **5 run(s)**.
 
 | Library    | Version     |
 |------------|-------------|
-| Neo.mjs    | 13.3.1 (npm) + neomjs/neo#20116 hot-path sync (056f5493c2) |
+| Neo.mjs    | 13.3.1 (npm) + app-level sync + src/collection/Base.mjs & src/grid/Container.mjs from neomjs/neo#20116 (c3fb7a56e4) patched into apps/bigData/neo/node_modules/neo.mjs/src/ before npm run build |
 | React      | 19.1.1 |
 | AG Grid Community / React | 36.2.0 |
 
@@ -373,4 +373,4 @@ The data is aggregated over **5 run(s)**.
 | Safari     | Safari kMDItemVersion = "27.0.1" |
 
 ---
-*This file is auto-generated on Mon, 26 Oct 2026 14:55:16 GMT. Do not edit manually.*
+*This file is auto-generated on Mon, 26 Oct 2026 15:37:36 GMT. Do not edit manually.*
