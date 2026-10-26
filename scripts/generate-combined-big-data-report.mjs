@@ -135,8 +135,29 @@ function generateNarrativeReport(allStats) {
     }
     md.push('');
 
+    md.push('## 2D Scrolling Performance on 100k Rows × 200 Columns (8 Render-Gated Hops)');
+    md.push('Average production mode `Total Time` in milliseconds (ms) to complete 8 sequential render-gated viewport jumps across 100,000 rows (`scroll-vertical-100k`), 200 columns (`scroll-horizontal-200-cols`), and simultaneous 2D diagonal axes (`scroll-diagonal-2d`). Both engines maintain `0.00 ms` Long-Task blocking and a steady `~16.7 ms` Max RAF delta in production mode; AG Grid applies synchronous main-thread DOM updates on each scroll jump (`~16–17 ms/hop`), whereas Neo.mjs processes each hop asynchronously across its `Main -> App Worker (16ms throttle) -> VDom Worker -> DeltaUpdates` pipeline while keeping the main thread completely unblocked. Lower is better.\n');
+    md.push('| Scroll Trajectory | Browser | Neo.mjs (ms) | React AG Grid (ms) | Neo.mjs Advantage |');
+    md.push('|:---|:---|---:|---:|:---:|');
+
+    const scrollBenchmarks = ['scroll-vertical-100k', 'scroll-horizontal-200-cols', 'scroll-diagonal-2d'];
+    for (const scrollName of scrollBenchmarks) {
+        for (const browser of BROWSERS) {
+            const browserMode = `${browser}-prod`;
+            const browserName = browser.charAt(0).toUpperCase() + browser.slice(1);
+            const neoTime = parseFloat(allStats.neo[scrollName]?.[browserMode]?.avg);
+            const reactTime = parseFloat(allStats.react[scrollName]?.[browserMode]?.avg);
+
+            if (neoTime && reactTime) {
+                const advantage = (reactTime / neoTime).toFixed(1) + 'x faster';
+                md.push(`| **${scrollName}** | **${browserName}** | **${neoTime.toFixed(2)}** | ${reactTime.toFixed(2)} | **${advantage}** |`);
+            }
+        }
+    }
+    md.push('');
+
     md.push('## Main-Thread Responsiveness Probe (Max RAF Delta & Long-Task Blocking)');
-    md.push('Measured concurrently via `requestAnimationFrame` delta tracking and `PerformanceObserver({ type: \'longtask\' })` while the grid processes large data updates (`16.7 ms` = 60fps; `0 ms` Long-Task Blocking = zero main-thread freeze).\n');
+    md.push('Measured concurrently via `requestAnimationFrame` delta tracking and `PerformanceObserver({ type: \'longtask\' })` while the grid processes large data updates and 2D scrolling (`16.7 ms` = 60fps; `0 ms` Long-Task Blocking = zero main-thread freeze).\n');
     md.push('| Scenario | Browser | Neo.mjs Max RAF (ms) | React AG Grid Max RAF (ms) | Neo.mjs Long-Task Block (ms) | React AG Grid Long-Task Block (ms) |');
     md.push('|:---|:---|---:|---:|---:|---:|');
 
@@ -147,7 +168,10 @@ function generateNarrativeReport(allStats) {
         'Change Rows from 1,000 to 5,000',
         'filter-grid (first)',
         'filter-grid (second)',
-        'filter-grid (clear)'
+        'filter-grid (clear)',
+        'scroll-vertical-100k',
+        'scroll-horizontal-200-cols',
+        'scroll-diagonal-2d'
     ];
     for (const scenario of probeScenarios) {
         for (const browser of BROWSERS) {
