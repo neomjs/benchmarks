@@ -1,8 +1,11 @@
-# Arm A (`react-ag-grid-mcp`) — React 19 + AG Grid Community 36.2.0
+# AGENTS.md — Arm A (`react-ag-grid-mcp`)
 
-## Workspace Overview
-- **Stack:** React 19 + `ag-grid-community@36.2.0` + `ag-grid-react@36.2.0` + Vite.
-- **Task Specification:** Read `../../tasks/grid-100k-multi-window/PROMPT.md` and implement all requirements in `src/`.
-- **Dataset:** Import `generateRows` from `../../tasks/grid-100k-multi-window/data/generateRows.mjs`.
-- **MCP Tooling:** Use the configured `ag-mcp` MCP server (`set_version` `36.2.0`, `search_docs`, `get_example`) for AG Grid v36 module registration, grouped column headers (`children`), sorting, filtering, and row selection APIs.
-- **Dev Server:** `npm run dev` serves on `http://localhost:5180`.
+## Task & Tooling Surface
+
+- **Task Specification:** Read [`../../tasks/grid-100k-multi-window/PROMPT.md`](../../tasks/grid-100k-multi-window/PROMPT.md) before writing code.
+- **Stack:** React 19 + `ag-grid-community@36.2.0` + `ag-grid-react@36.2.0` (MIT Community edition).
+- **MCP Surface:** Official AG Grid MCP server (`ag-mcp` configured in `.mcp.json` and `.codex/config.toml`). Use `ag-mcp` to query version-matched AG Grid v36 documentation, column grouping (`children`), sorting/filtering APIs, and React examples.
+
+## Verify in the running app before you call a change done
+
+Code that compiles or passes a static read is not done. Start the workspace (`npm run dev`), open the app in a browser or Playwright session (`http://localhost:5174`), inspect the rendered DOM and console for errors, and run the benchmark acceptance suite (`node ../../runner/runAgentBenchmark.mjs --verify-arm arm-a-react-ag-grid-mcp --url http://localhost:5174`) before finishing.

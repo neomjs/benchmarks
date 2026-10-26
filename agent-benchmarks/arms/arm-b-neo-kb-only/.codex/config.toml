@@ -1,3 +1,2 @@
-[mcp_servers.neo-mjs-knowledge-base]
-command = "npx"
-args    = ["-y", "--package=neo.mjs", "neo-kb-mcp"]
+# Arm B (neo-kb-only): static documentation + neo-agent-skills control (no MCP servers enabled).
+[mcp_servers]
