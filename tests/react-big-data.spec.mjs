@@ -285,7 +285,7 @@ test('should filter the grid by firstname', async ({page}) => {
 });
 
 test('should handle large data changes: 100k rows then 200 cols', async ({ page }) => {
-    test.setTimeout(30000); // Set timeout to 30 seconds for this specific test
+    test.setTimeout(60000); // Set timeout to 60 seconds for 100k x 200 + 2D scrolling benchmarks
     // 1. Change rows to 100k
     // Step 1: Trigger the UI action and start total duration + main-thread responsiveness measurement
     const rowsProbePromise = page.evaluate(() => {
@@ -412,4 +412,145 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     });
     console.log(`[Benchmark] ${colsMetricName}: ${colsProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${colsProbe.maxRafDeltaMs.toFixed(2)} ms)`);
     console.log(`[Benchmark] ${colsUiUpdateMetricName}: ${colsUiUpdateDuration !== null ? colsUiUpdateDuration.toFixed(2) : 'N/A'} ms`);
+
+    // Ensure all 200 columns are reflected in the AG Grid horizontal scroll container
+    await page.waitForFunction(() => {
+        const hScroll = document.querySelector('.ag-body-horizontal-scroll-viewport') || document.querySelector('.ag-grid-viewport') || document.querySelector('.ag-center-cols-viewport');
+        return hScroll && hScroll.scrollWidth > 15000;
+    });
+
+    await page.waitForSelector('.ag-overlay-loading-wrapper', { state: 'hidden' });
+
+    // 3. 2D Scrolling Benchmarks on 100,000 rows x 200 columns (Vertical, Horizontal, Diagonal)
+    const scrollProbes = await page.evaluate(async () => {
+        const measureProbe    = window.measureMainThreadProbe;
+        const gridViewport    = document.querySelector('.ag-grid-viewport') || document.querySelector('.ag-body-viewport');
+        const vScrollViewport = document.querySelector('.ag-body-vertical-scroll-viewport') || gridViewport;
+        const hScrollViewport = document.querySelector('.ag-body-horizontal-scroll-viewport') || document.querySelector('.ag-center-cols-viewport') || gridViewport;
+        const sampleRow       = document.querySelector('.ag-row[row-index="0"]');
+        const rowHeight       = sampleRow ? (parseFloat(sampleRow.style.height) || sampleRow.offsetHeight || 42) : 42;
+
+        const setVerticalScroll = (top) => {
+            if (gridViewport) gridViewport.scrollTop = top;
+            if (vScrollViewport && vScrollViewport !== gridViewport) vScrollViewport.scrollTop = top;
+        };
+
+        const setHorizontalScroll = (left) => {
+            if (gridViewport) gridViewport.scrollLeft = left;
+            if (hScrollViewport && hScrollViewport !== gridViewport) hScrollViewport.scrollLeft = left;
+        };
+
+        const getColScrollLeft = (colNum) => {
+            if (colNum <= 0) return 0;
+            const maxLeft = Math.max(0, hScrollViewport.scrollWidth - hScrollViewport.clientWidth);
+            return Math.min(maxLeft, 760 + (colNum - 7) * 100);
+        };
+
+        const isRowMounted = (rowId) => {
+            const row = document.querySelector(`.ag-row[row-index="${rowId}"]`);
+            if (!row) return false;
+            const cell = row.querySelector('.ag-cell');
+            return !!cell && cell.textContent.trim().length > 0;
+        };
+
+        const isCellMounted = (rowId, field) => {
+            const cell = document.querySelector(`.ag-row[row-index="${rowId}"] .ag-cell[col-id="${field}"]`);
+            return !!cell && cell.textContent.trim().length > 0;
+        };
+
+        // 3a. Vertical Scroll across 100k rows (8 render-gated steps)
+        const vSteps = [5000, 15000, 30000, 45000, 60000, 75000, 90000, 0];
+        let vIdx = 0;
+        const verticalProbe = await measureProbe('scroll-vertical-100k', () => {
+            vIdx = 0;
+            setVerticalScroll(vSteps[0] * rowHeight);
+        }, () => {
+            while (vIdx < vSteps.length && isRowMounted(vSteps[vIdx])) {
+                vIdx++;
+                if (vIdx < vSteps.length) {
+                    setVerticalScroll(vSteps[vIdx] * rowHeight);
+                }
+            }
+            return vIdx >= vSteps.length;
+        });
+
+        // 3b. Horizontal Scroll across 200 columns (8 render-gated steps at row 0)
+        const hSteps = [
+            { colNum: 30,  field: 'number30'  },
+            { colNum: 60,  field: 'number60'  },
+            { colNum: 90,  field: 'number90'  },
+            { colNum: 120, field: 'number120' },
+            { colNum: 150, field: 'number150' },
+            { colNum: 180, field: 'number180' },
+            { colNum: 195, field: 'number195' },
+            { colNum: 0,   field: 'firstname' }
+        ];
+        let hIdx = 0;
+        const horizontalProbe = await measureProbe('scroll-horizontal-200-cols', () => {
+            hIdx = 0;
+            setHorizontalScroll(getColScrollLeft(hSteps[0].colNum));
+        }, () => {
+            while (hIdx < hSteps.length && isCellMounted(0, hSteps[hIdx].field)) {
+                hIdx++;
+                if (hIdx < hSteps.length) {
+                    setHorizontalScroll(getColScrollLeft(hSteps[hIdx].colNum));
+                }
+            }
+            return hIdx >= hSteps.length;
+        });
+
+        // 3c. 2D Diagonal Scroll across 100k rows x 200 columns (8 simultaneous vertical + horizontal steps)
+        const dSteps = [
+            { rowId: 5000,  colNum: 30,  field: 'number30'  },
+            { rowId: 15000, colNum: 60,  field: 'number60'  },
+            { rowId: 30000, colNum: 90,  field: 'number90'  },
+            { rowId: 45000, colNum: 120, field: 'number120' },
+            { rowId: 60000, colNum: 150, field: 'number150' },
+            { rowId: 75000, colNum: 180, field: 'number180' },
+            { rowId: 90000, colNum: 195, field: 'number195' },
+            { rowId: 0,     colNum: 0,   field: 'firstname' }
+        ];
+        let dIdx = 0;
+        const diagonalProbe = await measureProbe('scroll-diagonal-2d', () => {
+            dIdx = 0;
+            setVerticalScroll(dSteps[0].rowId * rowHeight);
+            setHorizontalScroll(getColScrollLeft(dSteps[0].colNum));
+        }, () => {
+            while (dIdx < dSteps.length && isCellMounted(dSteps[dIdx].rowId, dSteps[dIdx].field)) {
+                dIdx++;
+                if (dIdx < dSteps.length) {
+                    setVerticalScroll(dSteps[dIdx].rowId * rowHeight);
+                    setHorizontalScroll(getColScrollLeft(dSteps[dIdx].colNum));
+                }
+            }
+            return dIdx >= dSteps.length;
+        });
+
+        return { verticalProbe, horizontalProbe, diagonalProbe };
+    });
+
+    test.info().annotations.push({
+        type: 'performance',
+        description: JSON.stringify({
+            'scroll-vertical-100k'                  : scrollProbes.verticalProbe.tvsMs,
+            'scroll-vertical-100k (Max RAF Delta)'  : scrollProbes.verticalProbe.maxRafDeltaMs,
+            ...(scrollProbes.verticalProbe.longTaskTotalBlockingMs !== null ? {
+                'scroll-vertical-100k (Long Task Block)' : scrollProbes.verticalProbe.longTaskTotalBlockingMs
+            } : {}),
+            'scroll-horizontal-200-cols'                  : scrollProbes.horizontalProbe.tvsMs,
+            'scroll-horizontal-200-cols (Max RAF Delta)'  : scrollProbes.horizontalProbe.maxRafDeltaMs,
+            ...(scrollProbes.horizontalProbe.longTaskTotalBlockingMs !== null ? {
+                'scroll-horizontal-200-cols (Long Task Block)' : scrollProbes.horizontalProbe.longTaskTotalBlockingMs
+            } : {}),
+            'scroll-diagonal-2d'                  : scrollProbes.diagonalProbe.tvsMs,
+            'scroll-diagonal-2d (Max RAF Delta)'  : scrollProbes.diagonalProbe.maxRafDeltaMs,
+            ...(scrollProbes.diagonalProbe.longTaskTotalBlockingMs !== null ? {
+                'scroll-diagonal-2d (Long Task Block)' : scrollProbes.diagonalProbe.longTaskTotalBlockingMs
+            } : {})
+        })
+    });
+
+    console.log(`[Benchmark] scroll-vertical-100k: ${scrollProbes.verticalProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${scrollProbes.verticalProbe.maxRafDeltaMs.toFixed(2)} ms)`);
+    console.log(`[Benchmark] scroll-horizontal-200-cols: ${scrollProbes.horizontalProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${scrollProbes.horizontalProbe.maxRafDeltaMs.toFixed(2)} ms)`);
+    console.log(`[Benchmark] scroll-diagonal-2d: ${scrollProbes.diagonalProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${scrollProbes.diagonalProbe.maxRafDeltaMs.toFixed(2)} ms)`);
 });

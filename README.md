@@ -39,4 +39,23 @@ For detailed instructions on how to set up the project and run the benchmarks, p
 
 The raw output from Playwright (videos, traces) is generated in the `test-results/` and `playwright-report/` directories.
 
-The summarized, version-controlled benchmark data is automatically generated in the root directory (e.g., `BENCHMARK_RESULTS_NEO.md`) when you run the report generation scripts. See the reproducibility guide for more details.
+The summarized, version-controlled benchmark reports are generated in the root directory when you run the report generation scripts:
+- **[Combined Big Data Showdown (`COMBINED_BIG_DATA_REPORT.md`)](./COMBINED_BIG_DATA_REPORT.md)**: Head-to-head comparison of `neo.mjs 13.3.1` (npm) + the app-level `MainStore.mjs` / `GridContainer.mjs` sync and [`patches/neo.mjs-13.3.1-bigdata-hotpath.patch`](./patches/neo.mjs-13.3.1-bigdata-hotpath.patch) (`src/collection/Base.mjs` + `src/grid/Container.mjs` from [`neomjs/neo#20116`](https://github.com/neomjs/neo/pull/20116), applied via `git apply --directory=apps/bigData/neo/node_modules/neo.mjs patches/neo.mjs-13.3.1-bigdata-hotpath.patch` before `npm --prefix apps/bigData/neo run build`) vs. `React 19.1.1 + AG Grid Community 36.2.0` (`animateRows={false}`, `vite preview`).
+- **[Neo.mjs Big Data Results (`BENCHMARK_RESULTS_NEO_BIG_DATA.md`)](./BENCHMARK_RESULTS_NEO_BIG_DATA.md)**
+- **[React + AG Grid Big Data Results (`BENCHMARK_RESULTS_REACT_BIG_DATA.md`)](./BENCHMARK_RESULTS_REACT_BIG_DATA.md)**
+- **[Scrolling Suite Results (`BENCHMARK_RESULTS_NEO.md` / `BENCHMARK_RESULTS_REACT.md` / `BENCHMARK_RESULTS_SOLID.md`)](./BENCHMARK_RESULTS_NEO.md)**
+
+### Latest Big Data Highlights (Chromium Production, 5-Run Average, Apple M5 Max)
+
+| Scenario | Neo.mjs | React + AG Grid | Neo.mjs Advantage / Notes |
+|:---|---:|---:|:---|
+| **Change Columns 50 → 200 (100k rows, UI Update)** | **150.26 ms** | 1082.58 ms | **7.2x faster** (`0.00 ms` Long-Task block vs. `328.80 ms`) |
+| **Change Rows 1,000 → 100,000 (UI Update)** | **109.30 ms** | 327.04 ms | **3.0x faster** (`0.00 ms` Long-Task block vs. `59.60 ms`) |
+| **Change Columns 50 → 75 (1k rows, UI Update)** | **22.26 ms** | 25.26 ms | **1.1x faster** (`16.70 ms` Max RAF vs. `24.09 ms`) |
+| **Change Rows 1,000 → 5,000 (UI Update)** | **18.54 ms** | 26.28 ms | **1.4x faster** (`16.70 ms` Max RAF vs. `20.74 ms`) |
+| **filter-grid (first)** | **16.30 ms** | 29.40 ms | **1.8x faster** (`14.76 ms` Max RAF vs. `23.71 ms`) |
+| **scroll-vertical-100k (8 render-gated hops)** | 281.50 ms | 127.82 ms | 2.2× slower — AG Grid reaches target 2.2× sooner (`0.00 ms` Long-Task block, `16.74 ms` Max RAF on both; includes [`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124) latency, fix in [`#20125`](https://github.com/neomjs/neo/pull/20125)) |
+| **scroll-horizontal-200-cols (8 render-gated hops)** | 233.48 ms | 134.62 ms | 1.7× slower — AG Grid reaches target 1.7× sooner (`0.00 ms` Long-Task block, `16.72 ms` Max RAF on both; includes [`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124) latency, fix in [`#20125`](https://github.com/neomjs/neo/pull/20125)) |
+| **scroll-diagonal-2d (8 render-gated hops)** | 379.16 ms | 133.34 ms | 2.8× slower — AG Grid reaches target 2.8× sooner (`0.00 ms` Long-Task block, `16.76 ms` Max RAF on both; includes [`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124) latency, fix in [`#20125`](https://github.com/neomjs/neo/pull/20125)) |
+
+See the [Reproducing the Benchmarks](./REPRODUCIBILITY.md) guide for full instructions on running the suites locally.

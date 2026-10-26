@@ -1,0 +1,155 @@
+--- a/src/collection/Base.mjs
++++ b/src/collection/Base.mjs
+@@ -636,6 +636,7 @@
+         me._items.splice(0, me.count);
+         me.map.clear();
+         me.internalIdMap?.clear();
++        me._count = 0;
+         me.initialIndexCounter = 0
+     }
+ 
+@@ -1158,7 +1159,7 @@
+     evaluateFilters(excludeFilter, onInclude=null) {
+         const items    = this.allItems?._items || this._items,
+             evaluators = this.filters.filter(filter => filter !== excludeFilter).map(filter => filter.createEvaluator());
+-        let filtered = items.slice();
++        let filtered;
+ 
+         if (this.filterMode === 'primitive') {
+             filtered = [];
+@@ -1176,6 +1177,7 @@
+                 }
+             }
+         } else {
++            filtered = items.slice();
+             for (const evaluate of evaluators) {
+                 const next = [];
+                 for (let i = 0; i < filtered.length; i++) {
+@@ -1595,6 +1597,8 @@
+         }
+ 
+         if (toAddArray && (len = toAddArray.length) > 0) {
++            const hasEffectiveFilters = me._filters.some(filter => filter.effective);
++
+             for (i=0; i < len; i++) {
+                 item = toAddArray[i];
+ 
+@@ -1615,7 +1619,7 @@
+                     item[initialIndexSymbol] = me.initialIndexCounter++
+                 }
+ 
+-                if (!map.has(key) && !me.isFilteredItem(item)) {
++                if (!map.has(key) && (!hasEffectiveFilters || !me.isFilteredItem(item))) {
+                     addedItems.push(item);
+                     map.set(key, item);
+ 
+--- a/src/grid/Container.mjs
++++ b/src/grid/Container.mjs
+@@ -480,21 +480,32 @@
+             {headerToolbar} = me;
+ 
+         me.syncValueBandingFields();
++        me.configsApplied && me.updateColCount();
++        me.syncSearchToolbar();
+ 
+         // - If columns changed at run-time OR
+         // - In case the `header.Toolbar#createItems()` method has run before columns where available
+         if (oldValue?.count || (value?.count && headerToolbar?.isConstructed)) {
+-            headerToolbar?.createItems()
+-
+             await me.timeout(50);
+ 
++            if (me.isDestroyed) {
++                return
++            }
++
+             await me.passSizeToBody();
+ 
+-            me.body?.createViewData()
+-        }
++            if (me.isDestroyed) {
++                return
++            }
+ 
+-        me.configsApplied && me.updateColCount();
+-        me.syncSearchToolbar()
++            me.bodyStart?.updateMountedAndVisibleColumns();
++            me.body?.updateMountedAndVisibleColumns();
++            me.bodyEnd?.updateMountedAndVisibleColumns();
++
++            me.bodyStart?.createViewData();
++            me.body?.createViewData();
++            me.bodyEnd?.createViewData()
++        }
+     }
+ 
+     /**
+@@ -796,7 +807,7 @@
+      */
+     beforeSetColumns(value, oldValue) {
+         if (this.configsApplied) {
+-            return this.createColumns(value)
++            return this.createColumns(value, oldValue)
+         }
+ 
+         return value
+@@ -896,13 +907,19 @@
+      * @param {Object[]} columns
+      * @returns {*}
+      */
+-    createColumns(columns) {
++    createColumns(columns, oldColumns=this._columns) {
+         let me                 = this,
+             {columnDefaults}   = me,
+             centerButtons      = [],
+             lockedEndButtons   = [],
+             lockedStartButtons = [],
+             sorters            = me.store?.sorters,
++            existingCollection = Neo.typeOf(oldColumns) === 'NeoInstance'
++                ? oldColumns
++                : Neo.typeOf(me._columns) === 'NeoInstance'
++                    ? me._columns
++                    : null,
++            oldCount           = existingCollection?.count || 0,
+             buttonConfig, columnClass, renderer;
+ 
+         if (columns) {
+@@ -959,22 +976,27 @@
+             }
+         }
+ 
+-        if (Neo.typeOf(me._columns) === 'NeoInstance') {
+-            me._columns.clear();
+-            me._columns.add(columns);
++        me.lockedStartColumns = columns.filter(c => c.locked === 'start');
++        me.centerColumns      = columns.filter(c => !c.locked);
++        me.lockedEndColumns   = columns.filter(c => c.locked === 'end');
+ 
+-            me.lockedStartColumns = columns.filter(c => c.locked === 'start');
+-            me.centerColumns      = columns.filter(c => !c.locked);
+-            me.lockedEndColumns   = columns.filter(c => c.locked === 'end');
++        if (existingCollection) {
++            for (const oldColumn of existingCollection.items) {
++                if (!columns?.includes(oldColumn)) {
++                    oldColumn.destroy()
++                }
++            }
+ 
++            existingCollection.clearSilent();
++            existingCollection.splice(null, null, columns, true);
++
++            me._columns = existingCollection;
++
+             me.createOrUpdateSubGrids(lockedStartButtons, centerButtons, lockedEndButtons);
++            me.afterSetColumns(existingCollection, {count: oldCount});
+ 
+-            return me._columns
++            return existingCollection
+         }
+-
+-        me.lockedStartColumns = columns.filter(c => c.locked === 'start');
+-        me.centerColumns      = columns.filter(c => !c.locked);
+-        me.lockedEndColumns   = columns.filter(c => c.locked === 'end');
+ 
+         me.createOrUpdateSubGrids(lockedStartButtons, centerButtons, lockedEndButtons);
+ 

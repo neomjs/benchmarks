@@ -5,32 +5,32 @@
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 1816.90 | 1969.00 | 1902.70 ± 61.39 | 1058.90 | 1141.50 | 1088.68 ± 29.70 |
-| Chromium | prod | 1872.50 | 2231.20 | 1955.64 ± 138.10 | 1090.50 | 1375.80 | 1157.14 ± 109.51 |
+| Chromium | dev | 1818.10 | 1860.80 | 1837.88 ± 13.91 | 1065.20 | 1094.90 | 1082.46 ± 10.68 |
+| Chromium | prod | 1814.30 | 1873.10 | 1839.10 ± 21.48 | 1034.50 | 1120.70 | 1082.58 ± 30.27 |
 
 ## Change Columns from 50 to 200 (with 100k rows) (Long Task Block)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 317.00 | 343.00 | 325.20 ± 9.13 |
-| Chromium | prod | 328.00 | 347.00 | 337.00 ± 6.23 |
+| Chromium | dev | 312.00 | 337.00 | 323.80 ± 8.16 |
+| Chromium | prod | 307.00 | 343.00 | 328.80 ± 13.18 |
 
 ## Change Columns from 50 to 200 (with 100k rows) (Max RAF Delta)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 350.00 | 432.40 | 366.52 ± 32.94 |
-| Chromium | prod | 366.70 | 383.40 | 376.68 ± 8.15 |
+| Chromium | dev | 350.00 | 410.30 | 372.08 ± 20.17 |
+| Chromium | prod | 350.00 | 408.90 | 378.44 ± 19.60 |
 
 ## Change Columns from 50 to 75
 
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 55.70 | 70.20 | 59.64 ± 5.54 | 38.00 | 45.20 | 39.78 ± 2.75 |
-| Chromium | prod | 25.80 | 33.70 | 30.18 ± 2.69 | 15.20 | 29.40 | 22.68 ± 5.65 |
+| Chromium | dev | 54.90 | 58.60 | 57.10 ± 1.28 | 37.30 | 38.30 | 37.86 ± 0.33 |
+| Chromium | prod | 28.70 | 32.30 | 29.80 ± 1.32 | 24.10 | 27.70 | 25.26 ± 1.32 |
 
 ## Change Columns from 50 to 75 (Long Task Block)
 
@@ -45,40 +45,40 @@
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 38.30 | 50.40 | 47.43 ± 4.61 |
-| Chromium | prod | 23.10 | 28.90 | 25.90 ± 2.12 |
+| Chromium | dev | 49.10 | 52.10 | 51.41 ± 1.16 |
+| Chromium | prod | 22.50 | 26.80 | 24.09 ± 1.53 |
 
 ## Change Rows from 1,000 to 100,000
 
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 514.30 | 863.60 | 594.34 ± 134.98 | 337.30 | 670.60 | 410.38 ± 130.26 |
-| Chromium | prod | 506.50 | 535.80 | 515.24 ± 10.51 | 331.30 | 351.10 | 336.44 ± 7.38 |
+| Chromium | dev | 519.30 | 524.60 | 522.26 ± 1.75 | 334.20 | 344.00 | 340.08 ± 3.96 |
+| Chromium | prod | 483.10 | 518.20 | 502.26 ± 13.83 | 314.00 | 335.60 | 327.04 ± 7.90 |
 
 ## Change Rows from 1,000 to 100,000 (Long Task Block)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 58.00 | 346.00 | 117.60 ± 114.21 |
-| Chromium | prod | 58.00 | 63.00 | 60.60 ± 1.85 |
+| Chromium | dev | 58.00 | 63.00 | 59.80 ± 1.72 |
+| Chromium | prod | 55.00 | 63.00 | 59.60 ± 3.20 |
 
 ## Change Rows from 1,000 to 100,000 (Max RAF Delta)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 100.00 | 383.30 | 170.42 ± 109.72 |
-| Chromium | prod | 99.90 | 165.40 | 113.08 ± 26.16 |
+| Chromium | dev | 83.30 | 166.60 | 116.30 ± 40.38 |
+| Chromium | prod | 83.30 | 100.00 | 90.02 ± 8.15 |
 
 ## Change Rows from 1,000 to 5,000
 
 | Browser | Mode | Total Time (ms) | | | UI Update Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev | Min | Max | Avg ± StdDev |
-| Chromium | dev | 59.50 | 85.20 | 70.88 ± 8.25 | 40.20 | 53.30 | 46.62 ± 4.52 |
-| Chromium | prod | 42.00 | 44.20 | 42.70 ± 0.82 | 25.30 | 30.10 | 28.46 ± 1.74 |
+| Chromium | dev | 67.80 | 71.50 | 69.50 ± 1.46 | 42.50 | 50.60 | 47.66 ± 2.91 |
+| Chromium | prod | 40.60 | 44.80 | 42.08 ± 1.46 | 24.00 | 28.30 | 26.28 ± 1.59 |
 
 ## Change Rows from 1,000 to 5,000 (Long Task Block)
 
@@ -93,16 +93,16 @@
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 29.90 | 51.30 | 36.22 ± 7.83 |
-| Chromium | prod | 20.80 | 24.70 | 22.48 ± 1.63 |
+| Chromium | dev | 27.60 | 44.90 | 33.84 ± 5.85 |
+| Chromium | prod | 19.10 | 24.20 | 20.74 ± 1.83 |
 
 ## filter-grid (clear)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 32.30 | 39.10 | 34.10 ± 2.54 |
-| Chromium | prod | 10.80 | 13.00 | 11.96 ± 0.80 |
+| Chromium | dev | 29.60 | 33.60 | 31.40 ± 1.34 |
+| Chromium | prod | 10.80 | 11.60 | 11.04 ± 0.30 |
 
 ## filter-grid (clear) (Long Task Block)
 
@@ -117,16 +117,16 @@
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 32.10 | 40.60 | 35.68 ± 3.08 |
-| Chromium | prod | 11.20 | 15.50 | 13.04 ± 1.57 |
+| Chromium | dev | 30.60 | 36.70 | 34.22 ± 2.21 |
+| Chromium | prod | 11.10 | 18.60 | 13.78 ± 2.63 |
 
 ## filter-grid (first)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 43.40 | 52.00 | 47.98 ± 3.04 |
-| Chromium | prod | 23.40 | 28.20 | 25.26 ± 1.70 |
+| Chromium | dev | 46.90 | 56.00 | 52.22 ± 3.38 |
+| Chromium | prod | 25.50 | 34.10 | 29.40 ± 2.75 |
 
 ## filter-grid (first) (Long Task Block)
 
@@ -141,16 +141,16 @@
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 19.20 | 46.53 | 33.11 ± 9.24 |
-| Chromium | prod | 20.60 | 23.10 | 21.89 ± 0.87 |
+| Chromium | dev | 30.10 | 47.40 | 38.79 ± 6.63 |
+| Chromium | prod | 20.20 | 29.30 | 23.71 ± 3.01 |
 
 ## filter-grid (second)
 
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 28.20 | 34.50 | 31.62 ± 2.48 |
-| Chromium | prod | 10.90 | 13.90 | 12.42 ± 0.96 |
+| Chromium | dev | 26.20 | 35.80 | 30.60 ± 3.52 |
+| Chromium | prod | 8.50 | 12.60 | 11.36 ± 1.46 |
 
 ## filter-grid (second) (Long Task Block)
 
@@ -165,8 +165,80 @@
 | Browser | Mode | Total Time (ms) | | |
 | :--- | :--- | ---: | ---: | ---: |
 | | | Min | Max | Avg ± StdDev |
-| Chromium | dev | 24.80 | 47.90 | 34.82 ± 7.52 |
-| Chromium | prod | 16.20 | 19.40 | 17.76 ± 1.03 |
+| Chromium | dev | 20.40 | 34.40 | 28.04 ± 5.84 |
+| Chromium | prod | 12.10 | 24.40 | 18.48 ± 3.92 |
+
+## scroll-diagonal-2d
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 133.50 | 134.10 | 133.78 ± 0.19 |
+| Chromium | prod | 133.10 | 133.60 | 133.34 ± 0.22 |
+
+## scroll-diagonal-2d (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## scroll-diagonal-2d (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 16.70 | 16.70 | 16.70 ± 0.00 |
+| Chromium | prod | 16.70 | 16.80 | 16.78 ± 0.04 |
+
+## scroll-horizontal-200-cols
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 122.10 | 129.00 | 125.94 ± 2.44 |
+| Chromium | prod | 134.40 | 134.80 | 134.62 ± 0.13 |
+
+## scroll-horizontal-200-cols (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## scroll-horizontal-200-cols (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 16.70 | 16.80 | 16.72 ± 0.04 |
+| Chromium | prod | 16.70 | 16.80 | 16.76 ± 0.05 |
+
+## scroll-vertical-100k
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 148.50 | 175.50 | 157.88 ± 10.36 |
+| Chromium | prod | 123.40 | 130.90 | 127.82 ± 3.05 |
+
+## scroll-vertical-100k (Long Task Block)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 0.00 | 0.00 | 0.00 ± 0.00 |
+| Chromium | prod | 0.00 | 0.00 | 0.00 ± 0.00 |
+
+## scroll-vertical-100k (Max RAF Delta)
+
+| Browser | Mode | Total Time (ms) | | |
+| :--- | :--- | ---: | ---: | ---: |
+| | | Min | Max | Avg ± StdDev |
+| Chromium | dev | 33.20 | 33.40 | 33.32 ± 0.07 |
+| Chromium | prod | 16.70 | 16.80 | 16.74 ± 0.05 |
 
 
 
@@ -180,7 +252,7 @@ The data is aggregated over **5 run(s)**.
 * **Playwright:** 1.64.1
 
 ## Library Versions
-* **Neo.mjs:** 13.3.1
+* **Neo.mjs:** 13.3.1 (npm) + neomjs/neo#20116 hot-path sync (056f5493c2)
 * **React:** 19.1.1
 * **AG Grid Community / React:** 36.2.0
 

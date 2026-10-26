@@ -14,6 +14,8 @@ async function main() {
     const framework    = frameworkArg ? frameworkArg.split('=')[1] : 'all';
     const suiteArg     = args.find(arg => arg.startsWith('--suite='));
     const suite        = suiteArg ? suiteArg.split('=')[1] : 'all';
+    const projectsArg  = args.find(arg => arg.startsWith('--projects='));
+    const projects     = projectsArg ? projectsArg.split('=')[1].split(',').filter(Boolean) : [];
 
     if (isNaN(runs) || runs < 1) {
         console.error('Error: --runs must be a positive number.');
@@ -81,7 +83,8 @@ async function main() {
             await fs.ensureDir(RESULTS_DIR);
             await fs.emptyDir(RESULTS_DIR);
 
-            let testCommand = `FRAMEWORK=${fw} CI=true npx playwright test ${filesToTest}`;
+            const projectFlags = projects.map(p => `--project=${p}`).join(' ');
+            let testCommand = `FRAMEWORK=${fw} CI=true npx playwright test ${filesToTest}${projectFlags ? ' ' + projectFlags : ''}`;
             if (s === 'big-data') {
                 testCommand = `APP=bigData ${testCommand}`;
             }
