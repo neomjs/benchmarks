@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "ag-mcp": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "ag-mcp"
+            ]
+        }
+    }
+}

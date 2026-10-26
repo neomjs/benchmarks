@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "neo-mjs-knowledge-base": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "--package=neo.mjs",
+                "neo-kb-mcp"
+            ]
+        }
+    }
+}

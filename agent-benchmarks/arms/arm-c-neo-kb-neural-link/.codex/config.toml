@@ -1,0 +1,7 @@
+[mcp_servers.neo-mjs-knowledge-base]
+command = "npx"
+args    = ["-y", "--package=neo.mjs", "neo-kb-mcp"]
+
+[mcp_servers.neural-link]
+command = "npx"
+args    = ["-y", "neo-neural-link"]
