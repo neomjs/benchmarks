@@ -252,7 +252,7 @@ The data is aggregated over **5 run(s)**.
 * **Playwright:** 1.64.1
 
 ## Library Versions
-* **Neo.mjs:** 13.3.1
+* **Neo.mjs:** 13.3.1 (npm) + neomjs/neo#20116 hot-path sync (056f5493c2)
 * **React:** 19.1.1
 * **AG Grid Community / React:** 36.2.0
 

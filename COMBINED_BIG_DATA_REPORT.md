@@ -1,7 +1,7 @@
 # Big Data Showdown: Neo.mjs vs. React + AG Grid
 
 ## Executive Summary
-This report benchmarks the rendering performance and main-thread responsiveness of the **Neo.mjs** grid (`v13.3.1` with Store Turbo Mode) against **React** (`19.1.1`) + **AG Grid Community** (`36.2.0`, `animateRows={false}`, tested against a `vite build` + `vite preview` production bundle). By pairing **UI Update Time** with concurrent **`requestAnimationFrame` delta** and **`PerformanceObserver({ type: 'longtask' })` main-thread blocking** probes, we measure both time-to-valid-DOM and UI responsiveness under load.
+This report benchmarks the rendering performance and main-thread responsiveness of the **Neo.mjs** grid (`neo.mjs 13.3.1` from npm + the app-level sync and `src/collection/Base.mjs` / `src/grid/Container.mjs` / `src/grid/Row.mjs` hot-path sync from [`neomjs/neo#20116`](https://github.com/neomjs/neo/pull/20116) at `056f5493c2`; the engine half lands on npm with the next `neo.mjs` release) against **React** (`19.1.1`) + **AG Grid Community** (`36.2.0`, `animateRows={false}`, tested against a `vite build` + `vite preview` production bundle). By pairing **UI Update Time** with concurrent **`requestAnimationFrame` delta** and **`PerformanceObserver({ type: 'longtask' })` main-thread blocking** probes, we measure both time-to-valid-DOM and UI responsiveness under load.
 
 In heavy, large-scale mutations, Neo.mjs's multi-threaded Off-Main-Thread (OMT) architecture delivers **7.2x faster UI updates** when expanding from 50 to 200 columns at 100,000 rows (150.26 ms vs. 1082.58 ms) and **3.0x faster UI updates** when scaling from 1,000 to 100,000 rows (109.30 ms vs. 327.04 ms). Crucially, Neo.mjs maintains **0.00 ms of Long-Task main-thread blocking** and a steady **16.80 ms Max RAF delta (~60fps)** across every scenario, whereas single-threaded React + AG Grid incurs **328.80 ms of Long-Task blocking** (a **378.44 ms** frame stall) during the 200-column / 100k-row update. On smaller mutations (50 to 75 columns at 1,000 rows) and 1,000-row interactive filtering with row animations disabled, both engines complete in a couple of frames (< 45 ms).
 
@@ -36,17 +36,19 @@ Average production mode `Total Time` in milliseconds (ms) across consecutive fil
 | Operation | Browser | Neo.mjs (ms) | React AG Grid (ms) | Neo.mjs Advantage |
 |:---|:---|---:|---:|:---:|
 | **filter-grid (first)** | **Chromium** | **16.30** | 29.40 | **1.8x faster** |
-| **filter-grid (second)** | **Chromium** | **22.74** | 11.36 | **0.5x faster** |
-| **filter-grid (clear)** | **Chromium** | **16.30** | 11.04 | **0.7x faster** |
+| **filter-grid (second)** | **Chromium** | 22.74 | 11.36 | 2.0× slower |
+| **filter-grid (clear)** | **Chromium** | 16.30 | 11.04 | 1.5× slower |
 
 ## 2D Scrolling Performance on 100k Rows × 200 Columns (8 Render-Gated Hops)
-Average production mode `Total Time` in milliseconds (ms) to complete 8 sequential render-gated viewport jumps across 100,000 rows (`scroll-vertical-100k`), 200 columns (`scroll-horizontal-200-cols`), and simultaneous 2D diagonal axes (`scroll-diagonal-2d`). Both engines maintain `0.00 ms` Long-Task blocking and a steady `~16.7 ms` Max RAF delta in production mode; AG Grid applies synchronous main-thread DOM updates on each scroll jump (`~16–17 ms/hop`), whereas Neo.mjs processes each hop asynchronously across its `Main -> App Worker (16ms throttle) -> VDom Worker -> DeltaUpdates` pipeline while keeping the main thread completely unblocked. Lower is better.
+Average production mode `Total Time` in milliseconds (ms) to complete 8 sequential render-gated viewport jumps across 100,000 rows (`scroll-vertical-100k`), 200 columns (`scroll-horizontal-200-cols`), and simultaneous 2D diagonal axes (`scroll-diagonal-2d`). Both engines maintain `0.00 ms` Long-Task blocking and a steady `~16.7 ms` Max RAF delta in production mode; AG Grid applies synchronous main-thread DOM updates on each scroll jump (`~16–17 ms/hop`), whereas Neo.mjs processes each hop asynchronously across its `Main -> App Worker (16ms throttle) -> VDom Worker -> DeltaUpdates` pipeline. Lower is better.
+
+> **Note ([`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124)):** The Neo.mjs scrolling figures below include the `ScrollManager.isScrolling` child-VDOM flight latency identified during this benchmark run, with the fix in review at [`neomjs/neo#20125`](https://github.com/neomjs/neo/pull/20125).
 
 | Scroll Trajectory | Browser | Neo.mjs (ms) | React AG Grid (ms) | Neo.mjs Advantage |
 |:---|:---|---:|---:|:---:|
-| **scroll-vertical-100k** | **Chromium** | **281.50** | 127.82 | **0.5x faster** |
-| **scroll-horizontal-200-cols** | **Chromium** | **233.48** | 134.62 | **0.6x faster** |
-| **scroll-diagonal-2d** | **Chromium** | **379.16** | 133.34 | **0.4x faster** |
+| **scroll-vertical-100k** | **Chromium** | 281.50 | 127.82 | 2.2× slower |
+| **scroll-horizontal-200-cols** | **Chromium** | 233.48 | 134.62 | 1.7× slower |
+| **scroll-diagonal-2d** | **Chromium** | 379.16 | 133.34 | 2.8× slower |
 
 ## Main-Thread Responsiveness Probe (Max RAF Delta & Long-Task Blocking)
 Measured concurrently via `requestAnimationFrame` delta tracking and `PerformanceObserver({ type: 'longtask' })` while the grid processes large data updates and 2D scrolling (`16.7 ms` = 60fps; `0 ms` Long-Task Blocking = zero main-thread freeze).
@@ -358,7 +360,7 @@ The data is aggregated over **5 run(s)**.
 
 | Library    | Version     |
 |------------|-------------|
-| Neo.mjs    | 13.3.1 |
+| Neo.mjs    | 13.3.1 (npm) + neomjs/neo#20116 hot-path sync (056f5493c2) |
 | React      | 19.1.1 |
 | AG Grid Community / React | 36.2.0 |
 
@@ -371,4 +373,4 @@ The data is aggregated over **5 run(s)**.
 | Safari     | Safari kMDItemVersion = "27.0.1" |
 
 ---
-*This file is auto-generated on Mon, 26 Oct 2026 04:07:40 GMT. Do not edit manually.*
+*This file is auto-generated on Mon, 26 Oct 2026 14:55:16 GMT. Do not edit manually.*

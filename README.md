@@ -40,7 +40,7 @@ For detailed instructions on how to set up the project and run the benchmarks, p
 The raw output from Playwright (videos, traces) is generated in the `test-results/` and `playwright-report/` directories.
 
 The summarized, version-controlled benchmark reports are generated in the root directory when you run the report generation scripts:
-- **[Combined Big Data Showdown (`COMBINED_BIG_DATA_REPORT.md`)](./COMBINED_BIG_DATA_REPORT.md)**: Head-to-head comparison of `Neo.mjs v13.3.1` (Store Turbo Mode + Fixed-DOM-Order VDOM pooling) vs. `React 19.1.1 + AG Grid Community 36.2.0` (`animateRows={false}`, `vite preview`).
+- **[Combined Big Data Showdown (`COMBINED_BIG_DATA_REPORT.md`)](./COMBINED_BIG_DATA_REPORT.md)**: Head-to-head comparison of `neo.mjs 13.3.1` (npm) + [`neomjs/neo#20116`](https://github.com/neomjs/neo/pull/20116) hot-path sync (`056f5493c2`; engine half lands on npm with the next `neo.mjs` release) vs. `React 19.1.1 + AG Grid Community 36.2.0` (`animateRows={false}`, `vite preview`).
 - **[Neo.mjs Big Data Results (`BENCHMARK_RESULTS_NEO_BIG_DATA.md`)](./BENCHMARK_RESULTS_NEO_BIG_DATA.md)**
 - **[React + AG Grid Big Data Results (`BENCHMARK_RESULTS_REACT_BIG_DATA.md`)](./BENCHMARK_RESULTS_REACT_BIG_DATA.md)**
 - **[Scrolling Suite Results (`BENCHMARK_RESULTS_NEO.md` / `BENCHMARK_RESULTS_REACT.md` / `BENCHMARK_RESULTS_SOLID.md`)](./BENCHMARK_RESULTS_NEO.md)**
@@ -54,8 +54,8 @@ The summarized, version-controlled benchmark reports are generated in the root d
 | **Change Columns 50 → 75 (1k rows, UI Update)** | **22.26 ms** | 25.26 ms | **1.1x faster** (`16.70 ms` Max RAF vs. `24.09 ms`) |
 | **Change Rows 1,000 → 5,000 (UI Update)** | **18.54 ms** | 26.28 ms | **1.4x faster** (`16.70 ms` Max RAF vs. `20.74 ms`) |
 | **filter-grid (first)** | **16.30 ms** | 29.40 ms | **1.8x faster** (`14.76 ms` Max RAF vs. `23.71 ms`) |
-| **scroll-vertical-100k (8 render-gated hops)** | **281.50 ms** | 127.82 ms | `0.00 ms` Long-Task block, `16.74 ms` Max RAF on both |
-| **scroll-horizontal-200-cols (8 render-gated hops)** | **233.48 ms** | 134.62 ms | `0.00 ms` Long-Task block, `16.72 ms` Max RAF on both |
-| **scroll-diagonal-2d (8 render-gated hops)** | **379.16 ms** | 133.34 ms | `0.00 ms` Long-Task block, `16.76 ms` Max RAF on both |
+| **scroll-vertical-100k (8 render-gated hops)** | 281.50 ms | 127.82 ms | 2.2× slower — AG Grid reaches target 2.2× sooner (`0.00 ms` Long-Task block, `16.74 ms` Max RAF on both; includes [`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124) latency, fix in [`#20125`](https://github.com/neomjs/neo/pull/20125)) |
+| **scroll-horizontal-200-cols (8 render-gated hops)** | 233.48 ms | 134.62 ms | 1.7× slower — AG Grid reaches target 1.7× sooner (`0.00 ms` Long-Task block, `16.72 ms` Max RAF on both; includes [`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124) latency, fix in [`#20125`](https://github.com/neomjs/neo/pull/20125)) |
+| **scroll-diagonal-2d (8 render-gated hops)** | 379.16 ms | 133.34 ms | 2.8× slower — AG Grid reaches target 2.8× sooner (`0.00 ms` Long-Task block, `16.76 ms` Max RAF on both; includes [`neomjs/neo#20124`](https://github.com/neomjs/neo/issues/20124) latency, fix in [`#20125`](https://github.com/neomjs/neo/pull/20125)) |
 
 See the [Reproducing the Benchmarks](./REPRODUCIBILITY.md) guide for full instructions on running the suites locally.
