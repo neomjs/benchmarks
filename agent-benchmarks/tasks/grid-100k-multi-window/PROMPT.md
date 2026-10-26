@@ -41,9 +41,9 @@ Configure the grid with two top-level column groups and six leaf columns:
    - `status` (header `"Status"`)
 
 ### 3. Virtualization, Sorting & Region Filtering
-- **Virtualization:** All `100,000` records must be loaded in the backing store/model while the DOM renders only the virtualized viewport slice (`< 250` DOM row elements at any time).
-- **Sorting (`[data-testid="sort-arr-desc"]`):** Provide a button `[data-testid="sort-arr-desc"]` (in addition to native column-header sort) that sorts the dataset by `arrUsd` **descending** (`ROW-000002` with `arrUsd: 999900` becomes the first row). Provide `[data-testid="sort-reset"]` to restore the default `id` ascending order (`ROW-000001` first).
-- **Region Filtering (`[data-testid="region-filter"]`):** Provide a `<select data-testid="region-filter">` (or button group exposing `data-testid="region-filter"`) with options `"ALL"`, `"EMEA"`, `"AMER"`, `"APAC"`, and `"LATAM"`. Selecting `"EMEA"` filters the grid to only rows where `region === "EMEA"` and updates `[data-testid="total-row-count"]` to the filtered row count.
+- **Virtualization:** All `100,000` records must be loaded in the backing store/model while the DOM renders only the virtualized viewport slice (`< 250` `[role="row"]` DOM row elements at any time; both `Neo.grid.Container` and `ag-grid-react` emit `role="row"` natively).
+- **Sorting (`[data-testid="sort-arr-desc"]`):** Provide a button `[data-testid="sort-arr-desc"]` (in addition to native column-header sort) that sorts the dataset by `arrUsd` **descending** (`ROW-000002` with `arrUsd: 999900` becomes the first row, while `ROW-000001` with `arrUsd: 125000` moves out of the top viewport). Provide `[data-testid="sort-reset"]` to restore the default `id` ascending order (`ROW-000001` first).
+- **Region Filtering (`[data-testid="region-filter"]`):** Provide a `<select data-testid="region-filter">` element with `<option>` values `"ALL"`, `"EMEA"`, `"AMER"`, `"APAC"`, and `"LATAM"`. Selecting `"EMEA"` filters the grid rows to only records where `region === "EMEA"` (removing non-EMEA rows such as `ROW-000002` from the viewport) and updates `[data-testid="total-row-count"]` to the exact filtered EMEA row count.
 
 ### 4. Second-Window Detail Synchronization
 - Provide a button `[data-testid="open-detail-window"]` that opens a second browser window (`window.open(..., 'gridDetailWindow')`) rendering the detail view container `[data-testid="detail-view"]`.

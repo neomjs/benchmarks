@@ -303,17 +303,22 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(markdown).toContain('3250');
     });
 
-    test('verify.spec.mjs fails on starter shell and passes against a compliant 100k multi-window server', async () => {
-        const rows           = generateRows(100000, 42);
-        let   serveCompliant = false;
+    test('verify.spec.mjs fails on starter shell, no-op-sort, and counter-only-filter mutations, and passes against a compliant 100k multi-window server', async () => {
+        test.setTimeout(60000);
 
-        const referenceHtml = `<!doctype html>
+        const rows      = generateRows(100000, 42),
+              emeaCount = rows.filter(r => r.region === 'EMEA').length;
+        let mode = 'starter';
+
+        const buildReferenceHtml = serverMode => `<!doctype html>
 <html>
-<head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Reference Grid</title></head>
+<head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Reference Grid (${serverMode})</title></head>
 <body>
   <script>
-    const params = new URLSearchParams(location.search);
-    const channel = new BroadcastChannel('grid-detail-sync');
+    const SERVER_MODE = ${JSON.stringify(serverMode)};
+    const EMEA_COUNT  = ${emeaCount};
+    const params      = new URLSearchParams(location.search);
+    const channel     = new BroadcastChannel('grid-detail-sync');
     if (params.get('view') === 'detail') {
       document.body.innerHTML = \`
         <section data-testid="detail-view">
@@ -354,8 +359,10 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
       let sortMode = 'id';
       let region = 'ALL';
       const render = () => {
-        let list = region === 'ALL' ? allRows : allRows.filter(r => r.region === region);
-        if (sortMode === 'arr-desc') {
+        let list = (region === 'ALL' || SERVER_MODE === 'counter-only-filter')
+          ? allRows
+          : allRows.filter(r => r.region === region);
+        if (sortMode === 'arr-desc' && SERVER_MODE !== 'no-op-sort') {
           list = [...list].sort((a, b) => b.arrUsd - a.arrUsd);
         }
         const slice = list.slice(0, 50);
@@ -364,7 +371,10 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         container.querySelectorAll('[role="row"]').forEach((el, idx) => {
           el.onclick = () => channel.postMessage(slice[idx]);
         });
-        document.querySelector('[data-testid="total-row-count"]').textContent = String(list.length);
+        const reportedCount = (SERVER_MODE === 'counter-only-filter' && region === 'EMEA')
+          ? EMEA_COUNT
+          : list.length;
+        document.querySelector('[data-testid="total-row-count"]').textContent = String(reportedCount);
       };
       fetch('/rows.json').then(r => r.json()).then(data => { allRows = data; render(); });
       document.querySelector('[data-testid="sort-arr-desc"]').onclick = () => { sortMode = 'arr-desc'; render(); };
@@ -383,7 +393,11 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 return;
             }
             res.writeHead(200, {'Content-Type': 'text/html'});
-            res.end(serveCompliant ? referenceHtml : '<html><body><h1>Unimplemented Starter</h1></body></html>');
+            if (mode === 'starter') {
+                res.end('<html><body><h1>Unimplemented Starter</h1></body></html>');
+                return;
+            }
+            res.end(buildReferenceHtml(mode));
         });
 
         await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -391,10 +405,21 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         const url    = `http://127.0.0.1:${port}`;
 
         try {
+            mode = 'starter';
             const redResult = await runArmVerification({arm: 'arm-a-react-ag-grid-mcp', url, timeoutMs: 1200});
             expect(redResult.pass).toBe(false);
 
-            serveCompliant = true;
+            mode = 'no-op-sort';
+            const noOpSortResult = await runArmVerification({arm: 'arm-a-react-ag-grid-mcp', url, timeoutMs: 1500});
+            expect(noOpSortResult.pass).toBe(false);
+            expect(noOpSortResult.output).toContain('ROW-000001');
+
+            mode = 'counter-only-filter';
+            const counterOnlyFilterResult = await runArmVerification({arm: 'arm-b-neo-kb-only', url, timeoutMs: 1500});
+            expect(counterOnlyFilterResult.pass).toBe(false);
+            expect(counterOnlyFilterResult.output).toContain('ROW-000002');
+
+            mode = 'compliant';
             const greenResult = await runArmVerification({arm: 'arm-c-neo-kb-neural-link', url, timeoutMs: 10000});
             expect(greenResult.pass, greenResult.output).toBe(true);
         } finally {
