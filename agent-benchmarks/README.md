@@ -42,6 +42,23 @@ agent-benchmarks/
 
 ## 3. Running Verification & Collecting Telemetry
 
+### Run Arms End-to-End in Isolated Clean-Room Staging
+`runAgentBenchmark.mjs` stages each arm into a clean temporary directory (`os.tmpdir()`), strips host `NEO_*` / `AGY_*` / `CLAUDECODE` environment variables, allocates collision-free dev-server and Neural Link ports (`18081+` so host bridges on `8081` are never touched), captures live `stream-json` transcripts and verification runs, tears down background child processes, and writes JSON + Markdown comparison reports:
+
+```bash
+# Run a single arm end-to-end in clean-room staging
+node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
+  --run-arm arm-c-neo-kb-neural-link \
+  --model claude-sonnet-4-6 \
+  --out-dir ./agent-benchmarks/results
+
+# Run all 3 arms sequentially and emit a combined JSON + Markdown report
+node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
+  --run-all \
+  --model claude-sonnet-4-6 \
+  --out-dir ./agent-benchmarks/results
+```
+
 ### Verify a Running Arm Workspace
 Start the target arm's dev server and run `verify.spec.mjs` against its URL (each verification run is appended to `agent-benchmarks/results/<arm>-verify-runs.jsonl` by default):
 
