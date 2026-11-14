@@ -62,8 +62,8 @@ Both the primary grid window and the second detail window must run with zero unc
 
 ## Verification
 
-Run the arm-agnostic Playwright verification suite against your running dev server:
+From your arm workspace directory, run the arm-agnostic Playwright verification suite via the benchmark runner against your running dev server (see `AGENTS.md` for your arm's exact `--verify-arm` name and running app URL):
 ```bash
-AGENT_BENCH_URL=http://localhost:<port> npx playwright test agent-benchmarks/tasks/grid-100k-multi-window/verify.spec.mjs
+node ../../runner/runAgentBenchmark.mjs --verify-arm <arm-name> --url <running-app-url>
 ```
-All assertions in `verify.spec.mjs` must pass (`exit code 0`).
+Each run appends a structured verification record to `<arm-name>-verify-runs.jsonl` and executes `verify.spec.mjs`. All assertions in `verify.spec.mjs` must pass (`exit code 0`).

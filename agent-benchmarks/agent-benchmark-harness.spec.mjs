@@ -3,17 +3,23 @@ import {spawn, execFileSync} from 'node:child_process';
 import fs                    from 'fs-extra';
 import http                  from 'node:http';
 import net                   from 'node:net';
+import os                    from 'node:os';
 import path                  from 'path';
 import {generateRows}        from './tasks/grid-100k-multi-window/data/generateRows.mjs';
 import {
     ARMS,
     adaptTranscriptEntry,
+    allocateFreePort,
     classifyToolCall,
+    isPortListening,
     parseTranscriptTelemetry,
     buildComparisonReport,
     formatComparisonMarkdown,
     runArmVerification,
-    readVerificationRuns
+    runCleanRoomArm,
+    readVerificationRuns,
+    sanitizeCleanRoomEnv,
+    stageArmWorkspace
 } from './runner/runAgentBenchmark.mjs';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
@@ -395,6 +401,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             versions         : {harnessVersion: '2.1.12', frameworkVersion: 'neo.mjs@13.3.1'},
             pass             : true,
             timeToGreenMs    : 150000,
+            sessionDurationMs: null,
             totalTokens      : {inputTokens: 2800, outputTokens: 600, cachedTokens: 1200, total: 3400},
             toolCallsByServer: {
                 docsKbQueries         : 1,
@@ -450,6 +457,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             versions         : {harnessVersion: '0.48.0', frameworkVersion: 'ag-grid-community@36.2.0'},
             pass             : false,
             timeToGreenMs    : null,
+            sessionDurationMs: null,
             totalTokens      : {inputTokens: 2000, outputTokens: 400, cachedTokens: 500, total: 2400},
             toolCallsByServer: {
                 docsKbQueries         : 1,
@@ -593,6 +601,413 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(greenResult.pass, greenResult.output).toBe(true);
         } finally {
             await new Promise(resolve => server.close(resolve));
+        }
+    });
+
+    test('parseTranscriptTelemetry normalizes Claude stream-json envelopes without double-counting result.usage', () => {
+        const streamJsonTranscript = [
+            JSON.stringify({
+                type               : 'system',
+                subtype            : 'init',
+                claude_code_version: '2.1.119',
+                model              : 'claude-sonnet-4-6',
+                timestamp          : '2026-10-27T10:00:00.000Z'
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                timestamp: '2026-10-27T10:00:10.000Z',
+                message  : {
+                    id     : 'msg_stream_01',
+                    model  : 'claude-sonnet-4-6',
+                    role   : 'assistant',
+                    usage  : {input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 400, cache_creation_input_tokens: 100},
+                    content: [{type: 'tool_use', id: 'toolu_s1', name: 'mcp__ag-mcp__search_docs', input: {query: 'virtualisation'}}]
+                }
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                timestamp: '2026-10-27T10:00:11.000Z',
+                message  : {
+                    id     : 'msg_stream_01',
+                    model  : 'claude-sonnet-4-6',
+                    role   : 'assistant',
+                    usage  : {input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 400, cache_creation_input_tokens: 100},
+                    content: [{type: 'tool_use', id: 'toolu_s2', name: 'Edit', input: {file_path: 'src/App.jsx'}}]
+                }
+            }),
+            JSON.stringify({
+                type     : 'rate_limit_event',
+                version  : '2.1.119',
+                timestamp: '2026-10-27T10:00:20.000Z'
+            }),
+            JSON.stringify({
+                type     : 'assistant',
+                timestamp: '2026-10-27T10:00:30.000Z',
+                message  : {
+                    id     : 'msg_stream_02',
+                    model  : 'claude-sonnet-4-6',
+                    role   : 'assistant',
+                    usage  : {input_tokens: 600, output_tokens: 150, cache_read_input_tokens: 500, cache_creation_input_tokens: 0},
+                    content: [{type: 'text', text: 'Done.'}]
+                }
+            }),
+            JSON.stringify({
+                type       : 'result',
+                subtype    : 'success',
+                duration_ms: 45000,
+                timestamp  : '2026-10-27T10:00:45.000Z',
+                usage      : {
+                    input_tokens               : 1600,
+                    output_tokens              : 350,
+                    cache_read_input_tokens    : 900,
+                    cache_creation_input_tokens: 100
+                }
+            })
+        ].join('\n');
+
+        const telemetry = parseTranscriptTelemetry(streamJsonTranscript, {
+            arm             : 'arm-a-react-ag-grid-mcp',
+            verificationRuns: [{timestamp: '2026-10-27T10:00:42.000Z', pass: true, durationMs: 3200}]
+        });
+
+        expect(telemetry.harness).toBe('claude-code');
+        expect(telemetry.model).toBe('claude-sonnet-4-6');
+        expect(telemetry.versions.harnessVersion).toBe('2.1.119');
+        expect(telemetry.timeToGreenMs).toBe(42000);
+        expect(telemetry.sessionDurationMs).toBe(45000);
+        expect(telemetry.totalTokens).toEqual({
+            inputTokens : 1600,
+            outputTokens: 350,
+            cachedTokens: 1000,
+            total       : 1950
+        });
+
+        // Result-only fallback when zero per-message usage entries exist (no start timestamp -> timeToGreenMs stays null)
+        const resultOnlyTranscript = JSON.stringify({
+            type               : 'result',
+            subtype            : 'success',
+            claude_code_version: '2.1.119',
+            duration_ms        : 38500,
+            modelUsage         : {'claude-sonnet-4-6': {inputTokens: 900, outputTokens: 210}},
+            usage              : {
+                input_tokens               : 900,
+                output_tokens              : 210,
+                cache_read_input_tokens    : 300,
+                cache_creation_input_tokens: 50
+            }
+        });
+
+        const fallbackTelemetry = parseTranscriptTelemetry(resultOnlyTranscript, {
+            arm             : 'arm-b-neo-kb-only',
+            verificationRuns: [{timestamp: '2026-10-27T10:05:00.000Z', pass: true, durationMs: 2800}]
+        });
+
+        expect(fallbackTelemetry.harness).toBe('claude-code');
+        expect(fallbackTelemetry.model).toBe('claude-sonnet-4-6');
+        expect(fallbackTelemetry.versions.harnessVersion).toBe('2.1.119');
+        expect(fallbackTelemetry.timeToGreenMs).toBeNull();
+        expect(fallbackTelemetry.sessionDurationMs).toBe(38500);
+        expect(fallbackTelemetry.totalTokens).toEqual({
+            inputTokens : 900,
+            outputTokens: 210,
+            cachedTokens: 350,
+            total       : 1110
+        });
+    });
+
+    test('PROMPT.md verification section aligns with runAgentBenchmark.mjs --verify-arm across all three arms', async () => {
+        const promptMd = await fs.readFile(
+            path.join(ROOT_DIR, 'agent-benchmarks/tasks/grid-100k-multi-window/PROMPT.md'),
+            'utf8'
+        );
+
+        expect(promptMd).toContain('node ../../runner/runAgentBenchmark.mjs --verify-arm');
+        expect(promptMd).not.toContain('npx playwright test agent-benchmarks/tasks/');
+
+        for (const arm of ARMS) {
+            const agentsMd = await fs.readFile(
+                path.join(ROOT_DIR, 'agent-benchmarks/arms', arm, 'AGENTS.md'),
+                'utf8'
+            );
+            expect(agentsMd).toContain(`node ../../runner/runAgentBenchmark.mjs --verify-arm ${arm} --url http://localhost:`);
+        }
+    });
+
+    test('clean-room environment, port helpers, stageArmWorkspace, and runCleanRoomArm isolate arms without host leakage', async () => {
+        const sanitized = sanitizeCleanRoomEnv(
+            {
+                PATH                  : '/usr/bin:/bin',
+                HOME                  : '/Users/tester',
+                NEO_FLEET_BRIDGE_TOKEN: 'secret-bridge-token',
+                NEO_PLANE_DATA_ROOT   : '/private/plane',
+                NEO_NL_PORT           : '8081',
+                AGY_ACCOUNT           : 'work',
+                CLAUDECODE            : '1',
+                CLAUDE_CODE_ENTRYPOINT: 'cli'
+            },
+            {PORT: 18080, NEO_NL_PORT: 18081}
+        );
+
+        expect(sanitized).toEqual({
+            PATH       : '/usr/bin:/bin',
+            HOME       : '/Users/tester',
+            PORT       : '18080',
+            NEO_NL_PORT: '18081'
+        });
+
+        const busyServer = net.createServer();
+        await new Promise(resolve => busyServer.listen(0, '127.0.0.1', resolve));
+        const busyPort = busyServer.address().port;
+
+        try {
+            expect(await isPortListening(busyPort)).toBe(true);
+            const fallbackPort = await allocateFreePort(busyPort);
+            expect(fallbackPort).not.toBe(busyPort);
+            expect(fallbackPort).toBeGreaterThan(0);
+        } finally {
+            await new Promise(resolve => busyServer.close(resolve));
+        }
+        expect(await isPortListening(busyPort)).toBe(false);
+
+        const customAppPortC = await allocateFreePort(0),
+              customNlPortC  = await allocateFreePort(0),
+              stagedC        = await stageArmWorkspace({
+                  arm        : 'arm-c-neo-kb-neural-link',
+                  appPort    : customAppPortC,
+                  nlPort     : customNlPortC,
+                  installDeps: false
+              });
+
+        try {
+            expect(stagedC.appPort).toBe(customAppPortC);
+            expect(stagedC.nlPort).toBe(customNlPortC);
+            expect(stagedC.appUrl).toBe(`http://localhost:${customAppPortC}/apps/gridbench/index.html`);
+
+            const stagedMcp       = await fs.readJson(path.join(stagedC.armDir, '.mcp.json')),
+                  stagedCodexToml = await fs.readFile(path.join(stagedC.armDir, '.codex/config.toml'), 'utf8'),
+                  stagedNeoConfig = await fs.readJson(path.join(stagedC.armDir, 'apps/gridbench/neo-config.json')),
+                  stagedPkg       = await fs.readJson(path.join(stagedC.armDir, 'package.json')),
+                  stagedAgentsMd  = await fs.readFile(path.join(stagedC.armDir, 'AGENTS.md'), 'utf8');
+
+            expect(stagedMcp.mcpServers['neural-link'].env.NEO_NL_PORT).toBe(String(customNlPortC));
+            expect(stagedCodexToml).toContain('[mcp_servers.neural-link.env]');
+            expect(stagedCodexToml).toContain(`NEO_NL_PORT = "${customNlPortC}"`);
+            expect(stagedNeoConfig.neuralLinkUrl).toBe(`ws://127.0.0.1:${customNlPortC}`);
+            expect(stagedPkg.scripts['server-start:headless']).toContain(`PORT=${customAppPortC} webpack serve`);
+            expect(stagedAgentsMd).toContain(`http://localhost:${customAppPortC}/apps/gridbench/index.html`);
+            expect(stagedAgentsMd).not.toContain('http://localhost:8080');
+            expect(await fs.pathExists(path.join(stagedC.stageRoot, 'node_modules'))).toBe(true);
+            expect(await fs.pathExists(path.join(stagedC.armDir, '.agents'))).toBe(false);
+            expect(await fs.pathExists(path.join(stagedC.armDir, 'node_modules'))).toBe(false);
+        } finally {
+            await fs.remove(stagedC.stageRoot);
+        }
+
+        const customAppPortA = await allocateFreePort(0),
+              stagedA        = await stageArmWorkspace({
+                  arm        : 'arm-a-react-ag-grid-mcp',
+                  appPort    : customAppPortA,
+                  installDeps: false
+              });
+
+        try {
+            expect(stagedA.nlPort).toBeNull();
+            const stagedAPkg      = await fs.readJson(path.join(stagedA.armDir, 'package.json')),
+                  stagedAAgentsMd = await fs.readFile(path.join(stagedA.armDir, 'AGENTS.md'), 'utf8');
+
+            expect(stagedAPkg.scripts.dev).toBe(`vite --port ${customAppPortA}`);
+            expect(stagedAAgentsMd).toContain(`http://localhost:${customAppPortA}`);
+            expect(stagedAAgentsMd).not.toContain('http://localhost:5174');
+        } finally {
+            await fs.remove(stagedA.stageRoot);
+        }
+
+        const tempOutDir       = path.join(os.tmpdir(), `neo-agent-bench-out-${Date.now()}`),
+              allocatedAppPort = await allocateFreePort(0),
+              prevBridge       = process.env.NEO_FLEET_BRIDGE_TOKEN,
+              prevClaude       = process.env.CLAUDECODE;
+
+        process.env.NEO_FLEET_BRIDGE_TOKEN = 'host-secret';
+        process.env.CLAUDECODE             = '1';
+
+        try {
+            const mockCmd = [
+                'test -z "$NEO_FLEET_BRIDGE_TOKEN"',
+                'test -z "$CLAUDECODE"',
+                'printf \'%s\\n\' \'{"type":"system","claude_code_version":"2.1.119","model":"claude-sonnet-4-6"}\'',
+                'printf \'%s\\n\' \'{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-4-6","usage":{"input_tokens":400,"output_tokens":80},"content":[{"type":"text","text":"ok"}]}}\'',
+                'mkdir -p ../../results',
+                'node -e \'require("fs").appendFileSync("../../results/arm-b-neo-kb-only-verify-runs.jsonl", JSON.stringify({type:"benchmark_verification",timestamp:new Date().toISOString(),arm:"arm-b-neo-kb-only",pass:true,durationMs:120}) + "\\n")\'',
+                'printf \'%s\\n\' \'{"type":"result","duration_ms":250,"usage":{"input_tokens":400,"output_tokens":80}}\''
+            ].join(' && ');
+
+            const result = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                cmd        : mockCmd,
+                outDir     : tempOutDir,
+                appPort    : allocatedAppPort,
+                installDeps: false
+            });
+
+            expect(result.telemetry.pass).toBe(true);
+            expect(result.telemetry.versions.harnessVersion).toBe('2.1.119');
+            expect(result.telemetry.totalTokens.total).toBe(480);
+            expect(result.telemetry.timeToGreenMs).not.toBeNull();
+            expect(result.telemetry.sessionDurationMs).toBe(250);
+            expect(result.telemetry.postExitVerification).toBeNull();
+            expect(result.postExitVerifyLogPath).toBeNull();
+            expect(await fs.pathExists(result.transcriptPath)).toBe(true);
+            expect(await fs.pathExists(result.verifyLogPath)).toBe(true);
+            expect(await isPortListening(allocatedAppPort)).toBe(false);
+        } finally {
+            if (prevBridge === undefined) delete process.env.NEO_FLEET_BRIDGE_TOKEN;
+            else process.env.NEO_FLEET_BRIDGE_TOKEN = prevBridge;
+            if (prevClaude === undefined) delete process.env.CLAUDECODE;
+            else process.env.CLAUDECODE = prevClaude;
+            await fs.remove(tempOutDir);
+        }
+    });
+
+    test('runCleanRoomArm isolates post-exit checks from agent verification telemetry and tears down detached listeners', async () => {
+        test.setTimeout(60000);
+
+        const dummyServerSource = [
+            'const http = require("node:http");',
+            'http.createServer(function (req, res) {',
+            '    res.writeHead(200, {"Content-Type": "text/html"});',
+            '    res.end("<html><body>not a grid</body></html>");',
+            '}).listen(Number(process.env.PORT), "127.0.0.1");'
+        ].join('\n');
+        const dummyServerB64 = Buffer.from(dummyServerSource, 'utf8').toString('base64');
+
+        // Mock agent that never runs --verify-arm and leaves a detached background HTTP server running on PORT
+        const detachedAgentSource = [
+            'const {spawn} = require("node:child_process");',
+            'const net = require("node:net");',
+            `const serverCode = Buffer.from("${dummyServerB64}", "base64").toString("utf8");`,
+            'const bg = spawn(process.execPath, ["-e", serverCode], {detached: true, stdio: "ignore", env: process.env});',
+            'bg.unref();',
+            'const port = Number(process.env.PORT);',
+            'function waitReady() {',
+            '    const sock = net.connect({port, host: "127.0.0.1"});',
+            '    sock.once("connect", function () {',
+            '        sock.destroy();',
+            '        process.stdout.write(JSON.stringify({type: "system", claude_code_version: "2.1.119", model: "claude-sonnet-4-6"}) + "\\n");',
+            '        process.stdout.write(JSON.stringify({type: "result", duration_ms: 310, usage: {input_tokens: 200, output_tokens: 40}}) + "\\n");',
+            '        process.exit(0);',
+            '    });',
+            '    sock.once("error", function () {',
+            '        sock.destroy();',
+            '        setTimeout(waitReady, 25);',
+            '    });',
+            '}',
+            'waitReady();'
+        ].join('\n');
+        const detachedAgentB64 = Buffer.from(detachedAgentSource, 'utf8').toString('base64'),
+              detachedAgentCmd = `node -e "eval(Buffer.from('${detachedAgentB64}','base64').toString('utf8'))"`;
+
+        // (a) Default (`postExitVerify: false`): no post-exit check runs, agent telemetry stays uncontaminated, detached listener is torn down
+        const tempOutDirA  = path.join(os.tmpdir(), `neo-agent-bench-probe-a-${Date.now()}`),
+              probeAppPort = await allocateFreePort(0);
+
+        try {
+            const resultA = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                cmd        : detachedAgentCmd,
+                outDir     : tempOutDirA,
+                appPort    : probeAppPort,
+                installDeps: false
+            });
+
+            expect(resultA.telemetry.pass).toBe(false);
+            expect(resultA.telemetry.verificationFailures).toBe(0);
+            expect(resultA.telemetry.timeToGreenMs).toBeNull();
+            expect(resultA.telemetry.postExitVerification).toBeNull();
+            expect(resultA.postExitVerifyLogPath).toBeNull();
+            expect(await fs.pathExists(resultA.verifyLogPath)).toBe(false);
+            expect(await isPortListening(probeAppPort)).toBe(false);
+        } finally {
+            await fs.remove(tempOutDirA);
+        }
+
+        // (b) `postExitVerify: true` with agent-left detached server: post-exit check writes to <arm>-post-exit-verify.jsonl without touching agent verify telemetry
+        const tempOutDirB   = path.join(os.tmpdir(), `neo-agent-bench-probe-b-${Date.now()}`),
+              probeAppPort2 = await allocateFreePort(0);
+
+        try {
+            const resultB = await runCleanRoomArm({
+                arm                    : 'arm-b-neo-kb-only',
+                cmd                    : detachedAgentCmd,
+                outDir                 : tempOutDirB,
+                appPort                : probeAppPort2,
+                installDeps            : false,
+                postExitVerify         : true,
+                postExitVerifyTimeoutMs: 1500
+            });
+
+            expect(resultB.telemetry.pass).toBe(false);
+            expect(resultB.telemetry.verificationFailures).toBe(0);
+            expect(resultB.telemetry.timeToGreenMs).toBeNull();
+            expect(await fs.pathExists(resultB.verifyLogPath)).toBe(false);
+            expect(resultB.telemetry.postExitVerification).toMatchObject({
+                type                 : 'runner_post_exit_verification',
+                ran                  : true,
+                pass                 : false,
+                serverStartedByRunner: false
+            });
+            expect(await fs.pathExists(resultB.postExitVerifyLogPath)).toBe(true);
+
+            const persistedLines = (await fs.readFile(resultB.postExitVerifyLogPath, 'utf8')).trim().split('\n').map(l => JSON.parse(l));
+            expect(persistedLines).toHaveLength(1);
+            expect(persistedLines[0]).toMatchObject({
+                type: 'runner_post_exit_verification',
+                arm : 'arm-b-neo-kb-only',
+                pass: false
+            });
+            expect(await isPortListening(probeAppPort2)).toBe(false);
+        } finally {
+            await fs.remove(tempOutDirB);
+        }
+
+        // (c) `postExitVerify: true` when agent stopped its server before exit: runner boots the staged dev script uniformly and tears it down
+        const stoppedServerAgentSource = [
+            'const fs = require("node:fs");',
+            'const pkg = JSON.parse(fs.readFileSync("./package.json", "utf8"));',
+            `pkg.scripts.dev = "node -e \\"eval(Buffer.from('${dummyServerB64}','base64').toString('utf8'))\\"";`,
+            'fs.writeFileSync("./package.json", JSON.stringify(pkg, null, 4), "utf8");',
+            'process.stdout.write(JSON.stringify({type: "system", claude_code_version: "2.1.119", model: "claude-sonnet-4-6"}) + "\\n");',
+            'process.stdout.write(JSON.stringify({type: "result", duration_ms: 210, usage: {input_tokens: 150, output_tokens: 30}}) + "\\n");'
+        ].join('\n');
+        const stoppedAgentB64 = Buffer.from(stoppedServerAgentSource, 'utf8').toString('base64'),
+              stoppedAgentCmd = `node -e "eval(Buffer.from('${stoppedAgentB64}','base64').toString('utf8'))"`,
+              tempOutDirC     = path.join(os.tmpdir(), `neo-agent-bench-probe-c-${Date.now()}`),
+              probeAppPort3   = await allocateFreePort(0);
+
+        try {
+            const resultC = await runCleanRoomArm({
+                arm                     : 'arm-a-react-ag-grid-mcp',
+                cmd                     : stoppedAgentCmd,
+                outDir                  : tempOutDirC,
+                appPort                 : probeAppPort3,
+                installDeps             : false,
+                postExitVerify          : true,
+                postExitStartupTimeoutMs: 5000,
+                postExitVerifyTimeoutMs : 1500
+            });
+
+            expect(resultC.telemetry.pass).toBe(false);
+            expect(resultC.telemetry.verificationFailures).toBe(0);
+            expect(await fs.pathExists(resultC.verifyLogPath)).toBe(false);
+            expect(resultC.telemetry.postExitVerification).toMatchObject({
+                type                 : 'runner_post_exit_verification',
+                ran                  : true,
+                pass                 : false,
+                serverStartedByRunner: true
+            });
+            expect(await fs.pathExists(resultC.postExitVerifyLogPath)).toBe(true);
+            expect(await isPortListening(probeAppPort3)).toBe(false);
+        } finally {
+            await fs.remove(tempOutDirC);
         }
     });
 });
