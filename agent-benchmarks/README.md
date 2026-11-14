@@ -43,7 +43,9 @@ agent-benchmarks/
 ## 3. Running Verification & Collecting Telemetry
 
 ### Run Arms End-to-End in Isolated Clean-Room Staging
-`runAgentBenchmark.mjs` stages each arm into a clean temporary directory (`os.tmpdir()`), strips host `NEO_*` / `AGY_*` / `CLAUDECODE` environment variables, allocates collision-free dev-server and Neural Link ports (`18081+` so host bridges on `8081` are never touched), captures live `stream-json` transcripts and verification runs, tears down background child processes, and writes JSON + Markdown comparison reports:
+`runAgentBenchmark.mjs` stages each arm into a clean temporary directory (`os.tmpdir()`), strips host `NEO_*` / `AGY_*` / `CLAUDECODE` environment variables, allocates collision-free dev-server and Neural Link ports (`18081+` so host bridges on `8081` are never touched), captures live `stream-json` transcripts and agent `--verify-arm` runs (`<arm>-verify-runs.jsonl`), tears down background child processes and port listeners, and writes JSON + Markdown comparison reports. Pass `--post-exit-verify` to run an optional post-exit workspace check across every arm (`<arm>-post-exit-verify.jsonl` / `postExitVerification`), kept strictly separate from `<arm>-verify-runs.jsonl` so agent `pass`, `verificationFailures`, and `timeToGreenMs` telemetry is never contaminated.
+
+> **Isolation Boundary:** Temporary staging isolates the starter workspace files, allocated ports, and `NEO_*` / `AGY_*` / `CLAUDECODE` environment variables (and `--setting-sources project,local` excludes user-scope `~/.claude` settings and `CLAUDE.md`), **not** the host OS or invoking user account. Because `--permission-mode bypassPermissions` (and Codex `--dangerously-bypass-approvals-and-sandbox`) executes as the invoking user with `HOME` and remaining environment variables intact, run `--run-arm` / `--run-all` inside a disposable VM or container.
 
 ```bash
 # Run a single arm end-to-end in clean-room staging
@@ -52,9 +54,10 @@ node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
   --model claude-sonnet-4-6 \
   --out-dir ./agent-benchmarks/results
 
-# Run all 3 arms sequentially and emit a combined JSON + Markdown report
+# Run all 3 arms sequentially with optional uniform post-exit verification
 node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
   --run-all \
+  --post-exit-verify \
   --model claude-sonnet-4-6 \
   --out-dir ./agent-benchmarks/results
 ```

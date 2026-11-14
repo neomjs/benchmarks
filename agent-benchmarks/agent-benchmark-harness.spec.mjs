@@ -401,6 +401,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             versions         : {harnessVersion: '2.1.12', frameworkVersion: 'neo.mjs@13.3.1'},
             pass             : true,
             timeToGreenMs    : 150000,
+            sessionDurationMs: null,
             totalTokens      : {inputTokens: 2800, outputTokens: 600, cachedTokens: 1200, total: 3400},
             toolCallsByServer: {
                 docsKbQueries         : 1,
@@ -456,6 +457,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             versions         : {harnessVersion: '0.48.0', frameworkVersion: 'ag-grid-community@36.2.0'},
             pass             : false,
             timeToGreenMs    : null,
+            sessionDurationMs: null,
             totalTokens      : {inputTokens: 2000, outputTokens: 400, cachedTokens: 500, total: 2400},
             toolCallsByServer: {
                 docsKbQueries         : 1,
@@ -672,6 +674,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(telemetry.model).toBe('claude-sonnet-4-6');
         expect(telemetry.versions.harnessVersion).toBe('2.1.119');
         expect(telemetry.timeToGreenMs).toBe(42000);
+        expect(telemetry.sessionDurationMs).toBe(45000);
         expect(telemetry.totalTokens).toEqual({
             inputTokens : 1600,
             outputTokens: 350,
@@ -679,7 +682,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             total       : 1950
         });
 
-        // Result-only fallback when zero per-message usage entries exist
+        // Result-only fallback when zero per-message usage entries exist (no start timestamp -> timeToGreenMs stays null)
         const resultOnlyTranscript = JSON.stringify({
             type               : 'result',
             subtype            : 'success',
@@ -702,7 +705,8 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(fallbackTelemetry.harness).toBe('claude-code');
         expect(fallbackTelemetry.model).toBe('claude-sonnet-4-6');
         expect(fallbackTelemetry.versions.harnessVersion).toBe('2.1.119');
-        expect(fallbackTelemetry.timeToGreenMs).toBe(38500);
+        expect(fallbackTelemetry.timeToGreenMs).toBeNull();
+        expect(fallbackTelemetry.sessionDurationMs).toBe(38500);
         expect(fallbackTelemetry.totalTokens).toEqual({
             inputTokens : 900,
             outputTokens: 210,
@@ -818,9 +822,10 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             await fs.remove(stagedA.stageRoot);
         }
 
-        const tempOutDir = path.join(os.tmpdir(), `neo-agent-bench-out-${Date.now()}`),
-              prevBridge = process.env.NEO_FLEET_BRIDGE_TOKEN,
-              prevClaude = process.env.CLAUDECODE;
+        const tempOutDir       = path.join(os.tmpdir(), `neo-agent-bench-out-${Date.now()}`),
+              allocatedAppPort = await allocateFreePort(0),
+              prevBridge       = process.env.NEO_FLEET_BRIDGE_TOKEN,
+              prevClaude       = process.env.CLAUDECODE;
 
         process.env.NEO_FLEET_BRIDGE_TOKEN = 'host-secret';
         process.env.CLAUDECODE             = '1';
@@ -840,6 +845,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 arm        : 'arm-b-neo-kb-only',
                 cmd        : mockCmd,
                 outDir     : tempOutDir,
+                appPort    : allocatedAppPort,
                 installDeps: false
             });
 
@@ -847,14 +853,161 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(result.telemetry.versions.harnessVersion).toBe('2.1.119');
             expect(result.telemetry.totalTokens.total).toBe(480);
             expect(result.telemetry.timeToGreenMs).not.toBeNull();
+            expect(result.telemetry.sessionDurationMs).toBe(250);
+            expect(result.telemetry.postExitVerification).toBeNull();
+            expect(result.postExitVerifyLogPath).toBeNull();
             expect(await fs.pathExists(result.transcriptPath)).toBe(true);
             expect(await fs.pathExists(result.verifyLogPath)).toBe(true);
+            expect(await isPortListening(allocatedAppPort)).toBe(false);
         } finally {
             if (prevBridge === undefined) delete process.env.NEO_FLEET_BRIDGE_TOKEN;
             else process.env.NEO_FLEET_BRIDGE_TOKEN = prevBridge;
             if (prevClaude === undefined) delete process.env.CLAUDECODE;
             else process.env.CLAUDECODE = prevClaude;
             await fs.remove(tempOutDir);
+        }
+    });
+
+    test('runCleanRoomArm isolates post-exit checks from agent verification telemetry and tears down detached listeners', async () => {
+        test.setTimeout(60000);
+
+        const dummyServerSource = [
+            'const http = require("node:http");',
+            'http.createServer(function (req, res) {',
+            '    res.writeHead(200, {"Content-Type": "text/html"});',
+            '    res.end("<html><body>not a grid</body></html>");',
+            '}).listen(Number(process.env.PORT), "127.0.0.1");'
+        ].join('\n');
+        const dummyServerB64 = Buffer.from(dummyServerSource, 'utf8').toString('base64');
+
+        // Mock agent that never runs --verify-arm and leaves a detached background HTTP server running on PORT
+        const detachedAgentSource = [
+            'const {spawn} = require("node:child_process");',
+            'const net = require("node:net");',
+            `const serverCode = Buffer.from("${dummyServerB64}", "base64").toString("utf8");`,
+            'const bg = spawn(process.execPath, ["-e", serverCode], {detached: true, stdio: "ignore", env: process.env});',
+            'bg.unref();',
+            'const port = Number(process.env.PORT);',
+            'function waitReady() {',
+            '    const sock = net.connect({port, host: "127.0.0.1"});',
+            '    sock.once("connect", function () {',
+            '        sock.destroy();',
+            '        process.stdout.write(JSON.stringify({type: "system", claude_code_version: "2.1.119", model: "claude-sonnet-4-6"}) + "\\n");',
+            '        process.stdout.write(JSON.stringify({type: "result", duration_ms: 310, usage: {input_tokens: 200, output_tokens: 40}}) + "\\n");',
+            '        process.exit(0);',
+            '    });',
+            '    sock.once("error", function () {',
+            '        sock.destroy();',
+            '        setTimeout(waitReady, 25);',
+            '    });',
+            '}',
+            'waitReady();'
+        ].join('\n');
+        const detachedAgentB64 = Buffer.from(detachedAgentSource, 'utf8').toString('base64'),
+              detachedAgentCmd = `node -e "eval(Buffer.from('${detachedAgentB64}','base64').toString('utf8'))"`;
+
+        // (a) Default (`postExitVerify: false`): no post-exit check runs, agent telemetry stays uncontaminated, detached listener is torn down
+        const tempOutDirA  = path.join(os.tmpdir(), `neo-agent-bench-probe-a-${Date.now()}`),
+              probeAppPort = await allocateFreePort(0);
+
+        try {
+            const resultA = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                cmd        : detachedAgentCmd,
+                outDir     : tempOutDirA,
+                appPort    : probeAppPort,
+                installDeps: false
+            });
+
+            expect(resultA.telemetry.pass).toBe(false);
+            expect(resultA.telemetry.verificationFailures).toBe(0);
+            expect(resultA.telemetry.timeToGreenMs).toBeNull();
+            expect(resultA.telemetry.postExitVerification).toBeNull();
+            expect(resultA.postExitVerifyLogPath).toBeNull();
+            expect(await fs.pathExists(resultA.verifyLogPath)).toBe(false);
+            expect(await isPortListening(probeAppPort)).toBe(false);
+        } finally {
+            await fs.remove(tempOutDirA);
+        }
+
+        // (b) `postExitVerify: true` with agent-left detached server: post-exit check writes to <arm>-post-exit-verify.jsonl without touching agent verify telemetry
+        const tempOutDirB   = path.join(os.tmpdir(), `neo-agent-bench-probe-b-${Date.now()}`),
+              probeAppPort2 = await allocateFreePort(0);
+
+        try {
+            const resultB = await runCleanRoomArm({
+                arm                    : 'arm-b-neo-kb-only',
+                cmd                    : detachedAgentCmd,
+                outDir                 : tempOutDirB,
+                appPort                : probeAppPort2,
+                installDeps            : false,
+                postExitVerify         : true,
+                postExitVerifyTimeoutMs: 1500
+            });
+
+            expect(resultB.telemetry.pass).toBe(false);
+            expect(resultB.telemetry.verificationFailures).toBe(0);
+            expect(resultB.telemetry.timeToGreenMs).toBeNull();
+            expect(await fs.pathExists(resultB.verifyLogPath)).toBe(false);
+            expect(resultB.telemetry.postExitVerification).toMatchObject({
+                type                 : 'runner_post_exit_verification',
+                ran                  : true,
+                pass                 : false,
+                serverStartedByRunner: false
+            });
+            expect(await fs.pathExists(resultB.postExitVerifyLogPath)).toBe(true);
+
+            const persistedLines = (await fs.readFile(resultB.postExitVerifyLogPath, 'utf8')).trim().split('\n').map(l => JSON.parse(l));
+            expect(persistedLines).toHaveLength(1);
+            expect(persistedLines[0]).toMatchObject({
+                type: 'runner_post_exit_verification',
+                arm : 'arm-b-neo-kb-only',
+                pass: false
+            });
+            expect(await isPortListening(probeAppPort2)).toBe(false);
+        } finally {
+            await fs.remove(tempOutDirB);
+        }
+
+        // (c) `postExitVerify: true` when agent stopped its server before exit: runner boots the staged dev script uniformly and tears it down
+        const stoppedServerAgentSource = [
+            'const fs = require("node:fs");',
+            'const pkg = JSON.parse(fs.readFileSync("./package.json", "utf8"));',
+            `pkg.scripts.dev = "node -e \\"eval(Buffer.from('${dummyServerB64}','base64').toString('utf8'))\\"";`,
+            'fs.writeFileSync("./package.json", JSON.stringify(pkg, null, 4), "utf8");',
+            'process.stdout.write(JSON.stringify({type: "system", claude_code_version: "2.1.119", model: "claude-sonnet-4-6"}) + "\\n");',
+            'process.stdout.write(JSON.stringify({type: "result", duration_ms: 210, usage: {input_tokens: 150, output_tokens: 30}}) + "\\n");'
+        ].join('\n');
+        const stoppedAgentB64 = Buffer.from(stoppedServerAgentSource, 'utf8').toString('base64'),
+              stoppedAgentCmd = `node -e "eval(Buffer.from('${stoppedAgentB64}','base64').toString('utf8'))"`,
+              tempOutDirC     = path.join(os.tmpdir(), `neo-agent-bench-probe-c-${Date.now()}`),
+              probeAppPort3   = await allocateFreePort(0);
+
+        try {
+            const resultC = await runCleanRoomArm({
+                arm                     : 'arm-a-react-ag-grid-mcp',
+                cmd                     : stoppedAgentCmd,
+                outDir                  : tempOutDirC,
+                appPort                 : probeAppPort3,
+                installDeps             : false,
+                postExitVerify          : true,
+                postExitStartupTimeoutMs: 5000,
+                postExitVerifyTimeoutMs : 1500
+            });
+
+            expect(resultC.telemetry.pass).toBe(false);
+            expect(resultC.telemetry.verificationFailures).toBe(0);
+            expect(await fs.pathExists(resultC.verifyLogPath)).toBe(false);
+            expect(resultC.telemetry.postExitVerification).toMatchObject({
+                type                 : 'runner_post_exit_verification',
+                ran                  : true,
+                pass                 : false,
+                serverStartedByRunner: true
+            });
+            expect(await fs.pathExists(resultC.postExitVerifyLogPath)).toBe(true);
+            expect(await isPortListening(probeAppPort3)).toBe(false);
+        } finally {
+            await fs.remove(tempOutDirC);
         }
     });
 });

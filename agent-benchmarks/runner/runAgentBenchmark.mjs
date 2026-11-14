@@ -378,7 +378,7 @@ export function adaptTranscriptEntry(entry = {}) {
  *
  * - Supports Claude Code (`message.usage`, `tool_use` with `mcp__<server>__<tool>`), Codex CLI (`turn.completed`, `item.completed`), and generic JSONL.
  * - Takes `pass` and `verificationFailures` from the runner's `verify.spec.mjs` executions (`verificationRuns` or embedded `benchmark_verification` records).
- * - Defines `timeToGreenMs` as elapsed milliseconds from the start of the transcript to the first passing verification (`null` when no verification passed).
+ * - Defines `timeToGreenMs` as elapsed milliseconds from the start of the transcript to the first passing verification (`null` when no verification passed or no start timestamp exists), and `sessionDurationMs` from harness session duration metadata when present.
  *
  * @param {String} jsonlContent Raw JSONL transcript content.
  * @param {Object} [options]
@@ -387,7 +387,7 @@ export function adaptTranscriptEntry(entry = {}) {
  * @param {String} [options.model]
  * @param {{harnessVersion?: String|null, frameworkVersion?: String|null}} [options.versions]
  * @param {Array<{timestamp?: String, pass: Boolean, durationMs?: Number}>} [options.verificationRuns=[]]
- * @returns {{arm: String, harness: String, model: String, versions: {harnessVersion: String|null, frameworkVersion: String|null}, pass: Boolean, timeToGreenMs: Number|null, totalTokens: {inputTokens: Number, outputTokens: Number, cachedTokens: Number, total: Number}, toolCallsByServer: {docsKbQueries: Number, neuralLinkRuntimeCalls: Number, fileEdits: Number, shellTestRuns: Number, other: Number}, verificationFailures: Number}}
+ * @returns {{arm: String, harness: String, model: String, versions: {harnessVersion: String|null, frameworkVersion: String|null}, pass: Boolean, timeToGreenMs: Number|null, sessionDurationMs: Number|null, totalTokens: {inputTokens: Number, outputTokens: Number, cachedTokens: Number, total: Number}, toolCallsByServer: {docsKbQueries: Number, neuralLinkRuntimeCalls: Number, fileEdits: Number, shellTestRuns: Number, other: Number}, verificationFailures: Number}}
  */
 export function parseTranscriptTelemetry(jsonlContent = '', {
     arm              = 'unknown',
@@ -498,9 +498,11 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         if (!Number.isNaN(greenMs)) {
             timeToGreenMs = Math.max(0, greenMs - firstTimestamp);
         }
-    } else if (pass && typeof fallbackDurationMs === 'number') {
-        timeToGreenMs = Math.max(0, fallbackDurationMs);
     }
+
+    const sessionDurationMs = typeof fallbackDurationMs === 'number'
+        ? Math.max(0, fallbackDurationMs)
+        : null;
 
     return {
         arm,
@@ -514,6 +516,7 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         },
         pass,
         timeToGreenMs,
+        sessionDurationMs,
         totalTokens: {
             inputTokens,
             outputTokens,
@@ -785,22 +788,69 @@ export async function stageArmWorkspace({
 }
 
 /**
+ * @summary Terminates any remaining local TCP listener on `port` and waits until the port is free.
+ * @param {Number} port
+ * @param {Number} [timeoutMs=3000]
+ * @returns {Promise<void>}
+ */
+async function terminatePortListeners(port, timeoutMs = 3000) {
+    const num = Number(port);
+    if (!Number.isInteger(num) || num <= 0 || !(await isPortListening(num))) {
+        return;
+    }
+
+    const signalListeners = async signal => {
+        try {
+            const {stdout} = await execFileAsync('lsof', ['-nP', `-iTCP:${num}`, '-sTCP:LISTEN', '-t']);
+            const pids     = stdout
+                .split('\n')
+                .map(s => Number(s.trim()))
+                .filter(pid => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+
+            for (const pid of pids) {
+                try { process.kill(-pid, signal); } catch {}
+                try { process.kill(pid, signal); } catch {}
+            }
+        } catch {}
+    };
+
+    await signalListeners('SIGTERM');
+
+    const deadline   = Date.now() + timeoutMs,
+          escalateAt = Date.now() + Math.min(1000, Math.floor(timeoutMs / 2));
+    let escalated    = false;
+
+    while (Date.now() < deadline) {
+        if (!(await isPortListening(num))) {
+            return;
+        }
+        if (!escalated && Date.now() >= escalateAt) {
+            escalated = true;
+            await signalListeners('SIGKILL');
+        }
+        await new Promise(r => setTimeout(r, 50));
+    }
+}
+
+/**
  * @summary Runs `verify.spec.mjs` against a running arm server, records pass/fail and duration,
- * and optionally appends a `benchmark_verification` record to `verifyLogPath`.
+ * and optionally appends a verification record (`recordType`) to `verifyLogPath`.
  * @param {Object} options
  * @param {String} options.arm
  * @param {String} [options.url='http://localhost:8080']
  * @param {Number} [options.timeoutMs=15000]
  * @param {String|null} [options.verifyLogPath=null]
  * @param {String} [options.rootDir=ROOT_DIR]
- * @returns {Promise<{type: 'benchmark_verification', timestamp: String, arm: String, pass: Boolean, durationMs: Number, output: String}>}
+ * @param {String} [options.recordType='benchmark_verification']
+ * @returns {Promise<{type: String, timestamp: String, arm: String, pass: Boolean, durationMs: Number, output: String}>}
  */
 export async function runArmVerification({
     arm,
     url           = 'http://localhost:8080',
     timeoutMs     = 15000,
     verifyLogPath = null,
-    rootDir       = ROOT_DIR
+    rootDir       = ROOT_DIR,
+    recordType    = 'benchmark_verification'
 }) {
     const start = Date.now();
     let   pass  = false,
@@ -836,7 +886,7 @@ export async function runArmVerification({
     }
 
     const record = {
-        type      : 'benchmark_verification',
+        type      : recordType,
         timestamp : new Date().toISOString(),
         arm,
         pass,
@@ -884,27 +934,35 @@ export async function readVerificationRuns(verifyLogPath) {
  * @param {Number} [options.nlPort]
  * @param {Boolean} [options.keepStage=false]
  * @param {Boolean} [options.installDeps=true]
- * @returns {Promise<{telemetry: Object, transcriptPath: String, verifyLogPath: String}>}
+ * @param {Boolean} [options.postExitVerify=false]
+ * @param {Number} [options.postExitStartupTimeoutMs=15000]
+ * @param {Number} [options.postExitVerifyTimeoutMs=15000]
+ * @returns {Promise<{telemetry: Object, transcriptPath: String, verifyLogPath: String, postExitVerifyLogPath: String|null}>}
  */
 export async function runCleanRoomArm({
     arm,
-    harness     = 'claude-code',
-    model       = 'sonnet',
-    cmd         = null,
-    outDir      = path.join(ROOT_DIR, 'agent-benchmarks/results'),
-    timeoutMs   = 900000,
+    harness                  = 'claude-code',
+    model                    = 'sonnet',
+    cmd                      = null,
+    outDir                   = path.join(ROOT_DIR, 'agent-benchmarks/results'),
+    timeoutMs                = 900000,
     appPort,
     nlPort,
-    keepStage   = false,
-    installDeps = true
+    keepStage                = false,
+    installDeps              = true,
+    postExitVerify           = false,
+    postExitStartupTimeoutMs = 15000,
+    postExitVerifyTimeoutMs  = 15000
 }) {
-    const resolvedOutDir   = path.resolve(ROOT_DIR, outDir),
-          transcriptPath   = path.join(resolvedOutDir, `${arm}-transcript.jsonl`),
-          outVerifyLogPath = path.join(resolvedOutDir, `${arm}-verify-runs.jsonl`);
+    const resolvedOutDir           = path.resolve(ROOT_DIR, outDir),
+          transcriptPath           = path.join(resolvedOutDir, `${arm}-transcript.jsonl`),
+          outVerifyLogPath         = path.join(resolvedOutDir, `${arm}-verify-runs.jsonl`),
+          outPostExitVerifyLogPath = path.join(resolvedOutDir, `${arm}-post-exit-verify.jsonl`);
 
     await fs.ensureDir(resolvedOutDir);
     await fs.writeFile(transcriptPath, '', 'utf8');
     await fs.remove(outVerifyLogPath);
+    await fs.remove(outPostExitVerifyLogPath);
 
     const staged = await stageArmWorkspace({arm, appPort, nlPort, installDeps}),
           prompt = 'Read AGENTS.md and ../../tasks/grid-100k-multi-window/PROMPT.md first, then implement all requirements in this workspace, start the dev server in the background, verify in the running app, and run the benchmark verification command from AGENTS.md until all assertions pass (exit code 0).',
@@ -935,9 +993,10 @@ export async function runCleanRoomArm({
         ];
     }
 
-    let child      = null,
-        writeChain = Promise.resolve(),
-        stdoutBuf  = '';
+    let child            = null,
+        runnerServerProc = null,
+        writeChain       = Promise.resolve(),
+        stdoutBuf        = '';
 
     const processLine = rawLine => {
         const trimmed = rawLine.trim();
@@ -1010,17 +1069,7 @@ export async function runCleanRoomArm({
         }
         await writeChain;
 
-        let verificationRuns = await readVerificationRuns(staged.verifyLogPath);
-        if (!verificationRuns.some(r => r.pass === true) && await isPortListening(staged.appPort)) {
-            await runArmVerification({
-                arm,
-                url          : staged.appUrl,
-                verifyLogPath: staged.verifyLogPath,
-                rootDir      : staged.stageRoot
-            });
-            verificationRuns = await readVerificationRuns(staged.verifyLogPath);
-        }
-
+        const verificationRuns = await readVerificationRuns(staged.verifyLogPath);
         if (await fs.pathExists(staged.verifyLogPath)) {
             await fs.copy(staged.verifyLogPath, outVerifyLogPath, {overwrite: true});
         }
@@ -1041,18 +1090,91 @@ export async function runCleanRoomArm({
             telemetry.model = model;
         }
 
+        if (postExitVerify) {
+            let listening             = await isPortListening(staged.appPort),
+                serverStartedByRunner = false;
+
+            if (!listening) {
+                const devScriptArgs = arm === 'arm-a-react-ag-grid-mcp'
+                    ? ['run', 'dev']
+                    : ['run', 'server-start:headless'];
+
+                runnerServerProc = spawn('npm', devScriptArgs, {
+                    cwd     : staged.armDir,
+                    detached: true,
+                    stdio   : 'ignore',
+                    env     : childEnv
+                });
+                runnerServerProc.on('error', () => {});
+                runnerServerProc.unref();
+                serverStartedByRunner = true;
+
+                const startupDeadline = Date.now() + postExitStartupTimeoutMs;
+                while (Date.now() < startupDeadline) {
+                    if (await isPortListening(staged.appPort)) {
+                        listening = true;
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 250));
+                }
+            }
+
+            if (listening) {
+                const postRun = await runArmVerification({
+                    arm,
+                    url          : staged.appUrl,
+                    timeoutMs    : postExitVerifyTimeoutMs,
+                    verifyLogPath: outPostExitVerifyLogPath,
+                    rootDir      : staged.stageRoot,
+                    recordType   : 'runner_post_exit_verification'
+                });
+                telemetry.postExitVerification = {
+                    type      : 'runner_post_exit_verification',
+                    ran       : true,
+                    pass      : postRun.pass,
+                    durationMs: postRun.durationMs,
+                    timestamp : postRun.timestamp,
+                    serverStartedByRunner
+                };
+            } else {
+                const skippedRecord = {
+                    type      : 'runner_post_exit_verification',
+                    timestamp : new Date().toISOString(),
+                    arm,
+                    ran       : false,
+                    pass      : null,
+                    durationMs: null,
+                    serverStartedByRunner,
+                    reason    : 'server-not-listening'
+                };
+                await fs.ensureDir(path.dirname(outPostExitVerifyLogPath));
+                await fs.appendFile(outPostExitVerifyLogPath, JSON.stringify(skippedRecord) + '\n', 'utf8');
+                telemetry.postExitVerification = skippedRecord;
+            }
+        } else {
+            telemetry.postExitVerification = null;
+        }
+
         return {
             telemetry,
             transcriptPath,
-            verifyLogPath: outVerifyLogPath
+            verifyLogPath        : outVerifyLogPath,
+            postExitVerifyLogPath: postExitVerify ? outPostExitVerifyLogPath : null
         };
     } finally {
+        if (runnerServerProc?.pid) {
+            try { process.kill(-runnerServerProc.pid, 'SIGTERM'); } catch {}
+        }
         if (child?.pid) {
             try { process.kill(-child.pid, 'SIGTERM'); } catch {}
         }
         try {
             await execFileAsync('pkill', ['-TERM', '-f', staged.stageRoot]);
         } catch {}
+        await terminatePortListeners(staged.appPort);
+        if (staged.nlPort) {
+            await terminatePortListeners(staged.nlPort);
+        }
         if (!keepStage) {
             await fs.remove(staged.stageRoot);
         }
@@ -1159,15 +1281,16 @@ async function main() {
         for (const arm of runArms) {
             const {telemetry} = await runCleanRoomArm({
                 arm,
-                harness    : harnessOpt || 'claude-code',
-                model      : modelOpt   || 'sonnet',
-                cmd        : getFlag('--cmd'),
+                harness       : harnessOpt || 'claude-code',
+                model         : modelOpt   || 'sonnet',
+                cmd           : getFlag('--cmd'),
                 outDir,
-                timeoutMs  : getFlag('--timeout-ms') ? Number(getFlag('--timeout-ms')) : 900000,
-                appPort    : getFlag('--app-port')   ? Number(getFlag('--app-port'))   : undefined,
-                nlPort     : getFlag('--nl-port')    ? Number(getFlag('--nl-port'))    : undefined,
-                keepStage  : args.includes('--keep-stage'),
-                installDeps: !args.includes('--no-install')
+                timeoutMs     : getFlag('--timeout-ms') ? Number(getFlag('--timeout-ms')) : 900000,
+                appPort       : getFlag('--app-port')   ? Number(getFlag('--app-port'))   : undefined,
+                nlPort        : getFlag('--nl-port')    ? Number(getFlag('--nl-port'))    : undefined,
+                keepStage     : args.includes('--keep-stage'),
+                installDeps   : !args.includes('--no-install'),
+                postExitVerify: args.includes('--post-exit-verify')
             });
             armResults.push(telemetry);
         }
