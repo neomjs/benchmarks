@@ -46,7 +46,7 @@
     "dependencies": {
         "@playwright/test": "^1.63.0",
         "fs-extra": "^11.3.0",
-        "glob": "^11.0.3"
+        "glob": "^14.0.6"
     },
     "funding": {
         "type": "GitHub Sponsors",
