@@ -229,3 +229,185 @@ export const measureMainThreadProbeInBrowser = (testName, action, condition, pas
         }
     });
 };
+
+/**
+ * @summary Parses `NEO_USE_VDOM_WORKER` (`'true'` | `'false'`) into a boolean arm override or `undefined`.
+ * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @returns {boolean|undefined}
+ */
+export const parseNeoUseVdomWorkerEnv = (env = process.env) => {
+    const raw = env.NEO_USE_VDOM_WORKER?.trim();
+    if (!raw) return undefined;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    throw new Error(`Invalid NEO_USE_VDOM_WORKER="${raw}". Expected "true" or "false".`);
+};
+
+/**
+ * @summary Intercepts `neo-config.json` requests before `MicroLoader.mjs` boots so `useVdomWorker` matches the requested arm,
+ * and applies optional CDP Main-thread CPU throttling (`NEO_CPU_THROTTLE`; Blink restricts `Emulation.setCPUThrottlingRate` to page targets).
+ * @param {import('@playwright/test').Page} page
+ * @param {boolean|undefined} [expected=parseNeoUseVdomWorkerEnv()]
+ * @returns {Promise<boolean|undefined>}
+ */
+export const configureNeoVdomWorker = async (page, expected = parseNeoUseVdomWorkerEnv()) => {
+    const throttleRaw  = process.env.NEO_CPU_THROTTLE?.trim();
+    const throttleRate = throttleRaw ? Number(throttleRaw) : 1;
+    if (Number.isFinite(throttleRate) && throttleRate > 1) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttleRate });
+    }
+
+    if (typeof expected !== 'boolean') return undefined;
+
+    await page.route('**/neo-config.json', async (route) => {
+        const response = await route.fetch();
+        const json     = await response.json();
+        json.useVdomWorker = expected;
+        await route.fulfill({ response, json });
+    });
+
+    return expected;
+};
+
+/**
+ * @summary Verifies that `Neo.config.useVdomWorker` and the live `Neo.worker.Manager` VDom worker match the requested arm.
+ * @param {import('@playwright/test').Page} page
+ * @param {boolean|undefined} [expected=parseNeoUseVdomWorkerEnv()]
+ * @returns {Promise<void>}
+ */
+export const assertNeoVdomWorkerTopology = async (page, expected = parseNeoUseVdomWorkerEnv()) => {
+    if (typeof expected !== 'boolean') return;
+
+    const topology = await page.evaluate(() => ({
+        useVdomWorker: Boolean(window.Neo?.config?.useVdomWorker),
+        hasVdomWorker: Boolean(
+            window.Neo?.worker?.Manager?.getWorker?.('vdom') ||
+            window.Neo?.worker?.Manager?.workers?.vdom?.worker
+        )
+    }));
+
+    if (topology.useVdomWorker !== expected || topology.hasVdomWorker !== expected) {
+        throw new Error(
+            `Neo worker topology mismatch: expected useVdomWorker=${expected}, got ${JSON.stringify(topology)}`
+        );
+    }
+};
+
+/**
+ * @summary Browser-side installer exposing zero-allocation `startWorkerMessageProbe()` and `stopWorkerMessageProbe()` counters on `Neo.worker.Manager`.
+ */
+export const installWorkerMessageProbeInBrowser = () => {
+    const recordInbound = (manager, event) => {
+        const state = manager.__neoBenchmarkProbeState;
+        if (!state) return;
+
+        state.inboundMessages++;
+        const data    = event?.data;
+        const payload = data?.action === 'reply' ? data.data : data;
+        const isDomUpdate = data?.action === 'updateVdom' ||
+            (data?.action === 'reply' && Boolean(payload?.updateVdom || payload?.autoMount));
+
+        if (isDomUpdate) {
+            state.domUpdateFlights++;
+            const deltas = data?.action === 'updateVdom' ? data.deltas : payload?.deltas;
+            if (Array.isArray(deltas)) {
+                state.totalDeltas += deltas.length;
+            }
+        }
+        if (payload?.vnodes || payload?.vnode) {
+            state.vnodeRelayMessages++;
+        }
+    };
+
+    const attachWorkerListeners = (manager) => {
+        for (const entry of Object.values(manager.workers || {})) {
+            const target = entry?.worker?.port || entry?.worker;
+            if (target && !target.__neoBenchmarkInboundWrapped) {
+                target.addEventListener('message', (event) => recordInbound(manager, event));
+                target.__neoBenchmarkInboundWrapped = true;
+            }
+        }
+    };
+
+    const ensureWrapped = () => {
+        const manager = window.Neo?.worker?.Manager;
+        if (!manager) {
+            return null;
+        }
+
+        attachWorkerListeners(manager);
+
+        if (manager.__neoBenchmarkProbeInstalled) {
+            return manager;
+        }
+
+        const origSendMessage = manager.sendMessage.bind(manager);
+        manager.__neoBenchmarkProbeState = null;
+
+        manager.sendMessage = function(dest, opts, transfer) {
+            const state = manager.__neoBenchmarkProbeState;
+            if (state) {
+                state.outboundMessages++;
+                if (opts?.data?.vnodes || opts?.data?.vnode) {
+                    state.vnodeRelayMessages++;
+                }
+            }
+            return origSendMessage(dest, opts, transfer);
+        };
+
+        manager.__neoBenchmarkProbeInstalled = true;
+        return manager;
+    };
+
+    window.startWorkerMessageProbe = () => {
+        const manager = ensureWrapped();
+        if (!manager) {
+            throw new Error('Neo.worker.Manager is not available for startWorkerMessageProbe()');
+        }
+        manager.__neoBenchmarkProbeState = {
+            startTime         : performance.now(),
+            inboundMessages   : 0,
+            outboundMessages  : 0,
+            domUpdateFlights  : 0,
+            totalDeltas       : 0,
+            vnodeRelayMessages: 0
+        };
+    };
+
+    window.stopWorkerMessageProbe = () => {
+        const manager = ensureWrapped();
+        const state   = manager?.__neoBenchmarkProbeState;
+        if (manager) {
+            manager.__neoBenchmarkProbeState = null;
+        }
+        if (!state) {
+            return {
+                elapsedMs              : 0,
+                inboundMessages        : 0,
+                outboundMessages       : 0,
+                totalMainWorkerMessages: 0,
+                domUpdateFlights       : 0,
+                flightsPerSec          : 0,
+                totalDeltas            : 0,
+                avgDeltasPerFlight     : 0,
+                vnodeRelayMessages     : 0
+            };
+        }
+        const elapsedMs = Math.max(1, performance.now() - state.startTime);
+        const totalMainWorkerMessages = state.inboundMessages + state.outboundMessages;
+        return {
+            elapsedMs              : Math.round(elapsedMs * 100) / 100,
+            inboundMessages        : state.inboundMessages,
+            outboundMessages       : state.outboundMessages,
+            totalMainWorkerMessages,
+            domUpdateFlights       : state.domUpdateFlights,
+            flightsPerSec          : Math.round((state.domUpdateFlights / (elapsedMs / 1000)) * 100) / 100,
+            totalDeltas            : state.totalDeltas,
+            avgDeltasPerFlight     : state.domUpdateFlights > 0
+                ? Math.round((state.totalDeltas / state.domUpdateFlights) * 100) / 100
+                : 0,
+            vnodeRelayMessages     : state.vnodeRelayMessages
+        };
+    };
+};

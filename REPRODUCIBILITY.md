@@ -23,6 +23,13 @@ Next, run the setup script to install all nested dependencies and build the Neo.
 npm run setup
 ```
 
+To install and build only the Neo.mjs benchmark apps (or overlay a local `neomjs/neo` checkout when benchmarking an unmerged Engine branch):
+
+```bash
+node scripts/setup.mjs --neo-only
+node scripts/setup.mjs --neo-only --engine-path=../neo
+```
+
 ## 3. Running the Benchmarks
 
 The benchmarks should be executed using the npm scripts defined in `package.json`.
@@ -42,6 +49,15 @@ npm run benchmark:accurate:all
 ```bash
 npm run benchmark:accurate:neo
 ```
+
+**Run A/B worker-topology comparisons for Neo.mjs (`useVdomWorker: true` vs `useVdomWorker: false`, isolated under `test-results-data/neo-vdom-worker` and `test-results-data/neo-app-worker`, with optional `AB/BA` interleaving, custom bucket names, and CDP Main-thread CPU throttling):**
+```bash
+npm run benchmark:accurate:neo -- --interleave-vdom-worker --projects=chromium-prod --runs=5
+npm run benchmark:accurate:neo -- --vdom-worker=true --projects=chromium-prod --runs=5
+npm run benchmark:accurate:neo -- --vdom-worker=false --projects=chromium-prod --runs=5
+npm run benchmark:accurate:neo -- --interleave-vdom-worker --cpu-throttle=4 --bucket-suffix=-cpu4x --projects=chromium-prod --runs=5
+```
+> **Note on `--cpu-throttle=<N>` (`NEO_CPU_THROTTLE`):** Chromium's CDP `Emulation.setCPUThrottlingRate` applies only to `page` targets (Main renderer thread) and returns `-32000 ("Operation is only supported for pages, not workers")` on Dedicated/Shared Workers. Use it specifically to stress Main-thread contention (`DomApiRenderer` delta application + message relay) rather than Worker-thread CPU scaling.
 
 **Run only the "scrolling" suite for Angular for a single run:**
 ```bash

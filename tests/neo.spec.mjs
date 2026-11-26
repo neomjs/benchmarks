@@ -1,10 +1,14 @@
 import {test, expect} from '@playwright/test';
-import { measurePerformanceInBrowser, measureJankInBrowser } from './utils/browser-test-helpers.mjs';
+import {
+    assertNeoVdomWorkerTopology,
+    configureNeoVdomWorker,
+    installWorkerMessageProbeInBrowser,
+    measureJankInBrowser,
+    measurePerformanceInBrowser
+} from './utils/browser-test-helpers.mjs';
 
 /**
- * A robust, observer-based function to wait for the grid to be ready for test setup.
- * This is used BEFORE the performance measurement begins.
- * It checks for both the expected row count and the presence of the first row element.
+ * @summary Waits for the Neo v14 grid to report `expectedRowCount` and mount row `0`, then verifies worker topology.
  * @param {import('@playwright/test').Page} page
  * @param {number} expectedRowCount
  * @param {number} [timeout=10000]
@@ -13,9 +17,10 @@ async function waitForGridReady(page, expectedRowCount, timeout = 10000) {
     await page.waitForFunction((expectedRowCount) => {
         const grid            = document.querySelector('[role="grid"]');
         const rowCountCorrect = grid && grid.getAttribute('aria-rowcount') === String(expectedRowCount);
-        const firstRowExists  = document.querySelector('#neo-grid-body-1__row-0');
+        const firstRowExists  = document.querySelector('.neo-grid-row[data-row-id="0"]');
         return rowCountCorrect && firstRowExists;
     }, expectedRowCount, {timeout});
+    await assertNeoVdomWorkerTopology(page);
 }
 
 const getButtonByText = (text) => {
@@ -23,9 +28,12 @@ const getButtonByText = (text) => {
 };
 
 test.beforeEach(async ({page}) => {
+    await configureNeoVdomWorker(page);
+
     // Inject the measurement functions into the browser context's window object
     await page.addInitScript({
         content: `
+            (${installWorkerMessageProbeInBrowser.toString()})();
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
             window.measureJank        = ${measureJankInBrowser.toString()};
             window.getButtonByText    = ${getButtonByText.toString()};
@@ -55,6 +63,7 @@ test('Neo.mjs benchmark: Create 10k Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
+    await assertNeoVdomWorkerTopology(page);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -66,8 +75,8 @@ test('Neo.mjs benchmark: Create 10k Rows', async ({page}) => {
             const rowCount = grid.getAttribute('aria-rowcount');
             if (rowCount !== '10001') return false;
 
-            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
-            return firstRowIdCell && firstRowIdCell.textContent === '1';
+            const firstRowIdCell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="id"]');
+            return firstRowIdCell && firstRowIdCell.textContent.trim() === '1';
         };
         return window.measurePerformance('Create 10k Rows', action, condition);
     });
@@ -81,6 +90,7 @@ test('Neo.mjs benchmark: Create 100k Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 100k Rows'}).waitFor();
+    await assertNeoVdomWorkerTopology(page);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -92,8 +102,8 @@ test('Neo.mjs benchmark: Create 100k Rows', async ({page}) => {
             const rowCount = grid.getAttribute('aria-rowcount');
             if (rowCount !== '100001') return false;
 
-            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
-            return firstRowIdCell && firstRowIdCell.textContent === '1';
+            const firstRowIdCell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="id"]');
+            return firstRowIdCell && firstRowIdCell.textContent.trim() === '1';
         };
         return window.measurePerformance('Create 100k Rows', action, condition);
     });
@@ -107,6 +117,7 @@ test('Neo.mjs benchmark: Create 1M Rows', async ({page}) => {
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 1M Rows'}).waitFor();
+    await assertNeoVdomWorkerTopology(page);
 
     const duration = await page.evaluate(() => {
         const action    = () => {
@@ -118,8 +129,8 @@ test('Neo.mjs benchmark: Create 1M Rows', async ({page}) => {
             const rowCount = grid.getAttribute('aria-rowcount');
             if (rowCount !== '1000001') return false;
 
-            const firstRowIdCell = document.querySelector('#neo-grid-body-1__row-0__id');
-            return firstRowIdCell && firstRowIdCell.textContent === '1';
+            const firstRowIdCell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="id"]');
+            return firstRowIdCell && firstRowIdCell.textContent.trim() === '1';
         };
         return window.measurePerformance('Create 1M Rows', action, condition);
     });
@@ -141,7 +152,7 @@ test('Neo.mjs benchmark: Update Every 10th Row', async ({page}) => {
             window.getButtonByText('Update Every 10th Row').click();
         };
         const condition = () => {
-            const node = document.querySelector('#neo-grid-body-1__row-0__label');
+            const node = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="label"]');
             return node && node.textContent.includes('updated row 1');
         };
         return window.measurePerformance('Update Every 10th Row', action, condition);
@@ -212,7 +223,7 @@ test('Neo.mjs benchmark: Remove Row', async ({page}) => {
         };
         const condition = () => {
             const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-rowcount') === '10001';
+            return grid && grid.getAttribute('aria-rowcount') === '10000';
         };
         return window.measurePerformance('Remove Row', action, condition);
     });
@@ -256,9 +267,12 @@ test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
     // Start the feed
     await page.getByRole('button', {name: 'Start/Stop Real-time Feed'}).click();
 
-    // Measure jank for 4 seconds while the feed is running
-    const jankMetrics = await page.evaluate(() => {
-        return window.measureJank(4000);
+    // Measure jank + worker message volume for 4 seconds while the feed is running
+    const {jankMetrics, workerStats} = await page.evaluate(async () => {
+        window.startWorkerMessageProbe();
+        const jankMetrics = await window.measureJank(4000);
+        const workerStats = window.stopWorkerMessageProbe();
+        return {jankMetrics, workerStats};
     });
 
     // Stop the feed
@@ -266,8 +280,9 @@ test('Neo.mjs benchmark: Real-time Feed UI Responsiveness', async ({page}) => {
 
     test.info().annotations.push({type: 'averageFps', description: `${jankMetrics.averageFps}`});
     test.info().annotations.push({type: 'longFrameCount', description: `${jankMetrics.longFrameCount}`});
+    test.info().annotations.push({type: 'workerMessages', description: JSON.stringify(workerStats)});
 
-    console.log(`Real-time Feed (4s active) Jank Metrics:`, jankMetrics);
+    console.log(`Real-time Feed (4s active) Jank Metrics:`, jankMetrics, `Worker Stats:`, workerStats);
 
     // Assert that the UI remained responsive. For Neo.mjs, we expect near-perfect frame rates.
     expect(jankMetrics.averageFps).toBeGreaterThanOrEqual(45);
@@ -279,6 +294,7 @@ test('Neo.mjs benchmark: Heavy Calculation (App Worker) UI Responsiveness', asyn
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor(); // Ensure page is ready
+    await assertNeoVdomWorkerTopology(page);
 
     // Start the heavy calculation
     await page.getByRole('button', {name: 'Run Heavy Calculation', exact: true}).click();
@@ -309,6 +325,7 @@ test('Neo.mjs benchmark: Heavy Calculation (Task Worker) UI Responsiveness', asy
     await page.goto('/apps/benchmarks/');
     await expect(page).toHaveTitle('Interactive Benchmark Neo');
     await page.getByRole('button', {name: 'Create 10k Rows'}).waitFor();
+    await assertNeoVdomWorkerTopology(page);
 
     // Start the heavy calculation
     await page.getByRole('button', {name: 'Run Heavy Calculation (Task Worker)'}).click();

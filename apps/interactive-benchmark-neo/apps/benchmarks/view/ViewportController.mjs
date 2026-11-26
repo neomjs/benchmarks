@@ -104,6 +104,9 @@ class ViewportController extends Base {
         this.getStateProvider().data.heavyCalcProgress = 'Finished!';
     }
 
+    /**
+     * @summary Selects a mounted row (or row 0 fallback) through the View-owned selection model.
+     */
     selectRow() {
         let store         = this.getStore('benchmarkGridStore'),
             {count}       = store,
@@ -111,17 +114,13 @@ class ViewportController extends Base {
             {mountedRows} = grid.body;
 
         if (count > 0) {
-            if (mountedRows[1] > mountedRows[0]) {
-                // Default case: select a random row from the visible (mounted) ones
-                let randomIndex = Math.floor(Math.random() * (mountedRows[1] - mountedRows[0] + 1)) + mountedRows[0];
+            let targetIndex = mountedRows[1] > mountedRows[0]
+                    ? Math.min(count - 1, Math.floor(Math.random() * (mountedRows[1] - mountedRows[0])) + mountedRows[0])
+                    : 0,
+                recordId    = grid.view.getRecordId(store.getAt(targetIndex));
 
-                // Ensure the index is within the bounds of the actual store items
-                if (randomIndex < count) {
-                    grid.body.selectionModel.selectRow(store.getAt(randomIndex).id);
-                }
-            } else {
-                // Fallback for when mountedRows is not ready: select the first row
-                grid.body.selectionModel.selectRow(store.getAt(0).id);
+            if (recordId != null) {
+                grid.view.selectionModel.selectRow(recordId);
             }
         }
     }

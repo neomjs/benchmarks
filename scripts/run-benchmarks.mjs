@@ -14,8 +14,23 @@ async function main() {
     const framework    = frameworkArg ? frameworkArg.split('=')[1] : 'all';
     const suiteArg     = args.find(arg => arg.startsWith('--suite='));
     const suite        = suiteArg ? suiteArg.split('=')[1] : 'all';
-    const projectsArg  = args.find(arg => arg.startsWith('--projects='));
-    const projects     = projectsArg ? projectsArg.split('=')[1].split(',').filter(Boolean) : [];
+    const projectsArg   = args.find(arg => arg.startsWith('--projects='));
+    const projects      = projectsArg ? projectsArg.split('=')[1].split(',').filter(Boolean) : [];
+    const vdomWorkerArg    = args.find(arg => arg.startsWith('--vdom-worker='));
+    const vdomWorkerRaw    = vdomWorkerArg ? vdomWorkerArg.split('=')[1] : process.env.NEO_USE_VDOM_WORKER;
+    const vdomWorker       = vdomWorkerRaw === 'true' ? true : vdomWorkerRaw === 'false' ? false : undefined;
+    const interleaveArms   = args.includes('--interleave-vdom-worker');
+    const bucketArg        = args.find(arg => arg.startsWith('--result-bucket='));
+    const customBucket     = bucketArg ? bucketArg.split('=')[1] : null;
+    const throttleArg      = args.find(arg => arg.startsWith('--cpu-throttle='));
+    const cpuThrottle      = throttleArg ? Number(throttleArg.split('=')[1]) : (process.env.NEO_CPU_THROTTLE ? Number(process.env.NEO_CPU_THROTTLE) : 1);
+    const suffixArg        = args.find(arg => arg.startsWith('--bucket-suffix='));
+    const bucketSuffix     = suffixArg ? suffixArg.split('=')[1] : '';
+
+    if (vdomWorkerRaw !== undefined && vdomWorkerRaw !== '' && vdomWorker === undefined) {
+        console.error(`Error: --vdom-worker / NEO_USE_VDOM_WORKER must be "true" or "false" (got "${vdomWorkerRaw}").`);
+        process.exit(1);
+    }
 
     if (isNaN(runs) || runs < 1) {
         console.error('Error: --runs must be a positive number.');
@@ -76,15 +91,57 @@ async function main() {
                 continue;
             }
 
-            const RESULTS_DIR = path.resolve(process.cwd(), 'test-results-data', fw, s);
+            const projectFlags  = projects.map(p => `--project=${p}`).join(' ');
             const PLAYWRIGHT_RESULTS_FILE = path.resolve(process.cwd(), 'test-results.json');
 
-            console.log(`--- Running suite: ${fw}/${s} ---`);
+            if (fw === 'neo' && interleaveArms) {
+                const trueBucket  = `neo-vdom-worker${bucketSuffix}`;
+                const falseBucket = `neo-app-worker${bucketSuffix}`;
+                const trueDir     = path.resolve(process.cwd(), 'test-results-data', trueBucket, s);
+                const falseDir    = path.resolve(process.cwd(), 'test-results-data', falseBucket, s);
+                console.log(`--- Running AB/BA interleaved suite: ${trueBucket} vs ${falseBucket} (${s}) ---`);
+                await fs.ensureDir(trueDir);
+                await fs.emptyDir(trueDir);
+                await fs.ensureDir(falseDir);
+                await fs.emptyDir(falseDir);
+
+                for (let i = 1; i <= runs; i++) {
+                    const armOrder = (i % 2 === 1) ? [true, false] : [false, true];
+                    for (const arm of armOrder) {
+                        const bucket  = arm ? trueBucket : falseBucket;
+                        const destDir = arm ? trueDir : falseDir;
+                        const throttlePrefix = cpuThrottle > 1 ? `NEO_CPU_THROTTLE=${cpuThrottle} ` : '';
+                        let cmd = `${throttlePrefix}NEO_USE_VDOM_WORKER=${arm} FRAMEWORK=${fw} CI=true npx playwright test ${filesToTest}${projectFlags ? ' ' + projectFlags : ''}`;
+                        if (s === 'big-data') {
+                            cmd = `APP=bigData ${cmd}`;
+                        }
+                        console.log(`--- Running interleaved test: Run ${i} of ${runs} (${bucket}) ---`);
+                        try {
+                            execSync(cmd, { stdio: 'inherit' });
+                            const runResultFile = path.join(destDir, `test-results-run-${i}.json`);
+                            await fs.move(PLAYWRIGHT_RESULTS_FILE, runResultFile, { overwrite: true });
+                            console.log(`Saved results for run ${i} (${bucket}) to ${runResultFile}`);
+                        } catch (error) {
+                            console.error(`An error occurred during interleaved run ${i} (${bucket}) for ${fw}/${s}. Aborting.`);
+                            process.exit(1);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            const resultBucket = customBucket || ((fw === 'neo' && vdomWorker !== undefined)
+                ? (vdomWorker ? 'neo-vdom-worker' : 'neo-app-worker')
+                : fw);
+            const RESULTS_DIR = path.resolve(process.cwd(), 'test-results-data', resultBucket, s);
+
+            console.log(`--- Running suite: ${resultBucket}/${s} ---`);
             await fs.ensureDir(RESULTS_DIR);
             await fs.emptyDir(RESULTS_DIR);
 
-            const projectFlags = projects.map(p => `--project=${p}`).join(' ');
-            let testCommand = `FRAMEWORK=${fw} CI=true npx playwright test ${filesToTest}${projectFlags ? ' ' + projectFlags : ''}`;
+            const throttlePrefix = cpuThrottle > 1 ? `NEO_CPU_THROTTLE=${cpuThrottle} ` : '';
+            const vdomEnvPrefix = (fw === 'neo' && vdomWorker !== undefined) ? `NEO_USE_VDOM_WORKER=${vdomWorker} ` : '';
+            let testCommand = `${throttlePrefix}${vdomEnvPrefix}FRAMEWORK=${fw} CI=true npx playwright test ${filesToTest}${projectFlags ? ' ' + projectFlags : ''}`;
             if (s === 'big-data') {
                 testCommand = `APP=bigData ${testCommand}`;
             }

@@ -1,5 +1,13 @@
 import {test, expect} from '@playwright/test';
-import { measurePerformanceInBrowser, measureUiUpdatePerformanceInBrowser, measureMainThreadProbeInBrowser } from './utils/browser-test-helpers.mjs';
+import {
+    assertNeoVdomWorkerTopology,
+    configureNeoVdomWorker,
+    installWorkerMessageProbeInBrowser,
+    measureJankInBrowser,
+    measureMainThreadProbeInBrowser,
+    measurePerformanceInBrowser,
+    measureUiUpdatePerformanceInBrowser
+} from './utils/browser-test-helpers.mjs';
 
 const getNeoGridNames = () => {
     const names = [];
@@ -27,8 +35,8 @@ const selectComboboxItem = (labelText, itemText) => {
         }
 
         const pickerObserver = new MutationObserver((mutations, observer) => {
-            const picker = document.querySelector('.neo-picker-container');
-            if (picker) {
+            const picker = document.getElementById(`${combobox.id}__picker`);
+            if (picker && picker.getBoundingClientRect().height > 0) {
                 const item = Array.from(picker.querySelectorAll('li')).find(li => li.textContent.trim() === itemText);
                 if (item) {
                     observer.disconnect();
@@ -37,16 +45,20 @@ const selectComboboxItem = (labelText, itemText) => {
                 }
             }
         });
-        pickerObserver.observe(document.body, { childList: true, subtree: true });
+        pickerObserver.observe(document.body, { attributes: true, childList: true, subtree: true });
 
         trigger.click();
     });
 };
 
 test.beforeEach(async ({page}) => {
+    await configureNeoVdomWorker(page);
+
     await page.addInitScript({
         content: `
+            (${installWorkerMessageProbeInBrowser.toString()})();
             window.getNeoGridNames            = ${getNeoGridNames.toString()};
+            window.measureJank                = ${measureJankInBrowser.toString()};
             window.measurePerformance         = ${measurePerformanceInBrowser.toString()};
             window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
             window.measureMainThreadProbe     = ${measureMainThreadProbeInBrowser.toString()};
@@ -74,6 +86,7 @@ test.beforeEach(async ({page}) => {
 
     await page.goto('/apps/bigdata/');
     await page.waitForFunction(() => document.querySelector('[role="grid"]'));
+    await assertNeoVdomWorkerTopology(page);
 });
 
 test('should load the app and display the initial grid data', async ({page}) => {
@@ -369,10 +382,14 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     console.log(`[Benchmark] ${colsMetricName}: ${colsProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${colsProbe.maxRafDeltaMs.toFixed(2)} ms)`);
     console.log(`[Benchmark] ${colsUiUpdateMetricName}: ${colsUiUpdateDuration !== null ? colsUiUpdateDuration.toFixed(2) : 'N/A'} ms`);
 
-    // Ensure all 200 column positions are synced to the horizontal scrollbar before scrolling
+    // Ensure all 200 column positions and 100k row scrollHeight are synced before scrolling
     await page.waitForFunction(() => {
+        const vScroll = document.querySelector('.neo-grid-view');
         const hScroll = document.querySelector('.neo-grid-horizontal-scrollbar');
-        return hScroll && hScroll.scrollWidth > 15000;
+        const numCell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="firstname"]');
+        return vScroll && vScroll.scrollHeight > 3000000 &&
+               hScroll && hScroll.scrollWidth > 15000 &&
+               numCell && numCell.textContent.trim().length > 0;
     });
 
     // 3. 2D Scrolling Benchmarks on 100,000 rows x 200 columns (Vertical, Horizontal, Diagonal)
@@ -404,6 +421,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
         // 3a. Vertical Scroll across 100k rows (8 render-gated steps)
         const vSteps = [5000, 15000, 30000, 45000, 60000, 75000, 90000, 0];
         let vIdx = 0;
+        window.startWorkerMessageProbe();
         const verticalProbe = await measureProbe('scroll-vertical-100k', () => {
             vIdx = 0;
             vScroller.scrollTop = vSteps[0] * rowHeight;
@@ -416,6 +434,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             }
             return vIdx >= vSteps.length;
         });
+        const verticalWorkerStats = window.stopWorkerMessageProbe();
 
         // 3b. Horizontal Scroll across 200 columns (8 render-gated steps at row 0)
         const hSteps = [
@@ -429,6 +448,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             { colNum: 0,   field: 'firstname' }
         ];
         let hIdx = 0;
+        window.startWorkerMessageProbe();
         const horizontalProbe = await measureProbe('scroll-horizontal-200-cols', () => {
             hIdx = 0;
             hScroller.scrollLeft = getColScrollLeft(hSteps[0].colNum);
@@ -441,6 +461,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             }
             return hIdx >= hSteps.length;
         });
+        const horizontalWorkerStats = window.stopWorkerMessageProbe();
 
         // 3c. 2D Diagonal Scroll across 100k rows x 200 columns (8 simultaneous vertical + horizontal steps)
         const dSteps = [
@@ -454,6 +475,7 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             { rowId: 0,     colNum: 0,   field: 'firstname' }
         ];
         let dIdx = 0;
+        window.startWorkerMessageProbe();
         const diagonalProbe = await measureProbe('scroll-diagonal-2d', () => {
             dIdx = 0;
             vScroller.scrollTop  = dSteps[0].rowId * rowHeight;
@@ -468,8 +490,25 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             }
             return dIdx >= dSteps.length;
         });
+        const diagonalWorkerStats = window.stopWorkerMessageProbe();
 
-        return { verticalProbe, horizontalProbe, diagonalProbe };
+        return {
+            verticalProbe,
+            horizontalProbe,
+            diagonalProbe,
+            verticalWorkerStats,
+            horizontalWorkerStats,
+            diagonalWorkerStats
+        };
+    });
+
+    test.info().annotations.push({
+        type: 'workerMessagesScroll2D',
+        description: JSON.stringify({
+            vertical  : scrollProbes.verticalWorkerStats,
+            horizontal: scrollProbes.horizontalWorkerStats,
+            diagonal  : scrollProbes.diagonalWorkerStats
+        })
     });
 
     test.info().annotations.push({
@@ -496,4 +535,369 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     console.log(`[Benchmark] scroll-vertical-100k: ${scrollProbes.verticalProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${scrollProbes.verticalProbe.maxRafDeltaMs.toFixed(2)} ms)`);
     console.log(`[Benchmark] scroll-horizontal-200-cols: ${scrollProbes.horizontalProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${scrollProbes.horizontalProbe.maxRafDeltaMs.toFixed(2)} ms)`);
     console.log(`[Benchmark] scroll-diagonal-2d: ${scrollProbes.diagonalProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${scrollProbes.diagonalProbe.maxRafDeltaMs.toFixed(2)} ms)`);
+});
+
+test('should sustain real-time streaming and 2D scrolling under duress (100k rows x 200 cols)', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await page.evaluate(() => window.selectComboboxItem('Amount Rows', '100000'));
+    await page.waitForFunction(() => document.querySelector('[role="grid"]')?.getAttribute('aria-rowcount') === '100001');
+
+    await page.evaluate(() => window.selectComboboxItem('Amount Columns', '200'));
+    await page.waitForFunction(() => {
+        const grid    = document.querySelector('[role="grid"]');
+        const hScroll = document.querySelector('.neo-grid-horizontal-scrollbar');
+        return grid?.getAttribute('aria-colcount') === '200' && hScroll && hScroll.scrollWidth > 15000;
+    });
+
+    const duressMetrics = await page.evaluate(async () => {
+        const toggleFeed = () => {
+            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Start/Stop Feed'));
+            if (!btn) throw new Error('Start/Stop Feed button not found in BigData ControlsContainer.');
+            btn.click();
+        };
+
+        toggleFeed();
+        await new Promise(res => setTimeout(res, 50));
+
+        // 1. Stationary high-frequency viewport + multi-column + sibling-component streaming (2,500ms)
+        window.startWorkerMessageProbe();
+        const streamJank        = await window.measureJank(2500);
+        const streamWorkerStats = window.stopWorkerMessageProbe();
+
+        // 2. 8-hop 2D Diagonal Scroll across 100k x 200 cols while 5ms real-time feed is active
+        const vScroller = document.querySelector('.neo-grid-view');
+        const hScroller = document.querySelector('.neo-grid-horizontal-scrollbar');
+        const sampleRow = document.querySelector('.neo-grid-row[data-row-id]');
+        const rowHeight = sampleRow ? (parseFloat(sampleRow.style.height) || sampleRow.offsetHeight || 32) : 32;
+
+        const getColScrollLeft = (colNum) => {
+            if (colNum <= 0) return 0;
+            const maxLeft = Math.max(0, hScroller.scrollWidth - hScroller.clientWidth);
+            return Math.min(maxLeft, 760 + (colNum - 7) * 100);
+        };
+
+        const isCellMounted = (rowId, field) => {
+            const cell = document.querySelector(`.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell[data-field="${field}"]`);
+            return !!cell && cell.textContent.trim().length > 0;
+        };
+
+        const dSteps = [
+            { rowId: 5000,  colNum: 30,  field: 'number30'  },
+            { rowId: 15000, colNum: 60,  field: 'number60'  },
+            { rowId: 30000, colNum: 90,  field: 'number90'  },
+            { rowId: 45000, colNum: 120, field: 'number120' },
+            { rowId: 60000, colNum: 150, field: 'number150' },
+            { rowId: 75000, colNum: 180, field: 'number180' },
+            { rowId: 90000, colNum: 195, field: 'number195' },
+            { rowId: 0,     colNum: 0,   field: 'firstname' }
+        ];
+        let dIdx = 0;
+
+        window.startWorkerMessageProbe();
+        const diagonalDuressProbe = await window.measureMainThreadProbe('scroll-diagonal-2d-under-stream', () => {
+            dIdx = 0;
+            vScroller.scrollTop  = dSteps[0].rowId * rowHeight;
+            hScroller.scrollLeft = getColScrollLeft(dSteps[0].colNum);
+        }, () => {
+            while (dIdx < dSteps.length && isCellMounted(dSteps[dIdx].rowId, dSteps[dIdx].field)) {
+                dIdx++;
+                if (dIdx < dSteps.length) {
+                    vScroller.scrollTop  = dSteps[dIdx].rowId * rowHeight;
+                    hScroller.scrollLeft = getColScrollLeft(dSteps[dIdx].colNum);
+                }
+            }
+            return dIdx >= dSteps.length;
+        });
+        const diagonalDuressWorkerStats = window.stopWorkerMessageProbe();
+
+        toggleFeed();
+
+        return {
+            streamJank,
+            streamWorkerStats,
+            diagonalDuressProbe,
+            diagonalDuressWorkerStats
+        };
+    });
+
+    test.info().annotations.push({
+        type: 'performance',
+        description: JSON.stringify({
+            'stream-100k-x-200-fps'                                   : duressMetrics.streamJank.averageFps,
+            'stream-100k-x-200-long-frames'                           : duressMetrics.streamJank.longFrameCount,
+            'stream-100k-x-200-flights-per-sec'                       : duressMetrics.streamWorkerStats.flightsPerSec,
+            'stream-100k-x-200-main-msgs'                             : duressMetrics.streamWorkerStats.totalMainWorkerMessages,
+            'scroll-diagonal-2d-under-stream'                         : duressMetrics.diagonalDuressProbe.tvsMs,
+            'scroll-diagonal-2d-under-stream (Max RAF Delta)'         : duressMetrics.diagonalDuressProbe.maxRafDeltaMs,
+            ...(duressMetrics.diagonalDuressProbe.longTaskTotalBlockingMs !== null ? {
+                'scroll-diagonal-2d-under-stream (Long Task Block)'   : duressMetrics.diagonalDuressProbe.longTaskTotalBlockingMs
+            } : {}),
+            'scroll-diagonal-2d-under-stream-flights'                 : duressMetrics.diagonalDuressWorkerStats.domUpdateFlights,
+            'scroll-diagonal-2d-under-stream-main-msgs'               : duressMetrics.diagonalDuressWorkerStats.totalMainWorkerMessages
+        })
+    });
+
+    test.info().annotations.push({
+        type: 'workerMessagesDuress',
+        description: JSON.stringify({
+            stationaryStream  : duressMetrics.streamWorkerStats,
+            diagonalUnderStream: duressMetrics.diagonalDuressWorkerStats
+        })
+    });
+
+    console.log(`[Benchmark] BigData 100k x 200 Stationary Stream (2.5s): FPS=${duressMetrics.streamJank.averageFps}, flights/s=${duressMetrics.streamWorkerStats.flightsPerSec}, mainMsgs=${duressMetrics.streamWorkerStats.totalMainWorkerMessages}`);
+    console.log(`[Benchmark] BigData 100k x 200 Diagonal Scroll Under Stream: ${duressMetrics.diagonalDuressProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${duressMetrics.diagonalDuressProbe.maxRafDeltaMs.toFixed(2)} ms, flights: ${duressMetrics.diagonalDuressWorkerStats.domUpdateFlights}, mainMsgs: ${duressMetrics.diagonalDuressWorkerStats.totalMainWorkerMessages})`);
+});
+
+test('should stress high row/column buffering (50x20, >5k nodes), 100k store filter/re-render, and n=20 2D scroll under stream', async ({ page }) => {
+    test.setTimeout(180000);
+
+    await page.evaluate(() => window.selectComboboxItem('Amount Rows', '100000'));
+    await page.waitForFunction(() => {
+        const grid    = document.querySelector('[role="grid"]');
+        const vScroll = document.querySelector('.neo-grid-view');
+        return grid?.getAttribute('aria-rowcount') === '100001' && vScroll && vScroll.scrollHeight > 3000000;
+    });
+
+    await page.evaluate(() => window.selectComboboxItem('Amount Columns', '200'));
+    await page.waitForFunction(() => {
+        const grid    = document.querySelector('[role="grid"]');
+        const hScroll = document.querySelector('.neo-grid-horizontal-scrollbar');
+        const numCell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="firstname"]');
+        return grid?.getAttribute('aria-colcount') === '200' &&
+               hScroll && hScroll.scrollWidth > 15000 &&
+               numCell && numCell.textContent.trim().length > 0;
+    });
+
+    // Maximize mounted VDOM/VNode tree via Buffer Rows = 50 and Buffer Columns = 20
+    await page.evaluate(() => window.selectComboboxItem('Buffer Rows', '50'));
+    await page.waitForTimeout(100);
+    await page.evaluate(() => window.selectComboboxItem('Buffer Columns', '20'));
+
+    // Position viewport at (row 60, scrollLeft 800) so both -/+ row buffers and col 0..40+ are mounted
+    await page.evaluate(() => {
+        const vScroller   = document.querySelector('.neo-grid-view');
+        const hScroller   = document.querySelector('.neo-grid-horizontal-scrollbar');
+        const sampleRow   = document.querySelector('.neo-grid-row[data-row-id]');
+        const rowHeight   = sampleRow ? (parseFloat(sampleRow.style.height) || sampleRow.offsetHeight || 32) : 32;
+        vScroller.scrollTop  = 60 * rowHeight;
+        hScroller.scrollLeft = 800;
+    });
+
+    await page.waitForFunction(() => {
+        const rows  = document.querySelectorAll('.neo-grid-body .neo-grid-row');
+        const cells = document.querySelectorAll('.neo-grid-body .neo-grid-cell');
+        return rows.length >= 80 && cells.length >= 2000;
+    });
+
+    const highBufferMetrics = await page.evaluate(async () => {
+        const gridBody        = document.querySelector('.neo-grid-body');
+        const vScroller       = document.querySelector('.neo-grid-view');
+        const hScroller       = document.querySelector('.neo-grid-horizontal-scrollbar');
+        const mountedRows     = gridBody.querySelectorAll('.neo-grid-row').length;
+        const mountedCells    = gridBody.querySelectorAll('.neo-grid-cell').length;
+        const mountedDomNodes = gridBody.querySelectorAll('*').length;
+
+        const toggleFeed = () => {
+            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Start/Stop Feed'));
+            if (!btn) throw new Error('Start/Stop Feed button not found.');
+            btn.click();
+        };
+
+        const setFirstnameFilter = (value) => {
+            const label     = Array.from(document.querySelectorAll('label')).find(l => l.textContent === 'Firstname');
+            const textfield = label.closest('.neo-textfield');
+            const input     = textfield.querySelector('input');
+            input.value     = value;
+            input.dispatchEvent(new Event('input',  { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+
+        const getRow0Firstname = () => {
+            const cell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="firstname"]');
+            return cell ? cell.textContent.trim() : null;
+        };
+
+        // Start 5ms 60-row/tick real-time feed
+        toggleFeed();
+        await new Promise(res => setTimeout(res, 60));
+
+        // 1. Stationary high-buffer (>4k DOM nodes) streaming window (2,000ms)
+        window.startWorkerMessageProbe();
+        const streamJank        = await window.measureJank(2000);
+        const streamWorkerStats = window.stopWorkerMessageProbe();
+
+        // Reset to top-left so row 0 firstname is mounted across 100k filter toggles (Buffer 50x20 keeps ~72 rows x ~35 cols mounted)
+        vScroller.scrollTop  = 0;
+        hScroller.scrollLeft = 0;
+        await new Promise(res => setTimeout(res, 80));
+
+        // 2. 10x App-worker 100k-record filter + full high-buffer structural re-renders under stream
+        const filterStepTvs    = [];
+        const filterStepMaxRaf = [];
+        let filterLongTaskSum  = 0;
+        window.startWorkerMessageProbe();
+        for (let i = 0; i < 10; i++) {
+            const isClearStep = (i === 9);
+            const currentName = getRow0Firstname();
+            const targetValue = isClearStep ? '' : (i % 2 === 0
+                ? (currentName === 'Amanda' ? 'Andrew' : 'Amanda')
+                : (currentName === 'John'   ? 'Jessica' : 'John'));
+
+            const probe = await window.measureMainThreadProbe(`highbuf-filter-${i + 1}`, () => {
+                setFirstnameFilter(targetValue);
+            }, () => {
+                if (isClearStep) {
+                    return document.querySelector('[role="grid"]')?.getAttribute('aria-rowcount') === '100001' &&
+                           Boolean(getRow0Firstname());
+                }
+                return getRow0Firstname() === targetValue;
+            });
+
+            filterStepTvs.push(probe.tvsMs);
+            filterStepMaxRaf.push(probe.maxRafDeltaMs);
+            filterLongTaskSum += (probe.longTaskTotalBlockingMs || 0);
+            await new Promise(res => setTimeout(res, 20));
+        }
+        const filterWorkerStats = window.stopWorkerMessageProbe();
+
+        while (vScroller.scrollHeight < 3000000) {
+            await new Promise(res => setTimeout(res, 16));
+        }
+
+        // 3. 12x discrete 2D diagonal scroll hops across 100k x 200 under high-buffer (>5k nodes) + active stream
+        const sampleRow = document.querySelector('.neo-grid-row[data-row-id]');
+        const rowHeight = sampleRow ? (parseFloat(sampleRow.style.height) || sampleRow.offsetHeight || 32) : 32;
+
+        const getColScrollLeft = (colNum) => {
+            if (colNum <= 0) return 0;
+            const maxLeft = Math.max(0, hScroller.scrollWidth - hScroller.clientWidth);
+            return Math.min(maxLeft, 760 + (colNum - 7) * 100);
+        };
+
+        const isCellMounted = (rowId, field) => {
+            const cell = document.querySelector(`.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell[data-field="${field}"]`);
+            return !!cell && cell.textContent.trim().length > 0;
+        };
+
+        const hops20 = [
+            { rowId: 4000,  colNum: 25,  field: 'number25'  },
+            { rowId: 9000,  colNum: 45,  field: 'number45'  },
+            { rowId: 14000, colNum: 65,  field: 'number65'  },
+            { rowId: 19000, colNum: 85,  field: 'number85'  },
+            { rowId: 25000, colNum: 105, field: 'number105' },
+            { rowId: 31000, colNum: 125, field: 'number125' },
+            { rowId: 38000, colNum: 145, field: 'number145' },
+            { rowId: 45000, colNum: 165, field: 'number165' },
+            { rowId: 52000, colNum: 180, field: 'number180' },
+            { rowId: 60000, colNum: 155, field: 'number155' },
+            { rowId: 68000, colNum: 135, field: 'number135' },
+            { rowId: 76000, colNum: 115, field: 'number115' },
+            { rowId: 84000, colNum: 95,  field: 'number95'  },
+            { rowId: 92000, colNum: 75,  field: 'number75'  },
+            { rowId: 80000, colNum: 55,  field: 'number55'  },
+            { rowId: 65000, colNum: 35,  field: 'number35'  },
+            { rowId: 50000, colNum: 70,  field: 'number70'  },
+            { rowId: 35000, colNum: 110, field: 'number110' },
+            { rowId: 20000, colNum: 150, field: 'number150' },
+            { rowId: 5000,  colNum: 30,  field: 'number30'  }
+        ];
+
+        const scrollHopTvs    = [];
+        const scrollHopMaxRaf = [];
+        let scrollLongTaskSum = 0;
+        let peakMountedNodes  = mountedDomNodes;
+
+        window.startWorkerMessageProbe();
+        for (let i = 0; i < hops20.length; i++) {
+            const hop = hops20[i];
+            const probe = await window.measureMainThreadProbe(`highbuf-hop-${i + 1}`, () => {
+                vScroller.scrollTop  = hop.rowId * rowHeight;
+                hScroller.scrollLeft = getColScrollLeft(hop.colNum);
+            }, () => isCellMounted(hop.rowId, hop.field));
+
+            scrollHopTvs.push(probe.tvsMs);
+            scrollHopMaxRaf.push(probe.maxRafDeltaMs);
+            scrollLongTaskSum += (probe.longTaskTotalBlockingMs || 0);
+            if (i === 4) {
+                peakMountedNodes = Math.max(peakMountedNodes, gridBody.querySelectorAll('*').length);
+            }
+            await new Promise(res => setTimeout(res, 25));
+        }
+        const scrollWorkerStats = window.stopWorkerMessageProbe();
+
+        toggleFeed();
+
+        const sum = (arr) => arr.reduce((s, x) => s + x, 0);
+        return {
+            mountedRows,
+            mountedCells,
+            mountedDomNodes,
+            peakMountedNodes,
+            streamJank,
+            streamWorkerStats,
+            filterStepTvs,
+            filterStepMaxRaf,
+            filterTotalTvsMs    : Math.round(sum(filterStepTvs) * 100) / 100,
+            filterMeanStepTvsMs : Math.round((sum(filterStepTvs) / filterStepTvs.length) * 100) / 100,
+            filterMaxStepTvsMs  : Math.max(...filterStepTvs),
+            filterMaxRafMs      : Math.max(...filterStepMaxRaf),
+            filterLongTaskSumMs : Math.round(filterLongTaskSum * 100) / 100,
+            filterWorkerStats,
+            scrollHopTvs,
+            scrollHopMaxRaf,
+            scrollTotalTvsMs    : Math.round(sum(scrollHopTvs) * 100) / 100,
+            scrollMeanHopTvsMs  : Math.round((sum(scrollHopTvs) / scrollHopTvs.length) * 100) / 100,
+            scrollMaxHopTvsMs   : Math.max(...scrollHopTvs),
+            scrollMaxRafMs      : Math.max(...scrollHopMaxRaf),
+            scrollLongTaskSumMs : Math.round(scrollLongTaskSum * 100) / 100,
+            scrollWorkerStats
+        };
+    });
+
+    test.info().annotations.push({
+        type       : 'performance',
+        description: JSON.stringify({
+            'highbuf-50x20-peak-dom-nodes'             : highBufferMetrics.peakMountedNodes,
+            'highbuf-50x20-stream-fps'                 : highBufferMetrics.streamJank.averageFps,
+            'highbuf-50x20-stream-long-frames'         : highBufferMetrics.streamJank.longFrameCount,
+            'highbuf-50x20-stream-flights-per-sec'     : highBufferMetrics.streamWorkerStats.flightsPerSec,
+            'highbuf-50x20-stream-vnode-relays'        : highBufferMetrics.streamWorkerStats.vnodeRelayMessages,
+            'highbuf-50x20-filter20-mean-step-tvs'     : highBufferMetrics.filterMeanStepTvsMs,
+            'highbuf-50x20-filter20-max-step-tvs'      : highBufferMetrics.filterMaxStepTvsMs,
+            'highbuf-50x20-filter20-max-raf'           : highBufferMetrics.filterMaxRafMs,
+            'highbuf-50x20-filter20-longtask'          : highBufferMetrics.filterLongTaskSumMs,
+            'highbuf-50x20-scroll20-mean-hop-tvs'      : highBufferMetrics.scrollMeanHopTvsMs,
+            'highbuf-50x20-scroll20-max-hop-tvs'       : highBufferMetrics.scrollMaxHopTvsMs,
+            'highbuf-50x20-scroll20-max-raf'           : highBufferMetrics.scrollMaxRafMs,
+            'highbuf-50x20-scroll20-longtask'          : highBufferMetrics.scrollLongTaskSumMs
+        })
+    });
+
+    test.info().annotations.push({
+        type       : 'highBufferFilterStepTimes',
+        description: JSON.stringify(highBufferMetrics.filterStepTvs)
+    });
+
+    test.info().annotations.push({
+        type       : 'highBufferScrollHopTimes',
+        description: JSON.stringify(highBufferMetrics.scrollHopTvs)
+    });
+
+    test.info().annotations.push({
+        type       : 'workerMessagesHighBuffer',
+        description: JSON.stringify({
+            mountedRows      : highBufferMetrics.mountedRows,
+            mountedCells     : highBufferMetrics.mountedCells,
+            peakMountedNodes : highBufferMetrics.peakMountedNodes,
+            stationaryStream : highBufferMetrics.streamWorkerStats,
+            filter20UnderFeed: highBufferMetrics.filterWorkerStats,
+            scroll20UnderFeed: highBufferMetrics.scrollWorkerStats
+        })
+    });
+
+    console.log(`[Benchmark] High-Buffer (50x20, peakNodes=${highBufferMetrics.peakMountedNodes}) Stream: FPS=${highBufferMetrics.streamJank.averageFps}, flights/s=${highBufferMetrics.streamWorkerStats.flightsPerSec}, relays=${highBufferMetrics.streamWorkerStats.vnodeRelayMessages}`);
+    console.log(`[Benchmark] High-Buffer (50x20) 20x 100k Filter+Render Under Feed: mean=${highBufferMetrics.filterMeanStepTvsMs}ms, max=${highBufferMetrics.filterMaxStepTvsMs}ms, maxRAF=${highBufferMetrics.filterMaxRafMs}ms`);
+    console.log(`[Benchmark] High-Buffer (50x20) 20x 2D Scroll Hops Under Feed: mean=${highBufferMetrics.scrollMeanHopTvsMs}ms, max=${highBufferMetrics.scrollMaxHopTvsMs}ms, maxRAF=${highBufferMetrics.scrollMaxRafMs}ms`);
 });

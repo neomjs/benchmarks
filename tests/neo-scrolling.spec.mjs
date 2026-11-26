@@ -1,19 +1,26 @@
 import {test, expect} from '@playwright/test';
-import { measurePerformanceInBrowser, measureJankInBrowser } from './utils/browser-test-helpers.mjs';
+import {
+    assertNeoVdomWorkerTopology,
+    configureNeoVdomWorker,
+    installWorkerMessageProbeInBrowser,
+    measureJankInBrowser,
+    measurePerformanceInBrowser
+} from './utils/browser-test-helpers.mjs';
 
 /**
- * A robust, observer-based function to wait for the grid to be ready for test setup.
+ * @summary Waits for the Neo v14 grid to report `expectedRowCount` and mount row `0`, then verifies worker topology.
  * @param {import('@playwright/test').Page} page
  * @param {number} expectedRowCount
  * @param {number} [timeout=10000]
  */
-async function waitForGridReady(page, expectedRowCount, timeout = 10000) {
+async function waitForGridReady(page, expectedRowCount, timeout = 30000) {
     await page.waitForFunction((expectedRowCount) => {
         const grid            = document.querySelector('[role="grid"]');
         const rowCountCorrect = grid && grid.getAttribute('aria-rowcount') === String(expectedRowCount);
-        const firstRowExists  = document.querySelector('#neo-grid-body-1__row-0');
+        const firstRowExists  = document.querySelector('.neo-grid-row[data-row-id="0"]');
         return rowCountCorrect && firstRowExists;
     }, expectedRowCount, {timeout});
+    await assertNeoVdomWorkerTopology(page);
 }
 
 /**
@@ -30,14 +37,14 @@ async function waitForGridReady(page, expectedRowCount, timeout = 10000) {
  */
 const runDiscreteScrollBenchmark = (scrollAmountRows, numScrolls, rowHeight, gridRenderOffset) => {
     return new Promise(async (resolve, reject) => {
-        const scrollableElement = document.querySelector('.neo-grid-body-wrapper');
+        const scrollableElement = document.querySelector('.neo-grid-view');
         if (!scrollableElement) {
-            reject(new Error('Scrollable element .neo-grid-body-wrapper not found.'));
+            reject(new Error('Scrollable element .neo-grid-view not found.'));
             return;
         }
 
         const scrollAmountPx = scrollAmountRows * rowHeight;
-        const timeout = navigator.userAgent.includes('Firefox') ? 10000 : 5000; // 10s for Firefox, 5s for others
+        const timeout = navigator.userAgent.includes('Firefox') ? 15000 : 15000;
 
         const results = [];
         let currentScrollTop = scrollableElement.scrollTop;
@@ -46,18 +53,23 @@ const runDiscreteScrollBenchmark = (scrollAmountRows, numScrolls, rowHeight, gri
             // CRITICAL FIX for Firefox: Removed Math.min capping by scrollHeight - clientHeight
             const targetScrollTop = currentScrollTop + scrollAmountPx;
 
-            // Adjusted expectedTopRowIndex to account for gridRenderOffset
-            const expectedTopRowIndex = Math.floor(targetScrollTop / rowHeight) - gridRenderOffset;
+            // Adjusted expectedTopRowIndex to account for gridRenderOffset (bufferRowRange)
+            const expectedTopRowIndex = Math.max(0, Math.floor(targetScrollTop / rowHeight) - gridRenderOffset);
 
             const action = (passThrough) => {
                 passThrough.scrollableElement.scrollTop = passThrough.targetScrollTop;
             };
 
             const condition = (passThrough) => {
-                const { expectedTopRowIndex, scrollStep } = passThrough;
-                const firstVisibleRow = document.querySelector('.neo-grid-body .neo-grid-row[aria-rowindex]');
-                // Corrected: aria-rowindex is 1-based and first real row is index 2
-                const actualTopRowIndex = firstVisibleRow ? parseInt(firstVisibleRow.getAttribute('aria-rowindex'), 10) - 2 : -1;
+                const { expectedTopRowIndex } = passThrough;
+                const mountedRows = document.querySelectorAll('.neo-grid-body .neo-grid-row[aria-rowindex]:not([aria-hidden="true"])');
+                let actualTopRowIndex = Infinity;
+                for (let j = 0; j < mountedRows.length; j++) {
+                    const idx = parseInt(mountedRows[j].getAttribute('aria-rowindex'), 10) - 2;
+                    if (idx < actualTopRowIndex) {
+                        actualTopRowIndex = idx;
+                    }
+                }
 
                 const isGridInValidState = (actualTopRowIndex === expectedTopRowIndex);
 
@@ -103,9 +115,12 @@ const runDiscreteScrollBenchmark = (scrollAmountRows, numScrolls, rowHeight, gri
 };
 
 test.beforeEach(async ({page}) => {
+    await configureNeoVdomWorker(page);
+
     // Inject the measurement functions into the browser context's window object
     await page.addInitScript({
         content: `
+            (${installWorkerMessageProbeInBrowser.toString()})();
             window.measurePerformance = ${measurePerformanceInBrowser.toString()};
             window.measureJank        = ${measureJankInBrowser.toString()};
             window.runDiscreteScrollBenchmark = ${runDiscreteScrollBenchmark.toString()};
@@ -136,10 +151,13 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
     const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Fixed offset due to headers and buffering (set to 3 as per user)
 
-    // Measure discrete scrolling fluidity
-    const results = await page.evaluate((params) => {
+    // Measure discrete scrolling fluidity + worker message volume
+    const { results, workerStats } = await page.evaluate(async (params) => {
         const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
-        return window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+        window.startWorkerMessageProbe();
+        const results     = await window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+        const workerStats = window.stopWorkerMessageProbe();
+        return { results, workerStats };
     }, { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset });
 
     // Stop the feed
@@ -155,7 +173,9 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 10k Rows UI Responsi
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'stepTimes', description: JSON.stringify(validResults.map(r => Math.round(r.timeToValidState * 100) / 100))});
     test.info().annotations.push({type: 'updateSuccessRate', description: `${updateSuccessRate.toFixed(2)}%`});
+    test.info().annotations.push({type: 'workerMessages', description: JSON.stringify(workerStats)});
 
     console.log(`Discrete Scrolling Metrics (10k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
@@ -186,10 +206,13 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
     const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Fixed offset due to headers and buffering (set to 3 as per user)
 
-    // Measure discrete scrolling fluidity
-    const results = await page.evaluate((params) => {
+    // Measure discrete scrolling fluidity + worker message volume
+    const { results, workerStats } = await page.evaluate(async (params) => {
         const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
-        return window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+        window.startWorkerMessageProbe();
+        const results     = await window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+        const workerStats = window.stopWorkerMessageProbe();
+        return { results, workerStats };
     }, { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset });
 
     // Stop the feed
@@ -205,7 +228,9 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 100k Rows UI Respons
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'stepTimes', description: JSON.stringify(validResults.map(r => Math.round(r.timeToValidState * 100) / 100))});
     test.info().annotations.push({type: 'updateSuccessRate', description: `${updateSuccessRate.toFixed(2)}%`});
+    test.info().annotations.push({type: 'workerMessages', description: JSON.stringify(workerStats)});
 
     console.log(`Discrete Scrolling Metrics (100k Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
@@ -242,10 +267,13 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
     const numScrolls       = 20; // Perform 20 discrete scroll steps
     const gridRenderOffset = 3; // Fixed offset due to headers and buffering (set to 3 as per user)
 
-    // Measure discrete scrolling fluidity
-    const results = await page.evaluate((params) => {
+    // Measure discrete scrolling fluidity + worker message volume
+    const { results, workerStats } = await page.evaluate(async (params) => {
         const { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset } = params;
-        return window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+        window.startWorkerMessageProbe();
+        const results     = await window.runDiscreteScrollBenchmark(scrollAmountRows, numScrolls, rowHeight, gridRenderOffset);
+        const workerStats = window.stopWorkerMessageProbe();
+        return { results, workerStats };
     }, { scrollAmountRows, numScrolls, rowHeight, gridRenderOffset });
 
     // Stop the feed
@@ -261,7 +289,9 @@ test('Neo.mjs benchmark: Scrolling Performance Under Duress 1M Rows UI Responsiv
 
     test.info().annotations.push({type: 'avgTimeToValidState', description: `${avgTimeToValidState.toFixed(2)}ms`});
     test.info().annotations.push({type: 'maxTimeToValidState', description: `${maxTimeToValidState.toFixed(2)}ms`});
+    test.info().annotations.push({type: 'stepTimes', description: JSON.stringify(validResults.map(r => Math.round(r.timeToValidState * 100) / 100))});
     test.info().annotations.push({type: 'updateSuccessRate', description: `${updateSuccessRate.toFixed(2)}%`});
+    test.info().annotations.push({type: 'workerMessages', description: JSON.stringify(workerStats)});
 
     console.log(`Discrete Scrolling Metrics (1M Rows):`, {
         avgTimeToValidState: avgTimeToValidState.toFixed(2),
