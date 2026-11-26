@@ -1,0 +1,18 @@
+{
+    "context": {
+        "fileName": [
+            "AGENTS.md",
+            "GEMINI.md"
+        ]
+    },
+    "mcpServers": {
+        "neural-link": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "neo-neural-link"
+            ],
+            "trust": true
+        }
+    }
+}

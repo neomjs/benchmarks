@@ -192,13 +192,30 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
               armBDir = path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-b-neo-kb-only'),
               armCDir = path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link');
 
-        const armAMcp = await fs.readJson(path.join(armADir, '.mcp.json')),
-              armBMcp = await fs.readJson(path.join(armBDir, '.mcp.json')),
-              armCMcp = await fs.readJson(path.join(armCDir, '.mcp.json'));
+        const armAMcp    = await fs.readJson(path.join(armADir, '.mcp.json')),
+              armBMcp    = await fs.readJson(path.join(armBDir, '.mcp.json')),
+              armCMcp    = await fs.readJson(path.join(armCDir, '.mcp.json')),
+              armAGemini = await fs.readJson(path.join(armADir, '.gemini/settings.json')),
+              armBGemini = await fs.readJson(path.join(armBDir, '.gemini/settings.json')),
+              armCGemini = await fs.readJson(path.join(armCDir, '.gemini/settings.json'));
 
         expect(Object.keys(armAMcp.mcpServers)).toEqual(['ag-mcp']);
         expect(Object.keys(armBMcp.mcpServers)).toEqual([]);
         expect(Object.keys(armCMcp.mcpServers)).toEqual(['neural-link']);
+
+        expect(armAGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
+        expect(armBGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
+        expect(armCGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
+        expect(Object.keys(armAGemini.mcpServers)).toEqual(['ag-mcp']);
+        expect(Object.keys(armBGemini.mcpServers)).toEqual([]);
+        expect(Object.keys(armCGemini.mcpServers)).toEqual(['neural-link']);
+
+        const armBPkg = await fs.readJson(path.join(armBDir, 'package.json')),
+              armCPkg = await fs.readJson(path.join(armCDir, 'package.json'));
+        expect(armBPkg.dependencies['neo.mjs']).toBe('14.0.0');
+        expect(armCPkg.dependencies['neo.mjs']).toBe('14.0.0');
+        expect(armBPkg.devDependencies['neo-agent-skills']).toBe('2.9.3');
+        expect(armCPkg.devDependencies['neo-agent-skills']).toBe('2.9.3');
 
         const armAPkg = await fs.readJson(path.join(armADir, 'package.json'));
         for (const ver of [...Object.values(armAPkg.dependencies), ...Object.values(armAPkg.devDependencies)]) {
@@ -398,7 +415,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             arm              : 'arm-c-neo-kb-neural-link',
             harness          : 'claude-code',
             model            : 'claude-opus-4-7',
-            versions         : {harnessVersion: '2.1.12', frameworkVersion: 'neo.mjs@13.3.1'},
+            versions         : {harnessVersion: '2.1.12', frameworkVersion: 'neo.mjs@14.0.0'},
             pass             : true,
             timeToGreenMs    : 150000,
             sessionDurationMs: null,
@@ -475,7 +492,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(report.arms).toHaveLength(2);
         expect(markdown).toContain('claude-code');
         expect(markdown).toContain('claude-opus-4-7');
-        expect(markdown).toContain('neo.mjs@13.3.1');
+        expect(markdown).toContain('neo.mjs@14.0.0');
         expect(markdown).toContain('150000');
         expect(markdown).toContain('N/A');
     });
@@ -742,8 +759,11 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 NEO_PLANE_DATA_ROOT   : '/private/plane',
                 NEO_NL_PORT           : '8081',
                 AGY_ACCOUNT           : 'work',
+                GEMINI_CLI_IDE_SERVER : '12345',
                 CLAUDECODE            : '1',
-                CLAUDE_CODE_ENTRYPOINT: 'cli'
+                CLAUDE_CODE_ENTRYPOINT: 'cli',
+                CLAUDE_CONFIG_DIR     : '/Users/tester/.neo-ai/claude',
+                CODEX_HOME            : '/Users/tester/.neo-ai/codex'
             },
             {PORT: 18080, NEO_NL_PORT: 18081}
         );
@@ -784,12 +804,14 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(stagedC.appUrl).toBe(`http://localhost:${customAppPortC}/apps/gridbench/index.html`);
 
             const stagedMcp       = await fs.readJson(path.join(stagedC.armDir, '.mcp.json')),
+                  stagedGemini    = await fs.readJson(path.join(stagedC.armDir, '.gemini/settings.json')),
                   stagedCodexToml = await fs.readFile(path.join(stagedC.armDir, '.codex/config.toml'), 'utf8'),
                   stagedNeoConfig = await fs.readJson(path.join(stagedC.armDir, 'apps/gridbench/neo-config.json')),
                   stagedPkg       = await fs.readJson(path.join(stagedC.armDir, 'package.json')),
                   stagedAgentsMd  = await fs.readFile(path.join(stagedC.armDir, 'AGENTS.md'), 'utf8');
 
             expect(stagedMcp.mcpServers['neural-link'].env.NEO_NL_PORT).toBe(String(customNlPortC));
+            expect(stagedGemini.mcpServers['neural-link'].env.NEO_NL_PORT).toBe(String(customNlPortC));
             expect(stagedCodexToml).toContain('[mcp_servers.neural-link.env]');
             expect(stagedCodexToml).toContain(`NEO_NL_PORT = "${customNlPortC}"`);
             expect(stagedNeoConfig.neuralLinkUrl).toBe(`ws://127.0.0.1:${customNlPortC}`);
@@ -1008,6 +1030,197 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(await isPortListening(probeAppPort3)).toBe(false);
         } finally {
             await fs.remove(tempOutDirC);
+        }
+    });
+
+    test('parseTranscriptTelemetry and runCleanRoomArm execute Gemini CLI stream-json harness end-to-end without double-counting cached tokens', async () => {
+        expect(classifyToolCall({toolName: 'ag-mcp_search_docs'})).toBe('docsKbQueries');
+        expect(classifyToolCall({toolName: 'ag_mcp_search_docs'})).toBe('docsKbQueries');
+        expect(classifyToolCall({toolName: 'neural-link_inspect_store'})).toBe('neuralLinkRuntimeCalls');
+        expect(classifyToolCall({toolName: 'neural_link_call_method'})).toBe('neuralLinkRuntimeCalls');
+        expect(classifyToolCall({toolName: 'read_file', input: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}})).toBe('docsKbQueries');
+        expect(classifyToolCall({toolName: 'grep_search', input: {dir_path: 'node_modules/neo.mjs/learn'}})).toBe('docsKbQueries');
+        expect(classifyToolCall({toolName: 'write_file', input: {file_path: 'apps/gridbench/view/Viewport.mjs'}})).toBe('fileEdits');
+        expect(classifyToolCall({toolName: 'replace', input: {file_path: 'apps/gridbench/view/Viewport.mjs'}})).toBe('fileEdits');
+        expect(classifyToolCall({toolName: 'run_shell_command', input: {command: 'npm run server-start:headless'}})).toBe('shellTestRuns');
+
+        const geminiStreamJson = [
+            JSON.stringify({
+                type      : 'init',
+                timestamp : '2026-11-26T00:10:00.000Z',
+                session_id: 'gem-session-01',
+                model     : 'gemini-3.1-pro-preview'
+            }),
+            JSON.stringify({
+                type     : 'message',
+                timestamp: '2026-11-26T00:10:01.000Z',
+                role     : 'user',
+                content  : 'Implement gridbench'
+            }),
+            JSON.stringify({
+                type      : 'tool_use',
+                timestamp : '2026-11-26T00:10:05.000Z',
+                tool_name : 'read_file',
+                tool_id   : 'call_1',
+                parameters: {file_path: '.agents/skills/neo-app-authoring/SKILL.md'}
+            }),
+            JSON.stringify({
+                type     : 'tool_result',
+                timestamp: '2026-11-26T00:10:06.000Z',
+                tool_id  : 'call_1',
+                status   : 'success',
+                output   : '# Neo App Authoring'
+            }),
+            JSON.stringify({
+                type      : 'tool_use',
+                timestamp : '2026-11-26T00:10:12.000Z',
+                tool_name : 'write_file',
+                tool_id   : 'call_2',
+                parameters: {file_path: 'apps/gridbench/view/Viewport.mjs'}
+            }),
+            JSON.stringify({
+                type      : 'tool_use',
+                timestamp : '2026-11-26T00:10:20.000Z',
+                tool_name : 'run_shell_command',
+                tool_id   : 'call_3',
+                parameters: {command: 'npm run server-start:headless'}
+            }),
+            JSON.stringify({
+                type      : 'tool_use',
+                timestamp : '2026-11-26T00:10:25.000Z',
+                tool_name : 'neural-link_inspect_store',
+                tool_id   : 'call_4',
+                parameters: {storeId: 'grid-store'}
+            }),
+            JSON.stringify({
+                type      : 'tool_use',
+                timestamp : '2026-11-26T00:10:26.000Z',
+                tool_name : 'neural_link_call_method',
+                tool_id   : 'call_5',
+                parameters: {method: 'sort'}
+            }),
+            JSON.stringify({
+                type     : 'message',
+                timestamp: '2026-11-26T00:10:39.000Z',
+                role     : 'assistant',
+                content  : 'Verified in running app.',
+                delta    : true
+            }),
+            JSON.stringify({
+                type     : 'result',
+                timestamp: '2026-11-26T00:10:40.000Z',
+                status   : 'success',
+                stats    : {
+                    total_tokens : 15600,
+                    input_tokens : 15000,
+                    output_tokens: 600,
+                    cached       : 12000,
+                    input        : 3000,
+                    duration_ms  : 40000,
+                    tool_calls   : 5,
+                    models       : {
+                        'gemini-3.1-pro-preview': {
+                            total_tokens : 15600,
+                            input_tokens : 15000,
+                            output_tokens: 600,
+                            cached       : 12000,
+                            input        : 3000
+                        }
+                    }
+                }
+            })
+        ].join('\n');
+
+        const telemetry = parseTranscriptTelemetry(geminiStreamJson, {
+            arm             : 'arm-c-neo-kb-neural-link',
+            versions        : {harnessVersion: '0.38.1'},
+            verificationRuns: [{timestamp: '2026-11-26T00:10:35.000Z', pass: true, durationMs: 3400}]
+        });
+
+        expect(telemetry).toEqual({
+            arm              : 'arm-c-neo-kb-neural-link',
+            harness          : 'gemini',
+            model            : 'gemini-3.1-pro-preview',
+            versions         : {harnessVersion: '0.38.1', frameworkVersion: 'neo.mjs@14.0.0'},
+            pass             : true,
+            timeToGreenMs    : 35000,
+            sessionDurationMs: 40000,
+            totalTokens      : {
+                inputTokens : 3000,
+                outputTokens: 600,
+                cachedTokens: 12000,
+                total       : 3600
+            },
+            toolCallsByServer: {
+                docsKbQueries         : 1,
+                neuralLinkRuntimeCalls: 2,
+                fileEdits             : 1,
+                shellTestRuns         : 1,
+                other                 : 0
+            },
+            verificationFailures: 0
+        });
+
+        // End-to-end production spawn check for `runCleanRoomArm({ harness: 'gemini', sandbox: true })`
+        const fakeBinDir  = path.join(os.tmpdir(), `neo-gemini-shim-${Date.now()}`),
+              tempOutDir  = path.join(os.tmpdir(), `neo-gemini-out-${Date.now()}`),
+              shimPath    = path.join(fakeBinDir, 'gemini'),
+              appPort     = await allocateFreePort(0),
+              nlPort      = await allocateFreePort(0),
+              prevPath    = process.env.PATH;
+
+        await fs.ensureDir(fakeBinDir);
+        const shimScript = [
+            '#!/usr/bin/env node',
+            'const fs = require("node:fs");',
+            'const args = process.argv.slice(2);',
+            'if (args.includes("--version")) { console.log("0.38.1"); process.exit(0); }',
+            'const settings = JSON.parse(fs.readFileSync(".gemini/settings.json", "utf8"));',
+            'if (settings.mcpServers["neural-link"].env.NEO_NL_PORT !== process.env.NEO_NL_PORT) process.exit(2);',
+            'if (!args.includes("--output-format") || !args.includes("stream-json")) process.exit(3);',
+            'if (!args.includes("--approval-mode") || !args.includes("yolo")) process.exit(4);',
+            'if (!args.includes("--sandbox") || !args.includes("--allowed-mcp-server-names") || !args.includes("neural-link")) process.exit(5);',
+            'const t0 = new Date().toISOString();',
+            'console.log(JSON.stringify({type: "init", timestamp: t0, session_id: "shim-1", model: "gemini-3.1-pro-preview"}));',
+            'console.log(JSON.stringify({type: "tool_use", timestamp: t0, tool_name: "neural-link_inspect_store", tool_id: "c1", parameters: {}}));',
+            'fs.mkdirSync("../../results", {recursive: true});',
+            'fs.appendFileSync("../../results/arm-c-neo-kb-neural-link-verify-runs.jsonl", JSON.stringify({type: "benchmark_verification", timestamp: new Date(Date.now() + 25).toISOString(), arm: "arm-c-neo-kb-neural-link", pass: true, durationMs: 15}) + "\\n");',
+            'console.log(JSON.stringify({type: "result", timestamp: new Date(Date.now() + 30).toISOString(), status: "success", stats: {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000, duration_ms: 30, tool_calls: 1, models: {"gemini-3.1-pro-preview": {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000}}}}));'
+        ].join('\n');
+        await fs.writeFile(shimPath, shimScript, {mode: 0o755});
+        process.env.PATH = `${fakeBinDir}:${prevPath}`;
+
+        try {
+            const liveRes = await runCleanRoomArm({
+                arm        : 'arm-c-neo-kb-neural-link',
+                harness    : 'gemini',
+                model      : 'gemini-3.1-pro-preview',
+                sandbox    : true,
+                outDir     : tempOutDir,
+                appPort,
+                nlPort,
+                installDeps: false
+            });
+
+            expect(liveRes.telemetry.pass).toBe(true);
+            expect(liveRes.telemetry.harness).toBe('gemini');
+            expect(liveRes.telemetry.model).toBe('gemini-3.1-pro-preview');
+            expect(liveRes.telemetry.versions).toEqual({
+                harnessVersion  : '0.38.1',
+                frameworkVersion: 'neo.mjs@14.0.0'
+            });
+            expect(liveRes.telemetry.totalTokens).toEqual({
+                inputTokens : 1000,
+                outputTokens: 200,
+                cachedTokens: 4000,
+                total       : 1200
+            });
+            expect(liveRes.telemetry.toolCallsByServer.neuralLinkRuntimeCalls).toBe(1);
+            expect(liveRes.telemetry.sessionDurationMs).toBe(30);
+        } finally {
+            process.env.PATH = prevPath;
+            await fs.remove(fakeBinDir);
+            await fs.remove(tempOutDir);
         }
     });
 });

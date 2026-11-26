@@ -47,7 +47,8 @@ export function resolveArmFrameworkVersion(arm, rootDir = ROOT_DIR) {
 }
 
 /**
- * @summary Splits `mcp__<server>__<tool>` tool names emitted by Claude Code and Codex MCP bridges into `{serverName, toolName}`.
+ * @summary Splits MCP-qualified tool names emitted by Claude Code / Codex (`mcp__<server>__<tool>`) and
+ * Gemini CLI (`<server>_<tool>` / `mcp_<server>_<tool>`) into `{serverName, toolName}`.
  * @param {String} [serverName='']
  * @param {String} [toolName='']
  * @returns {{serverName: String, toolName: String}}
@@ -62,6 +63,12 @@ export function splitMcpToolName(serverName = '', toolName = '') {
             server = parts[0];
             tool   = parts.slice(1).join('__');
         }
+    } else if (!server) {
+        const geminiPrefixMatch = tool.match(/^(?:mcp_)?(ag[-_]mcp|neural[-_]link|knowledge[-_]base)_(.+)$/i);
+        if (geminiPrefixMatch) {
+            server = geminiPrefixMatch[1].toLowerCase().replaceAll('_', '-');
+            tool   = geminiPrefixMatch[2];
+        }
     }
 
     return {
@@ -71,7 +78,7 @@ export function splitMcpToolName(serverName = '', toolName = '') {
 }
 
 /**
- * @summary Unpacks `mcp__<server>__<tool>` tool names emitted by Claude Code and Codex MCP bridges.
+ * @summary Unpacks `mcp__<server>__<tool>` and `<server>_<tool>` tool names emitted by CLI MCP bridges.
  * @param {{serverName?: String, toolName?: String, input?: Object}} call
  * @returns {{server: String, tool: String, input: Object}}
  */
@@ -109,8 +116,17 @@ export function classifyToolCall(call = {}) {
         return 'neuralLinkRuntimeCalls';
     }
 
-    const targetPath = String(input.file_path || input.path || input.url || input.pattern || '').toLowerCase();
-    const isDocRead  = (tool === 'read' || tool === 'read_file' || tool === 'grep' || tool === 'glob' || tool === 'webfetch') && (
+    const targetPath = String(input.file_path || input.path || input.dir_path || input.url || input.pattern || '').toLowerCase();
+    const isDocRead  = (
+        tool === 'read' ||
+        tool === 'read_file' ||
+        tool === 'grep' ||
+        tool === 'grep_search' ||
+        tool === 'glob' ||
+        tool === 'list_directory' ||
+        tool === 'webfetch' ||
+        tool === 'web_fetch'
+    ) && (
         targetPath.includes('.agents/skills') ||
         targetPath.includes('node_modules/neo.mjs/learn') ||
         targetPath.includes('node_modules/neo.mjs/examples') ||
@@ -216,7 +232,83 @@ export function adaptTranscriptEntry(entry = {}) {
         };
     }
 
-    // 2b. Claude Code `stream-json` non-message envelopes (`system`, `result`, `rate_limit_event`)
+    // 2b. Gemini CLI `stream-json` envelopes (`init`, `message`, `tool_use`, `tool_result`, `error`, and `result` with `stats`)
+    if (entry.type === 'init') {
+        return {
+            harness        : 'gemini',
+            harnessVersion : entry.gemini_cli_version || entry.version || null,
+            model          : entry.model || null,
+            timestamp,
+            usageId        : null,
+            usage          : null,
+            toolCalls      : [],
+            verificationRun: null
+        };
+    }
+
+    if (entry.type === 'tool_use' && (entry.tool_name || entry.name)) {
+        const {serverName, toolName} = splitMcpToolName('', entry.tool_name || entry.name || '');
+        return {
+            harness        : 'gemini',
+            harnessVersion : entry.gemini_cli_version || entry.version || null,
+            model          : entry.model || null,
+            timestamp,
+            usageId        : null,
+            usage          : null,
+            toolCalls      : [{
+                serverName,
+                toolName,
+                input: entry.parameters || entry.input || {}
+            }],
+            verificationRun: null
+        };
+    }
+
+    if (
+        entry.type === 'tool_result' ||
+        entry.type === 'error' ||
+        (entry.type === 'message' && typeof entry.role === 'string')
+    ) {
+        return {
+            harness        : 'gemini',
+            harnessVersion : entry.gemini_cli_version || entry.version || null,
+            model          : entry.model || null,
+            timestamp,
+            usageId        : null,
+            usage          : null,
+            toolCalls      : [],
+            verificationRun: null
+        };
+    }
+
+    if (entry.type === 'result' && entry.stats && typeof entry.stats === 'object') {
+        const s              = entry.stats,
+              cachedTokens   = Number(s.cached || 0),
+              inputTokens    = typeof s.input === 'number'
+                  ? Number(s.input)
+                  : Math.max(0, Number(s.input_tokens || 0) - cachedTokens),
+              outputTokens   = Number(s.output_tokens || 0),
+              modelFromStats = s.models && typeof s.models === 'object'
+                  ? Object.keys(s.models)[0] || null
+                  : null;
+
+        return {
+            harness        : 'gemini',
+            harnessVersion : entry.gemini_cli_version || entry.version || null,
+            model          : entry.model || modelFromStats || null,
+            timestamp,
+            usageId        : null,
+            usage          : null,
+            fallbackUsage  : {inputTokens, outputTokens, cachedTokens},
+            durationMs     : typeof s.duration_ms === 'number'
+                ? s.duration_ms
+                : (typeof entry.duration_ms === 'number' ? entry.duration_ms : null),
+            toolCalls      : [],
+            verificationRun: null
+        };
+    }
+
+    // 2c. Claude Code `stream-json` non-message envelopes (`system`, `result`, `rate_limit_event`)
     if (entry.type === 'system') {
         return {
             harness        : 'claude-code',
@@ -542,8 +634,11 @@ export function sanitizeCleanRoomEnv(baseEnv = process.env, extraEnv = {}) {
             value === undefined ||
             key.startsWith('NEO_') ||
             key.startsWith('AGY_') ||
+            key.startsWith('GEMINI_CLI_') ||
             key === 'CLAUDECODE' ||
-            key === 'CLAUDE_CODE_ENTRYPOINT'
+            key === 'CLAUDE_CODE_ENTRYPOINT' ||
+            key === 'CLAUDE_CONFIG_DIR' ||
+            key === 'CODEX_HOME'
         ) {
             continue;
         }
@@ -755,6 +850,18 @@ export async function stageArmWorkspace({
             await fs.writeFile(codexConfigPath, toml, 'utf8');
         }
 
+        const geminiSettingsPath = path.join(armDir, '.gemini/settings.json');
+        if (await fs.pathExists(geminiSettingsPath)) {
+            const geminiSettings = await fs.readJson(geminiSettingsPath);
+            if (geminiSettings.mcpServers?.['neural-link']) {
+                geminiSettings.mcpServers['neural-link'].env = {
+                    ...(geminiSettings.mcpServers['neural-link'].env || {}),
+                    NEO_NL_PORT: String(resolvedNlPort)
+                };
+                await fs.writeJson(geminiSettingsPath, geminiSettings, {spaces: 4});
+            }
+        }
+
         const neoConfigPath = path.join(armDir, 'apps/gridbench/neo-config.json');
         if (await fs.pathExists(neoConfigPath)) {
             const neoConfig = await fs.readJson(neoConfigPath);
@@ -950,6 +1057,7 @@ export async function runCleanRoomArm({
     nlPort,
     keepStage                = false,
     installDeps              = true,
+    sandbox                  = false,
     postExitVerify           = false,
     postExitStartupTimeoutMs = 15000,
     postExitVerifyTimeoutMs  = 15000
@@ -977,7 +1085,23 @@ export async function runCleanRoomArm({
         spawnArgs = ['-c', cmd];
     } else if (harness === 'codex') {
         spawnBin  = 'codex';
-        spawnArgs = ['exec', '--json', '--dangerously-bypass-approvals-and-sandbox', '-m', model, prompt];
+        spawnArgs = ['exec', '--json', '--dangerously-bypass-approvals-and-sandbox', ...(model ? ['-m', model] : []), prompt];
+    } else if (harness === 'gemini') {
+        const allowedMcp = arm === 'arm-a-react-ag-grid-mcp'
+            ? ['--allowed-mcp-server-names', 'ag-mcp']
+            : arm === 'arm-c-neo-kb-neural-link'
+                ? ['--allowed-mcp-server-names', 'neural-link']
+                : [];
+        spawnBin  = 'gemini';
+        spawnArgs = [
+            '-p', prompt,
+            ...(model ? ['-m', model] : []),
+            '--output-format', 'stream-json',
+            '--approval-mode', 'yolo',
+            '-e', 'none',
+            ...(sandbox ? ['--sandbox'] : []),
+            ...allowedMcp
+        ];
     } else {
         spawnBin  = 'claude';
         spawnArgs = [
@@ -1088,6 +1212,13 @@ export async function runCleanRoomArm({
         }
         if (telemetry.model === 'unknown' && model) {
             telemetry.model = model;
+        }
+        if (!telemetry.versions.harnessVersion && !cmd && (spawnBin === 'gemini' || spawnBin === 'claude' || spawnBin === 'codex')) {
+            try {
+                const {stdout} = await execFileAsync(spawnBin, ['--version'], {encoding: 'utf8', env: childEnv});
+                const trimmed  = stdout.trim().split('\n')[0]?.trim();
+                if (trimmed) telemetry.versions.harnessVersion = trimmed;
+            } catch {}
         }
 
         if (postExitVerify) {
@@ -1277,12 +1408,14 @@ async function main() {
 
     const runArms = args.includes('--run-all') ? [...ARMS] : getAllFlags('--run-arm');
     if (runArms.length > 0) {
-        const armResults = [];
+        const resolvedHarness = harnessOpt || (modelOpt?.startsWith('gemini') ? 'gemini' : 'claude-code'),
+              defaultModel    = resolvedHarness === 'gemini' ? '' : 'sonnet',
+              armResults      = [];
         for (const arm of runArms) {
             const {telemetry} = await runCleanRoomArm({
                 arm,
-                harness       : harnessOpt || 'claude-code',
-                model         : modelOpt   || 'sonnet',
+                harness       : resolvedHarness,
+                model         : modelOpt ?? defaultModel,
                 cmd           : getFlag('--cmd'),
                 outDir,
                 timeoutMs     : getFlag('--timeout-ms') ? Number(getFlag('--timeout-ms')) : 900000,
@@ -1290,6 +1423,7 @@ async function main() {
                 nlPort        : getFlag('--nl-port')    ? Number(getFlag('--nl-port'))    : undefined,
                 keepStage     : args.includes('--keep-stage'),
                 installDeps   : !args.includes('--no-install'),
+                sandbox       : args.includes('--sandbox'),
                 postExitVerify: args.includes('--post-exit-verify')
             });
             armResults.push(telemetry);

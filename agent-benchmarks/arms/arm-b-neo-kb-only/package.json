@@ -35,7 +35,7 @@
         "watch-themes": "node ./node_modules/neo.mjs/buildScripts/helpers/watchThemes.mjs"
     },
     "dependencies": {
-        "neo.mjs": "13.3.1"
+        "neo.mjs": "14.0.0"
     },
     "devDependencies": {
         "@fortawesome/fontawesome-free": "^7.3.1",
@@ -59,7 +59,7 @@
         "marked": "^18.1.0",
         "mermaid": "^12.1.0",
         "monaco-editor": "0.57.0",
-        "neo-agent-skills": "0.1.62",
+        "neo-agent-skills": "2.9.3",
         "parse5": "^8.0.1",
         "postcss": "^8.5.29",
         "sass": "^1.105.1",
