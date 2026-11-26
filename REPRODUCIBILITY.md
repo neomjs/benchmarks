@@ -10,16 +10,18 @@ This guide provides the steps required to clone the repository, install dependen
 
 ## 2. Installation
 
-First, clone the repository, install the root harness dependencies, and install the Playwright browser binary:
+First, clone the repository, install the root harness dependencies, and install the Playwright browsers configured in `playwright.config.mjs` (`chromium`, `firefox`, and `webkit`):
 
 ```bash
 git clone https://github.com/neomjs/benchmarks.git
 cd benchmarks
 npm install
-npx playwright install chromium
+npx playwright install
 ```
 
-Next, run the setup script (`node:fs`-only, zero external pre-install imports) to install all nested app dependencies, record `resources/engine-provenance.json`, and build the Neo.mjs applications:
+*(If you only plan to run Chromium-scoped suites via `--projects=chromium-prod` or `--projects=chromium-dev,chromium-prod`, `npx playwright install chromium` suffices.)*
+
+Next, run the setup script (`node:fs`-only, zero external pre-install imports) to install all nested app dependencies, build the applications, and stamp `resources/engine-provenance.json` after each Neo build succeeds:
 
 ```bash
 npm run setup

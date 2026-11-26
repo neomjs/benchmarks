@@ -148,6 +148,26 @@ export function writeEngineProvenance(appFullPath) {
     return provenance;
 }
 
+/**
+ * @summary Overlays a local Engine checkout (when requested), builds the Neo.mjs app, and writes `engine-provenance.json`
+ * strictly AFTER the build succeeds so a failed rebuild never stamps an older `dist/production` bundle with the new Engine source.
+ * @param {string} appFullPath
+ * @param {Object} [options]
+ * @param {string|null} [options.enginePath=null]
+ * @param {Function} [options.buildRunner]
+ * @returns {Object} Provenance record written post-build.
+ */
+export function buildNeoApp(appFullPath, {
+    enginePath  = null,
+    buildRunner = (dir) => runCommand('npm run build-all -- -l no', dir)
+} = {}) {
+    if (enginePath) {
+        overlayLocalEngine(enginePath, appFullPath);
+    }
+    buildRunner(appFullPath);
+    return writeEngineProvenance(appFullPath);
+}
+
 export function runSetup(args = process.argv.slice(2), env = process.env) {
     assertSupportedNodeVersion();
 
@@ -173,8 +193,8 @@ export function runSetup(args = process.argv.slice(2), env = process.env) {
     }
 
     if (withBrowser) {
-        console.log('\n--- Installing Playwright Chromium browser ---');
-        runCommand('npx playwright install chromium', projectRoot);
+        console.log('\n--- Installing Playwright browsers ---');
+        runCommand('npx playwright install', projectRoot);
     }
 
     for (const appPath of appPaths) {
@@ -188,13 +208,8 @@ export function runSetup(args = process.argv.slice(2), env = process.env) {
 
     for (const neoAppPath of neoAppPaths) {
         const fullPath = path.join(projectRoot, neoAppPath);
-        if (enginePath) {
-            overlayLocalEngine(enginePath, fullPath);
-        }
-        writeEngineProvenance(fullPath);
         console.log(`\n--- Building Neo.mjs app: ${neoAppPath} ---`);
-        runCommand('npm run build-all -- -l no', fullPath);
-        const provenance = writeEngineProvenance(fullPath);
+        const provenance = buildNeoApp(fullPath, { enginePath });
         console.log(`Verified ${neoAppPath} Engine provenance: ${JSON.stringify(provenance)}`);
     }
 

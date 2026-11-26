@@ -9,11 +9,14 @@ import {
 } from './utils/browser-test-helpers.mjs';
 import {
     buildBenchmarkConfig,
+    prepareSafeResultsDir,
     resolveSafeResultsDir
 } from '../scripts/run-benchmarks.mjs';
 import {
     OVERLAY_MARKER_FILE,
+    PROVENANCE_REL_PATH,
     assertSupportedNodeVersion,
+    buildNeoApp,
     overlayLocalEngine,
     prepareNeoAppForPublishedInstall,
     writeEngineProvenance
@@ -189,7 +192,7 @@ test.describe('Benchmark harness measurement, isolation, and setup contracts (#1
         expect(oneArm1x.buildChildEnv('neo', 'big-data', true).NEO_CPU_THROTTLE).toBe('1');
         expect(oneArm4x.buildChildEnv('neo', 'big-data', true).NEO_CPU_THROTTLE).toBe('4');
 
-        // 2. Single-arm 4x without --bucket-suffix still auto-isolates under -cpu4x
+        // 2. Single-arm and interleaved 4x runs (with or without --result-bucket) auto-isolate under -cpu4x
         const autoSuffix4x = buildBenchmarkConfig(
             ['--framework=neo', '--suite=big-data', '--vdom-worker=false', '--cpu-throttle=4'],
             {},
@@ -197,18 +200,74 @@ test.describe('Benchmark harness measurement, isolation, and setup contracts (#1
         );
         expect(autoSuffix4x.resolveSingleArmTarget('neo', 'big-data').resultBucket).toBe('neo-app-worker-cpu4x');
 
-        // 3. Custom --result-bucket path traversal is rejected before fs.emptyDir
+        const customSingle1x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--result-bucket=trialA', '--cpu-throttle=1'],
+            {},
+            cwd
+        );
+        const customSingle4x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--result-bucket=trialA', '--cpu-throttle=4'],
+            {},
+            cwd
+        );
+        expect(customSingle1x.resolveSingleArmTarget('neo', 'big-data').resultBucket).toBe('trialA');
+        expect(customSingle4x.resolveSingleArmTarget('neo', 'big-data').resultBucket).toBe('trialA-cpu4x');
+
+        const customInterleaved1x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--interleave-vdom-worker', '--result-bucket=trialA', '--cpu-throttle=1'],
+            {},
+            cwd
+        );
+        const customInterleaved4x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--interleave-vdom-worker', '--result-bucket=trialA', '--cpu-throttle=4'],
+            {},
+            cwd
+        );
+        expect(customInterleaved1x.resolveInterleavedTargets('big-data').trueBucket).toBe('trialA-vdom-worker');
+        expect(customInterleaved1x.resolveInterleavedTargets('big-data').falseBucket).toBe('trialA-app-worker');
+        expect(customInterleaved4x.resolveInterleavedTargets('big-data').trueBucket).toBe('trialA-vdom-worker-cpu4x');
+        expect(customInterleaved4x.resolveInterleavedTargets('big-data').falseBucket).toBe('trialA-app-worker-cpu4x');
+
+        // 3. Custom --result-bucket path traversal AND symlink escapes are rejected before fs.emptyDir
         for (const badBucket of ['..', '../escape', '/tmp/outside', 'nested/sub', '.']) {
             expect(() => resolveSafeResultsDir('/workspace/benchmarks/test-results-data', badBucket, 'big-data')).toThrow();
-            expect(() => buildBenchmarkConfig([`--result-bucket=${badBucket}`], {}, cwd).resolveSingleArmTarget('neo', 'big-data')).toThrow();
+            expect(() => buildBenchmarkConfig([`--result-bucket=${badBucket}`], {}, cwd)).toThrow();
         }
         expect(() => buildBenchmarkConfig(['--bucket-suffix=/../escape'], {}, cwd)).toThrow();
         expect(() => buildBenchmarkConfig(['--cpu-throttle=0'], {}, cwd)).toThrow();
+
+        const tmpSandbox  = fs.mkdtempSync(path.join(os.tmpdir(), 'neo-bench-symlink-'));
+        const resultsRoot = path.join(tmpSandbox, 'test-results-data');
+        const outsideDir  = path.join(tmpSandbox, 'outside-keep');
+        const sentinel    = path.join(outsideDir, 'must-survive.txt');
+        try {
+            fs.mkdirSync(resultsRoot, { recursive: true });
+            fs.mkdirSync(outsideDir, { recursive: true });
+            fs.writeFileSync(sentinel, 'preserve-me');
+
+            // Case A: bucket itself is a symlink pointing outside resultsRoot
+            fs.symlinkSync(outsideDir, path.join(resultsRoot, 'linked-bucket'));
+            expect(() => resolveSafeResultsDir(resultsRoot, 'linked-bucket', 'big-data')).toThrow(/symbolic link|out-of-root/i);
+            await expect(prepareSafeResultsDir(resultsRoot, 'linked-bucket', 'big-data')).rejects.toThrow(/symbolic link|out-of-root/i);
+
+            // Case B: suite subdirectory is a symlink pointing outside resultsRoot
+            fs.mkdirSync(path.join(resultsRoot, 'real-bucket'), { recursive: true });
+            fs.symlinkSync(outsideDir, path.join(resultsRoot, 'real-bucket', 'big-data'));
+            expect(() => resolveSafeResultsDir(resultsRoot, 'real-bucket', 'big-data')).toThrow(/symbolic link|out-of-root/i);
+            await expect(prepareSafeResultsDir(resultsRoot, 'real-bucket', 'big-data')).rejects.toThrow(/symbolic link|out-of-root/i);
+
+            expect(fs.existsSync(sentinel)).toBe(true);
+        } finally {
+            fs.rmSync(tmpSandbox, { recursive: true, force: true });
+        }
     });
 
-    test('RA-3: setup enforces Node >= 24 and removes local overlay marker before restoring published package', async () => {
+    test('RA-3: setup enforces Node >= 24, preserves prior dist/production provenance on failed rebuild, and aligns REPRODUCIBILITY browsers', async () => {
         expect(() => assertSupportedNodeVersion('20.11.0')).toThrow(/Node\.js >= 24\.0\.0/);
         expect(() => assertSupportedNodeVersion('24.0.0')).not.toThrow();
+
+        const guideText = fs.readFileSync(path.resolve(process.cwd(), 'REPRODUCIBILITY.md'), 'utf8');
+        expect(guideText).toContain('npx playwright install\n');
 
         const tmpRoot      = fs.mkdtempSync(path.join(os.tmpdir(), 'neo-bench-setup-'));
         const fakeSource   = path.join(tmpRoot, 'neo-source');
@@ -221,26 +280,54 @@ test.describe('Benchmark harness measurement, isolation, and setup contracts (#1
             fs.writeFileSync(path.join(fakeSource, 'src', 'worker', 'Manager.mjs'), '// overlay worker Manager\n');
             fs.writeFileSync(path.join(fakeSource, 'package.json'), JSON.stringify({ name: 'neo.mjs', version: '14.0.0' }));
 
-            // Simulate installed published package + extra stale file, then overlay local checkout
+            // 1. Clean published build writes npm-package provenance to dist/production
             fs.mkdirSync(path.join(targetNeoDir, 'src', 'worker'), { recursive: true });
+            fs.writeFileSync(path.join(targetNeoDir, 'src', 'worker', 'Manager.mjs'), '// published npm worker Manager\n');
             fs.writeFileSync(path.join(targetNeoDir, 'package.json'), JSON.stringify({ name: 'neo.mjs', version: '14.0.0' }));
-            overlayLocalEngine(fakeSource, fakeApp);
+            fs.mkdirSync(path.join(fakeApp, 'dist', 'production'), { recursive: true });
 
-            const overlaidProv = writeEngineProvenance(fakeApp);
+            const initialPubProv = buildNeoApp(fakeApp, {
+                enginePath : null,
+                buildRunner: () => {}
+            });
+            expect(initialPubProv.source).toBe('npm-package');
+
+            // 2. Failed overlay rebuild must NOT stamp existing dist/production with the unbuilt overlay source
+            expect(() => buildNeoApp(fakeApp, {
+                enginePath : fakeSource,
+                buildRunner: () => {
+                    throw new Error('simulated build-all failure');
+                }
+            })).toThrow(/simulated build-all failure/);
+
+            const prodProvAfterFailedBuild = JSON.parse(
+                fs.readFileSync(path.join(fakeApp, 'dist', 'production', PROVENANCE_REL_PATH), 'utf8')
+            );
+            expect(prodProvAfterFailedBuild.source).toBe('npm-package');
+            expect(prodProvAfterFailedBuild.overlaid).toBe(false);
+
+            // 3. Successful overlay rebuild updates dist/production provenance to local-overlay
+            const overlaidProv = buildNeoApp(fakeApp, {
+                enginePath : fakeSource,
+                buildRunner: () => {}
+            });
             expect(overlaidProv.source).toBe('local-overlay');
             expect(overlaidProv.overlaid).toBe(true);
             expect(fs.existsSync(path.join(targetNeoDir, OVERLAY_MARKER_FILE))).toBe(true);
 
-            // Switching back to published setup removes the overlaid node_modules/neo.mjs tree before npm install
+            // 4. Switching back to published setup removes the overlaid node_modules/neo.mjs tree before npm install
             const removed = prepareNeoAppForPublishedInstall(fakeApp);
             expect(removed).toBe(true);
             expect(fs.existsSync(targetNeoDir)).toBe(false);
 
-            // Fresh npm install writes clean published provenance
+            // 5. Fresh npm install + build writes clean published provenance
             fs.mkdirSync(path.join(targetNeoDir, 'src', 'worker'), { recursive: true });
             fs.writeFileSync(path.join(targetNeoDir, 'src', 'worker', 'Manager.mjs'), '// published npm worker Manager\n');
             fs.writeFileSync(path.join(targetNeoDir, 'package.json'), JSON.stringify({ name: 'neo.mjs', version: '14.0.0' }));
-            const publishedProv = writeEngineProvenance(fakeApp);
+            const publishedProv = buildNeoApp(fakeApp, {
+                enginePath : null,
+                buildRunner: () => {}
+            });
             expect(publishedProv.source).toBe('npm-package');
             expect(publishedProv.overlaid).toBe(false);
             expect(publishedProv.workerManagerSha256).not.toBe(overlaidProv.workerManagerSha256);

@@ -8,8 +8,33 @@ const __filename = fileURLToPath(import.meta.url);
 const BUCKET_SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SUFFIX_RE         = /^$|^[A-Za-z0-9._-]+$/;
 
+function lstatIfExists(targetPath) {
+    try {
+        return fs.lstatSync(targetPath);
+    } catch (err) {
+        if (err && err.code === 'ENOENT') return null;
+        throw err;
+    }
+}
+
+function resolveCanonicalPath(targetPath) {
+    const resolved = path.resolve(targetPath);
+    const missing  = [];
+    let cursor     = resolved;
+
+    while (!fs.existsSync(cursor)) {
+        const parent = path.dirname(cursor);
+        if (parent === cursor) break;
+        missing.unshift(path.basename(cursor));
+        cursor = parent;
+    }
+
+    const realBase = fs.existsSync(cursor) ? fs.realpathSync(cursor) : cursor;
+    return missing.length > 0 ? path.join(realBase, ...missing) : realBase;
+}
+
 /**
- * @summary Resolves `<resultsRoot>/<bucketName>/<suiteName>` and refuses any path traversal or root escape before cleanup.
+ * @summary Resolves `<resultsRoot>/<bucketName>/<suiteName>` and refuses any path traversal, symbolic link, or root escape before cleanup.
  * @param {string} resultsRoot
  * @param {string} bucketName
  * @param {string} suiteName
@@ -24,12 +49,51 @@ export function resolveSafeResultsDir(resultsRoot, bucketName, suiteName) {
         throw new Error(`Invalid suite name "${suiteName}".`);
     }
 
-    const resolved = path.resolve(root, bucketName, suiteName);
-    const rel      = path.relative(root, resolved);
+    const rootStat = lstatIfExists(root);
+    if (rootStat?.isSymbolicLink()) {
+        throw new Error(`Refusing symbolic link at results root "${root}".`);
+    }
+
+    const bucketPath = path.resolve(root, bucketName);
+    const bucketStat = lstatIfExists(bucketPath);
+    if (bucketStat?.isSymbolicLink()) {
+        throw new Error(`Refusing symbolic link in result bucket "${bucketPath}".`);
+    }
+
+    const resolved  = path.resolve(bucketPath, suiteName);
+    const suiteStat = lstatIfExists(resolved);
+    if (suiteStat?.isSymbolicLink()) {
+        throw new Error(`Refusing symbolic link in result suite directory "${resolved}".`);
+    }
+
+    const rel = path.relative(root, resolved);
     if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error(`Refusing out-of-root results destination "${resolved}" (must stay inside "${root}").`);
     }
+
+    const canonicalRoot   = resolveCanonicalPath(root);
+    const canonicalTarget = resolveCanonicalPath(resolved);
+    const canonicalRel    = path.relative(canonicalRoot, canonicalTarget);
+    if (!canonicalRel || canonicalRel.startsWith('..') || path.isAbsolute(canonicalRel)) {
+        throw new Error(`Refusing linked out-of-root results destination "${canonicalTarget}" (must stay inside "${canonicalRoot}").`);
+    }
+
     return resolved;
+}
+
+/**
+ * @summary Validates, creates, re-verifies realpath containment (rejecting symlinks), and empties `<resultsRoot>/<bucketName>/<suiteName>`.
+ * @param {string} resultsRoot
+ * @param {string} bucketName
+ * @param {string} suiteName
+ * @returns {Promise<string>}
+ */
+export async function prepareSafeResultsDir(resultsRoot, bucketName, suiteName) {
+    const dir = resolveSafeResultsDir(resultsRoot, bucketName, suiteName);
+    await fs.ensureDir(dir);
+    resolveSafeResultsDir(resultsRoot, bucketName, suiteName);
+    await fs.emptyDir(dir);
+    return dir;
 }
 
 /**
@@ -69,14 +133,17 @@ export function buildBenchmarkConfig(args = process.argv.slice(2), env = process
     if (!Number.isFinite(cpuThrottle) || cpuThrottle < 1) {
         throw new Error(`--cpu-throttle / NEO_CPU_THROTTLE must be a finite number >= 1 (got "${throttleArg ?? env.NEO_CPU_THROTTLE}").`);
     }
+    if (customBucket !== null && (!BUCKET_SEGMENT_RE.test(customBucket) || customBucket.includes('..'))) {
+        throw new Error(`Invalid --result-bucket="${customBucket}": must be a safe directory name inside test-results-data.`);
+    }
     if (rawSuffix !== null && (!SUFFIX_RE.test(rawSuffix) || rawSuffix.includes('..'))) {
         throw new Error(`Invalid --bucket-suffix="${rawSuffix}": path separators and ".." are forbidden.`);
     }
 
-    // Isolate throttled regimes from 1x runs automatically when no explicit suffix or custom bucket was supplied
+    // Isolate throttled regimes from 1x runs automatically across both default and custom buckets unless --bucket-suffix overrides it
     const effectiveSuffix = rawSuffix !== null
         ? rawSuffix
-        : (cpuThrottle > 1 && !customBucket ? `-cpu${cpuThrottle}x` : '');
+        : (cpuThrottle > 1 ? `-cpu${cpuThrottle}x` : '');
 
     const resultsRoot = path.resolve(cwd, 'test-results-data');
 
@@ -84,9 +151,7 @@ export function buildBenchmarkConfig(args = process.argv.slice(2), env = process
         const baseBucket   = customBucket || ((fw === 'neo' && vdomWorker !== undefined)
             ? (vdomWorker ? 'neo-vdom-worker' : 'neo-app-worker')
             : fw);
-        const resultBucket = customBucket
-            ? (rawSuffix !== null ? `${customBucket}${rawSuffix}` : customBucket)
-            : `${baseBucket}${effectiveSuffix}`;
+        const resultBucket = `${baseBucket}${effectiveSuffix}`;
         return {
             resultBucket,
             resultsDir: resolveSafeResultsDir(resultsRoot, resultBucket, s)
@@ -94,8 +159,9 @@ export function buildBenchmarkConfig(args = process.argv.slice(2), env = process
     };
 
     const resolveInterleavedTargets = (s) => {
-        const trueBucket  = `neo-vdom-worker${effectiveSuffix}`;
-        const falseBucket = `neo-app-worker${effectiveSuffix}`;
+        const prefix      = customBucket || 'neo';
+        const trueBucket  = `${prefix}-vdom-worker${effectiveSuffix}`;
+        const falseBucket = `${prefix}-app-worker${effectiveSuffix}`;
         return {
             trueBucket,
             falseBucket,
@@ -179,6 +245,7 @@ export async function main() {
         runs,
         projects,
         interleaveArms,
+        resultsRoot,
         frameworksToRun,
         suitesToRun,
         resolveSingleArmTarget,
@@ -226,12 +293,10 @@ export async function main() {
             const playwrightCmd           = `npx playwright test ${filesToTest}${projectFlags ? ' ' + projectFlags : ''}`;
 
             if (fw === 'neo' && interleaveArms) {
-                const { trueBucket, falseBucket, trueDir, falseDir } = resolveInterleavedTargets(s);
+                const { trueBucket, falseBucket } = resolveInterleavedTargets(s);
                 console.log(`--- Running AB/BA interleaved suite: ${trueBucket} vs ${falseBucket} (${s}) ---`);
-                await fs.ensureDir(trueDir);
-                await fs.emptyDir(trueDir);
-                await fs.ensureDir(falseDir);
-                await fs.emptyDir(falseDir);
+                const trueDir  = await prepareSafeResultsDir(resultsRoot, trueBucket, s);
+                const falseDir = await prepareSafeResultsDir(resultsRoot, falseBucket, s);
 
                 for (let i = 1; i <= runs; i++) {
                     const armOrder = (i % 2 === 1) ? [true, false] : [false, true];
@@ -254,12 +319,11 @@ export async function main() {
                 continue;
             }
 
-            const { resultBucket, resultsDir } = resolveSingleArmTarget(fw, s);
-            const childEnv                     = buildChildEnv(fw, s);
+            const { resultBucket } = resolveSingleArmTarget(fw, s);
+            const childEnv         = buildChildEnv(fw, s);
 
             console.log(`--- Running suite: ${resultBucket}/${s} (cpuThrottle=${childEnv.NEO_CPU_THROTTLE}x) ---`);
-            await fs.ensureDir(resultsDir);
-            await fs.emptyDir(resultsDir);
+            const resultsDir = await prepareSafeResultsDir(resultsRoot, resultBucket, s);
 
             for (let i = 1; i <= runs; i++) {
                 console.log(`--- Running test: Run ${i} of ${runs} (${resultBucket}) ---`);

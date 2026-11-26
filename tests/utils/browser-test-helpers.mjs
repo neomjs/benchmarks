@@ -324,7 +324,11 @@ export const configureNeoVdomWorker = async (page, expected = parseNeoUseVdomWor
 export const assertNeoVdomWorkerTopology = async (page, expected = parseNeoUseVdomWorkerEnv()) => {
     const topology = await page.evaluate(async () => {
         let engineProvenance = null;
-        for (const candidate of ['/resources/engine-provenance.json', 'resources/engine-provenance.json', '../../resources/engine-provenance.json']) {
+        const isDistProd = window.location.pathname.includes('/dist/production/');
+        const candidates = isDistProd
+            ? ['../../resources/engine-provenance.json', '/dist/production/resources/engine-provenance.json']
+            : ['/resources/engine-provenance.json', 'resources/engine-provenance.json'];
+        for (const candidate of candidates) {
             try {
                 const res = await fetch(candidate, { cache: 'no-store' });
                 if (res.ok) {
