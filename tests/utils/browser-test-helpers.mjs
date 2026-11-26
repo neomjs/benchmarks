@@ -310,10 +310,14 @@ export const installWorkerMessageProbeInBrowser = () => {
 
         if (isDomUpdate) {
             state.domUpdateFlights++;
-            const deltas = data?.action === 'updateVdom' ? data.deltas : payload?.deltas;
-            if (Array.isArray(deltas)) {
-                state.totalDeltas += deltas.length;
+            const deltas     = data?.action === 'updateVdom' ? data.deltas : payload?.deltas;
+            const metaObj    = data?.action === 'updateVdom' ? data.meta : payload?.meta;
+            const hasMeta    = Boolean(metaObj && Object.keys(metaObj).length > 0);
+            const deltaCount = Array.isArray(deltas) ? deltas.length : 0;
+            if (deltaCount > 0 || hasMeta) {
+                state.nonEmptyDomFlights++;
             }
+            state.totalDeltas += deltaCount;
         }
         if (payload?.vnodes || payload?.vnode) {
             state.vnodeRelayMessages++;
@@ -370,6 +374,7 @@ export const installWorkerMessageProbeInBrowser = () => {
             inboundMessages   : 0,
             outboundMessages  : 0,
             domUpdateFlights  : 0,
+            nonEmptyDomFlights: 0,
             totalDeltas       : 0,
             vnodeRelayMessages: 0
         };
@@ -388,7 +393,9 @@ export const installWorkerMessageProbeInBrowser = () => {
                 outboundMessages       : 0,
                 totalMainWorkerMessages: 0,
                 domUpdateFlights       : 0,
+                nonEmptyDomFlights     : 0,
                 flightsPerSec          : 0,
+                nonEmptyFlightsPerSec  : 0,
                 totalDeltas            : 0,
                 avgDeltasPerFlight     : 0,
                 vnodeRelayMessages     : 0
@@ -402,10 +409,12 @@ export const installWorkerMessageProbeInBrowser = () => {
             outboundMessages       : state.outboundMessages,
             totalMainWorkerMessages,
             domUpdateFlights       : state.domUpdateFlights,
+            nonEmptyDomFlights     : state.nonEmptyDomFlights,
             flightsPerSec          : Math.round((state.domUpdateFlights / (elapsedMs / 1000)) * 100) / 100,
+            nonEmptyFlightsPerSec  : Math.round((state.nonEmptyDomFlights / (elapsedMs / 1000)) * 100) / 100,
             totalDeltas            : state.totalDeltas,
-            avgDeltasPerFlight     : state.domUpdateFlights > 0
-                ? Math.round((state.totalDeltas / state.domUpdateFlights) * 100) / 100
+            avgDeltasPerFlight     : state.nonEmptyDomFlights > 0
+                ? Math.round((state.totalDeltas / state.nonEmptyDomFlights) * 100) / 100
                 : 0,
             vnodeRelayMessages     : state.vnodeRelayMessages
         };
