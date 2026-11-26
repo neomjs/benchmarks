@@ -4,23 +4,36 @@ This guide provides the steps required to clone the repository, install dependen
 
 ## 1. Prerequisites
 
--   **Node.js**: Version 20.x or later is recommended.
+-   **Node.js**: Version `24.0.0` or later is required (`neo.mjs@14.0.0` engine minimum).
 -   **Git**: Required to clone the repository.
 -   **Operating System**: The tests are designed to be run on macOS, Linux, or Windows.
 
 ## 2. Installation
 
-First, clone the repository to your local machine:
+First, clone the repository, install the root harness dependencies, and install the Playwright browsers configured in `playwright.config.mjs` (`chromium`, `firefox`, and `webkit`):
 
 ```bash
 git clone https://github.com/neomjs/benchmarks.git
 cd benchmarks
+npm install
+npx playwright install
 ```
 
-Next, run the setup script to install all nested dependencies and build the Neo.mjs applications:
+*(If you only plan to run Chromium-scoped suites via `--projects=chromium-prod` or `--projects=chromium-dev,chromium-prod`, `npx playwright install chromium` suffices.)*
+
+Next, run the setup script (`node:fs`-only, zero external pre-install imports) to install all nested app dependencies, build the applications, and stamp `resources/engine-provenance.json` after each Neo build succeeds:
 
 ```bash
 npm run setup
+```
+
+To install and build only the Neo.mjs benchmark apps, or overlay a local `neomjs/neo` checkout when benchmarking an unmerged Engine branch (re-running without `--engine-path` automatically removes `.neo-engine-overlay.json` and restores the clean published `neo.mjs@14.0.0` npm package):
+
+```bash
+node scripts/setup.mjs --neo-only
+node scripts/setup.mjs --neo-only --engine-path=../neo
+# Switch cleanly back from a local overlay to published neo.mjs@14.0.0:
+node scripts/setup.mjs --neo-only
 ```
 
 ## 3. Running the Benchmarks
@@ -42,6 +55,15 @@ npm run benchmark:accurate:all
 ```bash
 npm run benchmark:accurate:neo
 ```
+
+**Run A/B worker-topology comparisons for Neo.mjs (`useVdomWorker: true` vs `useVdomWorker: false`, isolated under `test-results-data/neo-vdom-worker` and `test-results-data/neo-app-worker`, with optional `AB/BA` interleaving, custom bucket names, and CDP Main-thread CPU throttling):**
+```bash
+npm run benchmark:accurate:neo -- --interleave-vdom-worker --projects=chromium-prod --runs=5
+npm run benchmark:accurate:neo -- --vdom-worker=true --projects=chromium-prod --runs=5
+npm run benchmark:accurate:neo -- --vdom-worker=false --projects=chromium-prod --runs=5
+npm run benchmark:accurate:neo -- --interleave-vdom-worker --cpu-throttle=4 --bucket-suffix=-cpu4x --projects=chromium-prod --runs=5
+```
+> **Note on `--cpu-throttle=<N>` (`NEO_CPU_THROTTLE`):** Chromium's CDP `Emulation.setCPUThrottlingRate` applies only to `page` targets (Main renderer thread) and returns `-32000 ("Operation is only supported for pages, not workers")` on Dedicated/Shared Workers. Use it specifically to stress Main-thread contention (`DomApiRenderer` delta application + message relay) rather than Worker-thread CPU scaling.
 
 **Run only the "scrolling" suite for Angular for a single run:**
 ```bash

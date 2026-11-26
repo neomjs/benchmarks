@@ -1,6 +1,6 @@
 {
     "name": "neo.mjs-benchmarks",
-    "version": "13.3.1",
+    "version": "14.0.0",
     "description": "Neo.mjs: Benchmarks",
     "type": "module",
     "scripts": {
@@ -13,6 +13,7 @@
         "test:react-big-data"                        : "FRAMEWORK=react APP=bigData npx playwright test tests/react-big-data.spec.mjs",
         "test:react"                                 : "FRAMEWORK=react npx playwright test tests/react.spec.mjs",
         "test:react-scrolling"                       : "FRAMEWORK=react npx playwright test tests/react-scrolling.spec.mjs",
+        "test:harness-contracts"                     : "node -e \"import('./scripts/run-benchmarks.mjs').then(m => m.ensurePortsFree([8080]))\" && CI=true FRAMEWORK=neo APP=bigData npx playwright test tests/benchmark-harness-contracts.spec.mjs --project=chromium-prod",
         "test:agent-benchmarks"                      : "npx playwright test -c agent-benchmarks/playwright.config.mjs agent-benchmarks/agent-benchmark-harness.spec.mjs",
         "benchmark:accurate:all"                     : "node ./scripts/run-benchmarks.mjs --framework=all --suite=all",
         "benchmark:accurate:angular"                 : "FRAMEWORK=angular node ./scripts/run-benchmarks.mjs --framework=angular --suite=all",

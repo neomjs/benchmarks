@@ -166,13 +166,7 @@ export const measureMainThreadProbeInBrowser = (testName, action, condition, pas
             longTaskObserver.observe({ type: 'longtask', buffered: false });
         }
 
-        function tick(now) {
-            if (!rafActive) return;
-            frameDeltas.push(now - lastFrameTime);
-            lastFrameTime = now;
-            requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
+        let settled = false;
 
         const cleanup = () => {
             rafActive = false;
@@ -182,6 +176,8 @@ export const measureMainThreadProbeInBrowser = (testName, action, condition, pas
         };
 
         const finish = (endTime) => {
+            if (settled) return;
+            settled = true;
             const finalGap = endTime - lastFrameTime;
             if (finalGap > 0) frameDeltas.push(finalGap);
             cleanup();
@@ -196,6 +192,25 @@ export const measureMainThreadProbeInBrowser = (testName, action, condition, pas
                 frameCount             : frameDeltas.length
             });
         };
+
+        function tick(now) {
+            if (!rafActive || settled) return;
+            frameDeltas.push(now - lastFrameTime);
+            lastFrameTime = now;
+            try {
+                if (condition(passThrough)) {
+                    finish(performance.now());
+                    return;
+                }
+            } catch (e) {
+                settled = true;
+                cleanup();
+                reject(e);
+                return;
+            }
+            requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
 
         const observer = new MutationObserver(() => {
             try {
@@ -228,4 +243,244 @@ export const measureMainThreadProbeInBrowser = (testName, action, condition, pas
             reject(e);
         }
     });
+};
+
+/**
+ * @summary Checks that a target grid cell is non-empty AND visually inside `.neo-grid-view` along both X and Y axes
+ * (rejecting offscreen buffered rows/columns until scroll sync and DOM translation bring the cell into the viewport).
+ * @param {HTMLElement|null} vScroller - The `.neo-grid-view` scroll viewport element.
+ * @param {number|string} rowId - Logical `data-row-id` of the target row.
+ * @param {string|null} [field=null] - Optional `data-field` of the target column cell (`null` checks the row's first cell).
+ * @returns {boolean}
+ */
+export const isCellInViewportInBrowser = (vScroller, rowId, field = null) => {
+    if (!vScroller) return false;
+    const selector = field
+        ? `.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell[data-field="${field}"]`
+        : `.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell`;
+    const cell = vScroller.querySelector(selector);
+    if (!cell || cell.textContent.trim().length === 0) return false;
+
+    const viewRect = vScroller.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+    if (viewRect.width <= 0 || viewRect.height <= 0 || cellRect.width <= 0 || cellRect.height <= 0) {
+        return false;
+    }
+
+    const visibleWidth  = Math.min(cellRect.right, viewRect.right) - Math.max(cellRect.left, viewRect.left);
+    const visibleHeight = Math.min(cellRect.bottom, viewRect.bottom) - Math.max(cellRect.top, viewRect.top);
+
+    return visibleWidth >= Math.min(8, cellRect.width * 0.25) &&
+           visibleHeight >= Math.min(8, cellRect.height * 0.25);
+};
+
+/**
+ * @summary Parses `NEO_USE_VDOM_WORKER` (`'true'` | `'false'`) into a boolean arm override or `undefined`.
+ * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @returns {boolean|undefined}
+ */
+export const parseNeoUseVdomWorkerEnv = (env = process.env) => {
+    const raw = env.NEO_USE_VDOM_WORKER?.trim();
+    if (!raw) return undefined;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    throw new Error(`Invalid NEO_USE_VDOM_WORKER="${raw}". Expected "true" or "false".`);
+};
+
+/**
+ * @summary Intercepts `neo-config.json` requests before `MicroLoader.mjs` boots so `useVdomWorker` matches the requested arm,
+ * and applies optional CDP Main-thread CPU throttling (`NEO_CPU_THROTTLE`; Blink restricts `Emulation.setCPUThrottlingRate` to page targets).
+ * @param {import('@playwright/test').Page} page
+ * @param {boolean|undefined} [expected=parseNeoUseVdomWorkerEnv()]
+ * @returns {Promise<boolean|undefined>}
+ */
+export const configureNeoVdomWorker = async (page, expected = parseNeoUseVdomWorkerEnv()) => {
+    const throttleRaw  = process.env.NEO_CPU_THROTTLE?.trim();
+    const throttleRate = throttleRaw ? Number(throttleRaw) : 1;
+    if (Number.isFinite(throttleRate) && throttleRate > 1) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttleRate });
+    }
+
+    if (typeof expected !== 'boolean') return undefined;
+
+    await page.route('**/neo-config.json', async (route) => {
+        const response = await route.fetch();
+        const json     = await response.json();
+        json.useVdomWorker = expected;
+        await route.fulfill({ response, json });
+    });
+
+    return expected;
+};
+
+/**
+ * @summary Verifies that `Neo.config.useVdomWorker` and the live `Neo.worker.Manager` VDom worker match the requested arm,
+ * and reads `/resources/engine-provenance.json` when available so runs record whether published npm v14 or a local overlay executed.
+ * @param {import('@playwright/test').Page} page
+ * @param {boolean|undefined} [expected=parseNeoUseVdomWorkerEnv()]
+ * @returns {Promise<{useVdomWorker: boolean, hasVdomWorker: boolean, engineProvenance: Object|null}>}
+ */
+export const assertNeoVdomWorkerTopology = async (page, expected = parseNeoUseVdomWorkerEnv()) => {
+    const topology = await page.evaluate(async () => {
+        let engineProvenance = null;
+        const isDistProd = window.location.pathname.includes('/dist/production/');
+        const candidates = isDistProd
+            ? ['../../resources/engine-provenance.json', '/dist/production/resources/engine-provenance.json']
+            : ['/resources/engine-provenance.json', 'resources/engine-provenance.json'];
+        for (const candidate of candidates) {
+            try {
+                const res = await fetch(candidate, { cache: 'no-store' });
+                if (res.ok) {
+                    engineProvenance = await res.json();
+                    break;
+                }
+            } catch {
+                // Ignore missing provenance file in non-Neo apps
+            }
+        }
+        return {
+            useVdomWorker: Boolean(window.Neo?.config?.useVdomWorker),
+            hasVdomWorker: Boolean(
+                window.Neo?.worker?.Manager?.getWorker?.('vdom') ||
+                window.Neo?.worker?.Manager?.workers?.vdom?.worker
+            ),
+            engineProvenance
+        };
+    });
+
+    if (typeof expected === 'boolean' && (topology.useVdomWorker !== expected || topology.hasVdomWorker !== expected)) {
+        throw new Error(
+            `Neo worker topology mismatch: expected useVdomWorker=${expected}, got ${JSON.stringify(topology)}`
+        );
+    }
+
+    return topology;
+};
+
+/**
+ * @summary Browser-side installer exposing zero-allocation `startWorkerMessageProbe()` and `stopWorkerMessageProbe()` counters on `Neo.worker.Manager`.
+ */
+export const installWorkerMessageProbeInBrowser = () => {
+    const recordInbound = (manager, event) => {
+        const state = manager.__neoBenchmarkProbeState;
+        if (!state) return;
+
+        state.inboundMessages++;
+        const data    = event?.data;
+        const payload = data?.action === 'reply' ? data.data : data;
+        const isDomUpdate = data?.action === 'updateVdom' ||
+            (data?.action === 'reply' && Boolean(payload?.updateVdom || payload?.autoMount));
+
+        if (isDomUpdate) {
+            state.domUpdateFlights++;
+            const deltas     = data?.action === 'updateVdom' ? data.deltas : payload?.deltas;
+            const metaObj    = data?.action === 'updateVdom' ? data.meta : payload?.meta;
+            const hasMeta    = Boolean(metaObj && Object.keys(metaObj).length > 0);
+            const deltaCount = Array.isArray(deltas) ? deltas.length : 0;
+            if (deltaCount > 0 || hasMeta) {
+                state.nonEmptyDomFlights++;
+            }
+            state.totalDeltas += deltaCount;
+        }
+        if (payload?.vnodes || payload?.vnode) {
+            state.vnodeRelayMessages++;
+        }
+    };
+
+    const attachWorkerListeners = (manager) => {
+        for (const entry of Object.values(manager.workers || {})) {
+            const target = entry?.worker?.port || entry?.worker;
+            if (target && !target.__neoBenchmarkInboundWrapped) {
+                target.addEventListener('message', (event) => recordInbound(manager, event));
+                target.__neoBenchmarkInboundWrapped = true;
+            }
+        }
+    };
+
+    const ensureWrapped = () => {
+        const manager = window.Neo?.worker?.Manager;
+        if (!manager) {
+            return null;
+        }
+
+        attachWorkerListeners(manager);
+
+        if (manager.__neoBenchmarkProbeInstalled) {
+            return manager;
+        }
+
+        const origSendMessage = manager.sendMessage.bind(manager);
+        manager.__neoBenchmarkProbeState = null;
+
+        manager.sendMessage = function(dest, opts, transfer) {
+            const state = manager.__neoBenchmarkProbeState;
+            if (state) {
+                state.outboundMessages++;
+                if (opts?.data?.vnodes || opts?.data?.vnode) {
+                    state.vnodeRelayMessages++;
+                }
+            }
+            return origSendMessage(dest, opts, transfer);
+        };
+
+        manager.__neoBenchmarkProbeInstalled = true;
+        return manager;
+    };
+
+    window.startWorkerMessageProbe = () => {
+        const manager = ensureWrapped();
+        if (!manager) {
+            throw new Error('Neo.worker.Manager is not available for startWorkerMessageProbe()');
+        }
+        manager.__neoBenchmarkProbeState = {
+            startTime         : performance.now(),
+            inboundMessages   : 0,
+            outboundMessages  : 0,
+            domUpdateFlights  : 0,
+            nonEmptyDomFlights: 0,
+            totalDeltas       : 0,
+            vnodeRelayMessages: 0
+        };
+    };
+
+    window.stopWorkerMessageProbe = () => {
+        const manager = ensureWrapped();
+        const state   = manager?.__neoBenchmarkProbeState;
+        if (manager) {
+            manager.__neoBenchmarkProbeState = null;
+        }
+        if (!state) {
+            return {
+                elapsedMs              : 0,
+                inboundMessages        : 0,
+                outboundMessages       : 0,
+                totalMainWorkerMessages: 0,
+                domUpdateFlights       : 0,
+                nonEmptyDomFlights     : 0,
+                flightsPerSec          : 0,
+                nonEmptyFlightsPerSec  : 0,
+                totalDeltas            : 0,
+                avgDeltasPerFlight     : 0,
+                vnodeRelayMessages     : 0
+            };
+        }
+        const elapsedMs = Math.max(1, performance.now() - state.startTime);
+        const totalMainWorkerMessages = state.inboundMessages + state.outboundMessages;
+        return {
+            elapsedMs              : Math.round(elapsedMs * 100) / 100,
+            inboundMessages        : state.inboundMessages,
+            outboundMessages       : state.outboundMessages,
+            totalMainWorkerMessages,
+            domUpdateFlights       : state.domUpdateFlights,
+            nonEmptyDomFlights     : state.nonEmptyDomFlights,
+            flightsPerSec          : Math.round((state.domUpdateFlights / (elapsedMs / 1000)) * 100) / 100,
+            nonEmptyFlightsPerSec  : Math.round((state.nonEmptyDomFlights / (elapsedMs / 1000)) * 100) / 100,
+            totalDeltas            : state.totalDeltas,
+            avgDeltasPerFlight     : state.nonEmptyDomFlights > 0
+                ? Math.round((state.totalDeltas / state.nonEmptyDomFlights) * 100) / 100
+                : 0,
+            vnodeRelayMessages     : state.vnodeRelayMessages
+        };
+    };
 };

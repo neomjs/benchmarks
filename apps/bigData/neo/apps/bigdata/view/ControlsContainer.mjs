@@ -139,6 +139,13 @@ class ControlsContainer extends Container {
                     ntype    : 'label',
                     reference: 'count-rows-label',
                     style    : {marginTop: '1em'}
+                }, {
+                    ntype    : 'button',
+                    handler  : 'up.onToggleStreamClick',
+                    reference: 'stream-feed-button',
+                    style    : {marginTop: '1em'},
+                    text     : 'Start/Stop Feed',
+                    width    : 200
                 }]
             }, {
                 module: Container,
@@ -268,6 +275,96 @@ class ControlsContainer extends Container {
     }
 
     firstFiltering = true
+    /**
+     * @member {Number|null} streamIntervalId=null
+     * @private
+     */
+    streamIntervalId = null
+    /**
+     * @member {Number} streamTickCount=0
+     * @private
+     */
+    streamTickCount = 0
+
+    /**
+     * @param {...*} args
+     */
+    destroy(...args) {
+        if (this.streamIntervalId) {
+            clearInterval(this.streamIntervalId);
+            this.streamIntervalId = null
+        }
+        super.destroy(...args)
+    }
+
+    /**
+     * @summary Starts or stops a 5ms real-time feed mutating visible + random BigData rows and the row-count status label.
+     */
+    onToggleStreamClick() {
+        let me = this;
+
+        if (me.streamIntervalId) {
+            clearInterval(me.streamIntervalId);
+            me.streamIntervalId = null;
+            console.log('BigData real-time feed stopped.');
+            me.updateRowsLabel();
+            return
+        }
+
+        const {grid}  = me,
+              {store} = grid;
+
+        me.streamTickCount  = 0;
+        me.streamIntervalId = setInterval(() => {
+            const count = store.count;
+            if (count < 1) return;
+
+            me.streamTickCount++;
+
+            const [mountedStart, mountedEnd] = grid.body.mountedRows,
+                  visibleSpan                = Math.max(1, mountedEnd - mountedStart),
+                  visibleBatch               = Math.min(visibleSpan > 60 ? 60 : 20, visibleSpan),
+                  updatedRecords             = [],
+                  seenIds                    = new Set(),
+                  tick                       = me.streamTickCount;
+
+            for (let i = 0; i < visibleBatch; i++) {
+                const idx  = Math.min(count - 1, mountedStart + ((tick + i) % visibleSpan)),
+                      item = store.getAt(idx);
+                if (item && !seenIds.has(item.id)) {
+                    seenIds.add(item.id);
+                    updatedRecords.push({
+                        id      : item.id,
+                        counter : ((item.counter || 0) + 1) % 1000,
+                        progress: ((item.progress || 0) + 5) % 100,
+                        number7 : (tick * 13 + i) % 10000,
+                        number8 : (tick * 17 + i) % 10000,
+                        number9 : (tick * 19 + i) % 10000,
+                        number10: (tick * 23 + i) % 10000
+                    })
+                }
+            }
+
+            for (let j = 0; j < 10; j++) {
+                const idx  = Math.floor(Math.random() * count),
+                      item = store.getAt(idx);
+                if (item && !seenIds.has(item.id)) {
+                    seenIds.add(item.id);
+                    updatedRecords.push({
+                        id      : item.id,
+                        counter : ((item.counter || 0) + 1) % 1000,
+                        progress: ((item.progress || 0) + 5) % 100,
+                        number7 : (tick * 29 + j) % 10000
+                    })
+                }
+            }
+
+            grid.bulkUpdateRecords(updatedRecords);
+            me.getItem('count-rows-label').text = `Streaming tick ${tick} · rows: ${count}`
+        }, 5);
+
+        console.log('BigData real-time feed started.')
+    }
 
     /**
      * @param {Object} data
