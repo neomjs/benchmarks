@@ -3,6 +3,7 @@ import {
     assertNeoVdomWorkerTopology,
     configureNeoVdomWorker,
     installWorkerMessageProbeInBrowser,
+    isCellInViewportInBrowser,
     measureJankInBrowser,
     measureMainThreadProbeInBrowser,
     measurePerformanceInBrowser,
@@ -58,6 +59,7 @@ test.beforeEach(async ({page}) => {
         content: `
             (${installWorkerMessageProbeInBrowser.toString()})();
             window.getNeoGridNames            = ${getNeoGridNames.toString()};
+            window.isCellInViewport           = ${isCellInViewportInBrowser.toString()};
             window.measureJank                = ${measureJankInBrowser.toString()};
             window.measurePerformance         = ${measurePerformanceInBrowser.toString()};
             window.measureUiUpdatePerformance = ${measureUiUpdatePerformanceInBrowser.toString()};
@@ -86,7 +88,13 @@ test.beforeEach(async ({page}) => {
 
     await page.goto('/apps/bigdata/');
     await page.waitForFunction(() => document.querySelector('[role="grid"]'));
-    await assertNeoVdomWorkerTopology(page);
+    const topology = await assertNeoVdomWorkerTopology(page);
+    if (topology?.engineProvenance) {
+        test.info().annotations.push({
+            type       : 'engineProvenance',
+            description: JSON.stringify(topology.engineProvenance)
+        });
+    }
 });
 
 test('should load the app and display the initial grid data', async ({page}) => {
@@ -337,30 +345,38 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     console.log(`[Benchmark] ${rowsUiUpdateMetricName}: ${rowsUiUpdateDuration !== null ? rowsUiUpdateDuration.toFixed(2) : 'N/A'} ms`);
 
     // 2. Change columns to 200
+    const namesBefore200Cols = await page.evaluate(() => window.getNeoGridNames());
+
     // Step 1: Trigger the UI action and start total duration + main-thread responsiveness measurement
-    const colsProbePromise = page.evaluate(() => {
+    const colsProbePromise = page.evaluate((initial) => {
         const action = () => {
             window.selectComboboxItem('Amount Columns', '200');
         };
 
         const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-colcount') === '200';
+            const grid         = document.querySelector('[role="grid"]');
+            const currentNames = window.getNeoGridNames();
+            return grid && grid.getAttribute('aria-colcount') === '200' &&
+                   currentNames.length === initial.length &&
+                   currentNames.some((name, i) => name !== initial[i]);
         };
         return window.measureMainThreadProbe('change-cols-200-total', action, condition);
-    });
+    }, namesBefore200Cols);
 
     // Step 2: Wait for the "Data creation total time" log
     await page.waitForEvent('console', msg => msg.text().includes('Data creation total time:'));
 
     // Step 3: Start measuring UI update
-    const colsUiUpdateDurationPromise = page.evaluate(() => {
+    const colsUiUpdateDurationPromise = page.evaluate((initial) => {
         const condition = () => {
-            const grid = document.querySelector('[role="grid"]');
-            return grid && grid.getAttribute('aria-colcount') === '200';
+            const grid         = document.querySelector('[role="grid"]');
+            const currentNames = window.getNeoGridNames();
+            return grid && grid.getAttribute('aria-colcount') === '200' &&
+                   currentNames.length === initial.length &&
+                   currentNames.some((name, i) => name !== initial[i]);
         };
         return window.measureUiUpdatePerformance('change-cols-200-ui-update', condition);
-    });
+    }, namesBefore200Cols);
 
     // Step 4: Await both promises
     const [colsProbe, colsUiUpdateDuration] = await Promise.all([colsProbePromise, colsUiUpdateDurationPromise]);
@@ -382,12 +398,13 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
     console.log(`[Benchmark] ${colsMetricName}: ${colsProbe.tvsMs.toFixed(2)} ms (maxRafDelta: ${colsProbe.maxRafDeltaMs.toFixed(2)} ms)`);
     console.log(`[Benchmark] ${colsUiUpdateMetricName}: ${colsUiUpdateDuration !== null ? colsUiUpdateDuration.toFixed(2) : 'N/A'} ms`);
 
-    // Ensure all 200 column positions and 100k row scrollHeight are synced before scrolling
+    // Ensure all 200 column positions, newly loaded 200-column cells, and 100k row scrollHeight are settled before scrolling
     await page.waitForFunction(() => {
-        const vScroll = document.querySelector('.neo-grid-view');
-        const hScroll = document.querySelector('.neo-grid-horizontal-scrollbar');
-        const numCell = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="firstname"]');
+        const vScroll  = document.querySelector('.neo-grid-view');
+        const hScroll  = document.querySelector('.neo-grid-horizontal-scrollbar');
+        const numCell  = document.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="number7"]');
         return vScroll && vScroll.scrollHeight > 3000000 &&
+               vScroll.scrollTop === 0 &&
                hScroll && hScroll.scrollWidth > 15000 &&
                numCell && numCell.textContent.trim().length > 0;
     });
@@ -406,17 +423,9 @@ test('should handle large data changes: 100k rows then 200 cols', async ({ page 
             return Math.min(maxLeft, 760 + (colNum - 7) * 100);
         };
 
-        const isRowMounted = (rowId) => {
-            const row = document.querySelector(`.neo-grid-row[data-row-id="${rowId}"]`);
-            if (!row) return false;
-            const cell = row.querySelector('.neo-grid-cell');
-            return !!cell && cell.textContent.trim().length > 0;
-        };
+        const isRowMounted = (rowId) => window.isCellInViewport(vScroller, rowId, null);
 
-        const isCellMounted = (rowId, field) => {
-            const cell = document.querySelector(`.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell[data-field="${field}"]`);
-            return !!cell && cell.textContent.trim().length > 0;
-        };
+        const isCellMounted = (rowId, field) => window.isCellInViewport(vScroller, rowId, field);
 
         // 3a. Vertical Scroll across 100k rows (8 render-gated steps)
         const vSteps = [5000, 15000, 30000, 45000, 60000, 75000, 90000, 0];
@@ -577,10 +586,7 @@ test('should sustain real-time streaming and 2D scrolling under duress (100k row
             return Math.min(maxLeft, 760 + (colNum - 7) * 100);
         };
 
-        const isCellMounted = (rowId, field) => {
-            const cell = document.querySelector(`.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell[data-field="${field}"]`);
-            return !!cell && cell.textContent.trim().length > 0;
-        };
+        const isCellMounted = (rowId, field) => window.isCellInViewport(vScroller, rowId, field);
 
         const dSteps = [
             { rowId: 5000,  colNum: 30,  field: 'number30'  },
@@ -776,10 +782,7 @@ test('should stress high row/column buffering (50x20, >5k nodes), 100k store fil
             return Math.min(maxLeft, 760 + (colNum - 7) * 100);
         };
 
-        const isCellMounted = (rowId, field) => {
-            const cell = document.querySelector(`.neo-grid-row[data-row-id="${rowId}"] .neo-grid-cell[data-field="${field}"]`);
-            return !!cell && cell.textContent.trim().length > 0;
-        };
+        const isCellMounted = (rowId, field) => window.isCellInViewport(vScroller, rowId, field);
 
         const hops20 = [
             { rowId: 4000,  colNum: 25,  field: 'number25'  },

@@ -1,0 +1,251 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {
+    assertNeoVdomWorkerTopology,
+    isCellInViewportInBrowser,
+    measureMainThreadProbeInBrowser
+} from './utils/browser-test-helpers.mjs';
+import {
+    buildBenchmarkConfig,
+    resolveSafeResultsDir
+} from '../scripts/run-benchmarks.mjs';
+import {
+    OVERLAY_MARKER_FILE,
+    assertSupportedNodeVersion,
+    overlayLocalEngine,
+    prepareNeoAppForPublishedInstall,
+    writeEngineProvenance
+} from '../scripts/setup.mjs';
+
+test.describe('Benchmark harness measurement, isolation, and setup contracts (#15)', () => {
+    test('RA-1: buffered offscreen cell at 18 ms does not end 2D TVS before entering viewport at 60 ms', async ({ page }) => {
+        await page.setContent(`
+            <div class="neo-grid-view" style="position:relative;width:600px;height:300px;overflow:hidden;"></div>
+        `);
+        await page.addScriptTag({
+            content: `
+                window.isCellInViewport       = ${isCellInViewportInBrowser.toString()};
+                window.measureMainThreadProbe = ${measureMainThreadProbeInBrowser.toString()};
+            `
+        });
+
+        const replay = await page.evaluate(async () => {
+            const vScroller = document.querySelector('.neo-grid-view');
+            let mountedOffscreen = false;
+            let visibleWhenMounted = null;
+
+            const probe = await window.measureMainThreadProbe('buffered-2d-replay', () => {
+                // Mount target cell offscreen horizontally (+900 px) and vertically (+450 px) at 18 ms
+                setTimeout(() => {
+                    const row = document.createElement('div');
+                    row.className = 'neo-grid-row';
+                    row.setAttribute('data-row-id', '5000');
+                    row.style.cssText = 'position:absolute;top:450px;left:0;height:32px;width:2000px;';
+
+                    const cell = document.createElement('div');
+                    cell.className = 'neo-grid-cell';
+                    cell.setAttribute('data-field', 'number30');
+                    cell.style.cssText = 'position:absolute;left:900px;top:0;width:100px;height:32px;';
+                    cell.textContent = '42';
+
+                    row.appendChild(cell);
+                    vScroller.appendChild(row);
+                    mountedOffscreen = true;
+                    visibleWhenMounted = window.isCellInViewport(vScroller, 5000, 'number30');
+                }, 18);
+
+                // Translate row + cell into the visible viewport at 60 ms (without adding child nodes)
+                setTimeout(() => {
+                    const row  = vScroller.querySelector('.neo-grid-row[data-row-id="5000"]');
+                    const cell = row.querySelector('.neo-grid-cell[data-field="number30"]');
+                    row.style.transform  = 'translate3d(-900px, -450px, 0px)';
+                    cell.style.left      = '900px';
+                }, 60);
+            }, () => window.isCellInViewport(vScroller, 5000, 'number30'));
+
+            return {
+                mountedOffscreen,
+                visibleWhenMounted,
+                visibleAtEnd: window.isCellInViewport(vScroller, 5000, 'number30'),
+                tvsMs       : probe.tvsMs
+            };
+        });
+
+        expect(replay.mountedOffscreen).toBe(true);
+        expect(replay.visibleWhenMounted).toBe(false);
+        expect(replay.visibleAtEnd).toBe(true);
+        expect(replay.tvsMs).toBeGreaterThanOrEqual(55);
+    });
+
+    test('RA-1 & RA-3: live BigData buffer rejects offscreen buffered cells until scrolled into viewport and records engineProvenance', async ({ page }) => {
+        await page.addInitScript({
+            content: `window.isCellInViewport = ${isCellInViewportInBrowser.toString()};`
+        });
+        await page.goto('/apps/bigdata/');
+        await page.waitForFunction(() => {
+            const grid      = document.querySelector('[role="grid"]');
+            const vScroller = document.querySelector('.neo-grid-view');
+            const firstCell = vScroller?.querySelector('.neo-grid-row[data-row-id="0"] .neo-grid-cell[data-field="firstname"]');
+            return grid?.getAttribute('aria-rowcount') === '1001' &&
+                   Boolean(firstCell && firstCell.textContent.trim().length > 0);
+        });
+
+        const topology = await assertNeoVdomWorkerTopology(page);
+        expect(topology.engineProvenance).toBeTruthy();
+        expect(topology.engineProvenance.version).toBe('14.0.0');
+        expect(['npm-package', 'local-overlay']).toContain(topology.engineProvenance.source);
+
+        const bufferCheck = await page.evaluate(async () => {
+            const vScroller    = document.querySelector('.neo-grid-view');
+            const hScroller    = document.querySelector('.neo-grid-horizontal-scrollbar');
+            const mountedCells = Array.from(vScroller.querySelectorAll('.neo-grid-row[data-row-id] .neo-grid-cell[data-field]'));
+            const viewRect     = vScroller.getBoundingClientRect();
+
+            const offscreenRowEl = mountedCells.find(cell => {
+                const r = cell.getBoundingClientRect();
+                return cell.getAttribute('data-field') === 'firstname' &&
+                       cell.textContent.trim().length > 0 &&
+                       r.top >= viewRect.bottom + 4;
+            });
+            const offscreenColEl = mountedCells.find(cell => {
+                const r     = cell.getBoundingClientRect();
+                const rowId = cell.closest('.neo-grid-row')?.getAttribute('data-row-id');
+                return rowId === '0' &&
+                       cell.textContent.trim().length > 0 &&
+                       r.left >= viewRect.right + 4;
+            });
+
+            if (!offscreenRowEl || !offscreenColEl) {
+                return { foundBufferedOffscreen: false, mountedCount: mountedCells.length };
+            }
+
+            const targetRowId = offscreenRowEl.closest('.neo-grid-row').getAttribute('data-row-id');
+            const targetField = offscreenColEl.getAttribute('data-field');
+
+            const row0Visible           = window.isCellInViewport(vScroller, 0, 'firstname');
+            const offscreenRowAccepted  = window.isCellInViewport(vScroller, targetRowId, 'firstname');
+            const offscreenColAccepted  = window.isCellInViewport(vScroller, 0, targetField);
+
+            // Scroll the offscreen buffered row + column into the visible viewport and verify acceptance
+            const sampleRow  = vScroller.querySelector('.neo-grid-row[data-row-id]');
+            const rowHeight  = sampleRow ? (parseFloat(sampleRow.style.height) || sampleRow.offsetHeight || 32) : 32;
+            const colMatch   = /^number(\d+)$/.exec(targetField);
+            const targetLeft = colMatch ? Math.max(0, 760 + (Number(colMatch[1]) - 7) * 100) : 400;
+
+            const probe = await new Promise((resolve, reject) => {
+                const start = performance.now();
+                vScroller.scrollTop = Number(targetRowId) * rowHeight;
+                if (hScroller) {
+                    hScroller.scrollLeft = targetLeft;
+                }
+                const check = () => {
+                    if (window.isCellInViewport(vScroller, targetRowId, targetField)) {
+                        resolve({ settledVisible: true, elapsedMs: performance.now() - start });
+                        return;
+                    }
+                    if (performance.now() - start > 5000) {
+                        reject(new Error(`Scrolled buffered cell (${targetRowId}, ${targetField}) did not enter viewport within 5s`));
+                        return;
+                    }
+                    requestAnimationFrame(check);
+                };
+                requestAnimationFrame(check);
+            });
+
+            return {
+                foundBufferedOffscreen: true,
+                row0Visible,
+                offscreenRowAccepted,
+                offscreenColAccepted,
+                settledVisible        : probe.settledVisible
+            };
+        });
+
+        expect(bufferCheck.foundBufferedOffscreen).toBe(true);
+        expect(bufferCheck.row0Visible).toBe(true);
+        expect(bufferCheck.offscreenRowAccepted).toBe(false);
+        expect(bufferCheck.offscreenColAccepted).toBe(false);
+        expect(bufferCheck.settledVisible).toBe(true);
+    });
+
+    test('RA-2: runner isolates 1x vs 4x CPU regimes, honors --bucket-suffix on single-arm runs, and confines result paths', async () => {
+        const cwd = '/workspace/benchmarks';
+
+        // 1. Single-arm 4x run honors --bucket-suffix and never collides with 1x
+        const oneArm4x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--vdom-worker=true', '--cpu-throttle=4', '--bucket-suffix=-cpu4x'],
+            {},
+            cwd
+        );
+        const oneArm1x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--vdom-worker=true', '--cpu-throttle=1'],
+            { NEO_CPU_THROTTLE: '4' }, // Inherited 4x in parent env must be overridden by explicit --cpu-throttle=1
+            cwd
+        );
+        expect(oneArm4x.resolveSingleArmTarget('neo', 'big-data').resultBucket).toBe('neo-vdom-worker-cpu4x');
+        expect(oneArm1x.resolveSingleArmTarget('neo', 'big-data').resultBucket).toBe('neo-vdom-worker');
+        expect(oneArm1x.buildChildEnv('neo', 'big-data', true).NEO_CPU_THROTTLE).toBe('1');
+        expect(oneArm4x.buildChildEnv('neo', 'big-data', true).NEO_CPU_THROTTLE).toBe('4');
+
+        // 2. Single-arm 4x without --bucket-suffix still auto-isolates under -cpu4x
+        const autoSuffix4x = buildBenchmarkConfig(
+            ['--framework=neo', '--suite=big-data', '--vdom-worker=false', '--cpu-throttle=4'],
+            {},
+            cwd
+        );
+        expect(autoSuffix4x.resolveSingleArmTarget('neo', 'big-data').resultBucket).toBe('neo-app-worker-cpu4x');
+
+        // 3. Custom --result-bucket path traversal is rejected before fs.emptyDir
+        for (const badBucket of ['..', '../escape', '/tmp/outside', 'nested/sub', '.']) {
+            expect(() => resolveSafeResultsDir('/workspace/benchmarks/test-results-data', badBucket, 'big-data')).toThrow();
+            expect(() => buildBenchmarkConfig([`--result-bucket=${badBucket}`], {}, cwd).resolveSingleArmTarget('neo', 'big-data')).toThrow();
+        }
+        expect(() => buildBenchmarkConfig(['--bucket-suffix=/../escape'], {}, cwd)).toThrow();
+        expect(() => buildBenchmarkConfig(['--cpu-throttle=0'], {}, cwd)).toThrow();
+    });
+
+    test('RA-3: setup enforces Node >= 24 and removes local overlay marker before restoring published package', async () => {
+        expect(() => assertSupportedNodeVersion('20.11.0')).toThrow(/Node\.js >= 24\.0\.0/);
+        expect(() => assertSupportedNodeVersion('24.0.0')).not.toThrow();
+
+        const tmpRoot      = fs.mkdtempSync(path.join(os.tmpdir(), 'neo-bench-setup-'));
+        const fakeSource   = path.join(tmpRoot, 'neo-source');
+        const fakeApp      = path.join(tmpRoot, 'app');
+        const targetNeoDir = path.join(fakeApp, 'node_modules', 'neo.mjs');
+
+        try {
+            fs.mkdirSync(path.join(fakeSource, 'src', 'worker'), { recursive: true });
+            fs.writeFileSync(path.join(fakeSource, 'src', 'Neo.mjs'), '// overlay Neo.mjs\n');
+            fs.writeFileSync(path.join(fakeSource, 'src', 'worker', 'Manager.mjs'), '// overlay worker Manager\n');
+            fs.writeFileSync(path.join(fakeSource, 'package.json'), JSON.stringify({ name: 'neo.mjs', version: '14.0.0' }));
+
+            // Simulate installed published package + extra stale file, then overlay local checkout
+            fs.mkdirSync(path.join(targetNeoDir, 'src', 'worker'), { recursive: true });
+            fs.writeFileSync(path.join(targetNeoDir, 'package.json'), JSON.stringify({ name: 'neo.mjs', version: '14.0.0' }));
+            overlayLocalEngine(fakeSource, fakeApp);
+
+            const overlaidProv = writeEngineProvenance(fakeApp);
+            expect(overlaidProv.source).toBe('local-overlay');
+            expect(overlaidProv.overlaid).toBe(true);
+            expect(fs.existsSync(path.join(targetNeoDir, OVERLAY_MARKER_FILE))).toBe(true);
+
+            // Switching back to published setup removes the overlaid node_modules/neo.mjs tree before npm install
+            const removed = prepareNeoAppForPublishedInstall(fakeApp);
+            expect(removed).toBe(true);
+            expect(fs.existsSync(targetNeoDir)).toBe(false);
+
+            // Fresh npm install writes clean published provenance
+            fs.mkdirSync(path.join(targetNeoDir, 'src', 'worker'), { recursive: true });
+            fs.writeFileSync(path.join(targetNeoDir, 'src', 'worker', 'Manager.mjs'), '// published npm worker Manager\n');
+            fs.writeFileSync(path.join(targetNeoDir, 'package.json'), JSON.stringify({ name: 'neo.mjs', version: '14.0.0' }));
+            const publishedProv = writeEngineProvenance(fakeApp);
+            expect(publishedProv.source).toBe('npm-package');
+            expect(publishedProv.overlaid).toBe(false);
+            expect(publishedProv.workerManagerSha256).not.toBe(overlaidProv.workerManagerSha256);
+        } finally {
+            fs.rmSync(tmpRoot, { recursive: true, force: true });
+        }
+    });
+});

@@ -4,30 +4,34 @@ This guide provides the steps required to clone the repository, install dependen
 
 ## 1. Prerequisites
 
--   **Node.js**: Version 20.x or later is recommended.
+-   **Node.js**: Version `24.0.0` or later is required (`neo.mjs@14.0.0` engine minimum).
 -   **Git**: Required to clone the repository.
 -   **Operating System**: The tests are designed to be run on macOS, Linux, or Windows.
 
 ## 2. Installation
 
-First, clone the repository to your local machine:
+First, clone the repository, install the root harness dependencies, and install the Playwright browser binary:
 
 ```bash
 git clone https://github.com/neomjs/benchmarks.git
 cd benchmarks
+npm install
+npx playwright install chromium
 ```
 
-Next, run the setup script to install all nested dependencies and build the Neo.mjs applications:
+Next, run the setup script (`node:fs`-only, zero external pre-install imports) to install all nested app dependencies, record `resources/engine-provenance.json`, and build the Neo.mjs applications:
 
 ```bash
 npm run setup
 ```
 
-To install and build only the Neo.mjs benchmark apps (or overlay a local `neomjs/neo` checkout when benchmarking an unmerged Engine branch):
+To install and build only the Neo.mjs benchmark apps, or overlay a local `neomjs/neo` checkout when benchmarking an unmerged Engine branch (re-running without `--engine-path` automatically removes `.neo-engine-overlay.json` and restores the clean published `neo.mjs@14.0.0` npm package):
 
 ```bash
 node scripts/setup.mjs --neo-only
 node scripts/setup.mjs --neo-only --engine-path=../neo
+# Switch cleanly back from a local overlay to published neo.mjs@14.0.0:
+node scripts/setup.mjs --neo-only
 ```
 
 ## 3. Running the Benchmarks
