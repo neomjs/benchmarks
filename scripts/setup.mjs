@@ -74,28 +74,18 @@ export function prepareNeoAppForPublishedInstall(appFullPath) {
 
 /**
  * @summary Overlays a local `neomjs/neo` checkout (`src`, `buildScripts`, `resources/css`, `resources/scss`, `package.json`)
- * into `<app>/node_modules/neo.mjs` and writes `.neo-engine-overlay.json`.
+ * into `<app>/node_modules/neo.mjs` and stamps `.neo-engine-overlay.json` BEFORE mutating any package files so even an
+ * interrupted or throwing copy forces `prepareNeoAppForPublishedInstall()` to purge the dirty package on the next setup.
  * @param {string} sourceNeoDir
  * @param {string} appFullPath
+ * @param {Object} [options]
+ * @param {Function} [options.copyImpl=fs.cpSync]
  * @returns {Object} Overlay metadata written to `.neo-engine-overlay.json`.
  */
-export function overlayLocalEngine(sourceNeoDir, appFullPath) {
+export function overlayLocalEngine(sourceNeoDir, appFullPath, { copyImpl = fs.cpSync } = {}) {
     const targetNeoDir = path.join(appFullPath, 'node_modules', 'neo.mjs');
     if (!fs.existsSync(path.join(sourceNeoDir, 'src', 'Neo.mjs'))) {
         throw new Error(`Invalid NEO_ENGINE_PATH / --engine-path: ${sourceNeoDir} (missing src/Neo.mjs)`);
-    }
-
-    fs.mkdirSync(targetNeoDir, { recursive: true });
-    console.log(`Overlaying local neo.mjs checkout from ${sourceNeoDir} -> ${targetNeoDir}`);
-    for (const rel of ['src', 'buildScripts', 'resources/css', 'resources/scss', 'package.json']) {
-        const src = path.join(sourceNeoDir, rel);
-        const dst = path.join(targetNeoDir, rel);
-        if (fs.existsSync(src)) {
-            if (fs.statSync(src).isDirectory()) {
-                fs.rmSync(dst, { recursive: true, force: true });
-            }
-            fs.cpSync(src, dst, { recursive: true, force: true });
-        }
     }
 
     let gitSha = null;
@@ -105,13 +95,31 @@ export function overlayLocalEngine(sourceNeoDir, appFullPath) {
         gitSha = null;
     }
 
-    const marker = {
+    fs.mkdirSync(targetNeoDir, { recursive: true });
+    const markerPath = path.join(targetNeoDir, OVERLAY_MARKER_FILE);
+    const marker     = {
         source    : 'local-overlay',
+        status    : 'in-progress',
         enginePath: sourceNeoDir,
         gitSha,
         overlaidAt: new Date().toISOString()
     };
-    fs.writeFileSync(path.join(targetNeoDir, OVERLAY_MARKER_FILE), JSON.stringify(marker, null, 2) + '\n');
+    fs.writeFileSync(markerPath, JSON.stringify(marker, null, 2) + '\n');
+
+    console.log(`Overlaying local neo.mjs checkout from ${sourceNeoDir} -> ${targetNeoDir}`);
+    for (const rel of ['src', 'buildScripts', 'resources/css', 'resources/scss', 'package.json']) {
+        const src = path.join(sourceNeoDir, rel);
+        const dst = path.join(targetNeoDir, rel);
+        if (fs.existsSync(src)) {
+            if (fs.statSync(src).isDirectory()) {
+                fs.rmSync(dst, { recursive: true, force: true });
+            }
+            copyImpl(src, dst, { recursive: true, force: true });
+        }
+    }
+
+    marker.status = 'complete';
+    fs.writeFileSync(markerPath, JSON.stringify(marker, null, 2) + '\n');
     return marker;
 }
 

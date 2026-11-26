@@ -331,6 +331,30 @@ test.describe('Benchmark harness measurement, isolation, and setup contracts (#1
             expect(publishedProv.source).toBe('npm-package');
             expect(publishedProv.overlaid).toBe(false);
             expect(publishedProv.workerManagerSha256).not.toBe(overlaidProv.workerManagerSha256);
+
+            // 6. Interrupted overlay (failure mid-copy AFTER modifying src/ files) already wrote .neo-engine-overlay.json
+            // BEFORE modifying files, so same-version published restore purges the dirty tree instead of mislabeling it npm-package
+            let copiedSrc = false;
+            expect(() => overlayLocalEngine(fakeSource, fakeApp, {
+                copyImpl: (src, dst, opts) => {
+                    if (!copiedSrc) {
+                        copiedSrc = true;
+                        fs.cpSync(src, dst, opts);
+                        return;
+                    }
+                    throw new Error('simulated mid-overlay interruption after src/ modified');
+                }
+            })).toThrow(/simulated mid-overlay interruption/);
+
+            // Verify src/ was already modified to local source AND marker is already present with status: 'in-progress'
+            expect(fs.readFileSync(path.join(targetNeoDir, 'src', 'worker', 'Manager.mjs'), 'utf8')).toContain('overlay worker Manager');
+            expect(fs.existsSync(path.join(targetNeoDir, OVERLAY_MARKER_FILE))).toBe(true);
+            expect(JSON.parse(fs.readFileSync(path.join(targetNeoDir, OVERLAY_MARKER_FILE), 'utf8')).status).toBe('in-progress');
+            expect(writeEngineProvenance(fakeApp).source).toBe('local-overlay');
+
+            // Next published setup purges the interrupted overlay so npm restores clean published files
+            expect(prepareNeoAppForPublishedInstall(fakeApp)).toBe(true);
+            expect(fs.existsSync(targetNeoDir)).toBe(false);
         } finally {
             fs.rmSync(tmpRoot, { recursive: true, force: true });
         }
