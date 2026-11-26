@@ -43,7 +43,7 @@ function runCommand(command, cwd) {
 }
 
 /**
- * @summary Overlays a local `neomjs/neo` checkout (`src`, `buildScripts`, `resources/scss`, `package.json`) into `<app>/node_modules/neo.mjs`.
+ * @summary Overlays a local `neomjs/neo` checkout (`src`, `buildScripts`, `resources/css`, `package.json`) into `<app>/node_modules/neo.mjs`.
  * @param {string} sourceNeoDir
  * @param {string} appFullPath
  */
@@ -54,7 +54,7 @@ function overlayLocalEngine(sourceNeoDir, appFullPath) {
     }
 
     console.log(`Overlaying local neo.mjs checkout from ${sourceNeoDir} -> ${targetNeoDir}`);
-    for (const rel of ['src', 'buildScripts', 'resources/scss', 'package.json']) {
+    for (const rel of ['src', 'buildScripts', 'resources/css', 'resources/scss', 'package.json']) {
         const src = path.join(sourceNeoDir, rel);
         const dst = path.join(targetNeoDir, rel);
         if (fs.existsSync(src)) {
