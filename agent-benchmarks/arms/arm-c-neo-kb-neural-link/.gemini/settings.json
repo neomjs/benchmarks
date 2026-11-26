@@ -5,6 +5,11 @@
             "GEMINI.md"
         ]
     },
+    "mcp": {
+        "allowed": [
+            "neural-link"
+        ]
+    },
     "mcpServers": {
         "neural-link": {
             "command": "npx",

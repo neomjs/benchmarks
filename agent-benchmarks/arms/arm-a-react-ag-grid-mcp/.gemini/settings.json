@@ -5,6 +5,11 @@
             "GEMINI.md"
         ]
     },
+    "mcp": {
+        "allowed": [
+            "ag-mcp"
+        ]
+    },
     "mcpServers": {
         "ag-mcp": {
             "command": "npx",

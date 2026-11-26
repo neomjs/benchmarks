@@ -10,11 +10,14 @@ import {
     ARMS,
     adaptTranscriptEntry,
     allocateFreePort,
+    buildAgentSpawnSpec,
+    buildCleanRoomChildEnv,
     classifyToolCall,
     isPortListening,
     parseTranscriptTelemetry,
     buildComparisonReport,
     formatComparisonMarkdown,
+    resolveEffectiveGeminiMcpConfig,
     runArmVerification,
     runCleanRoomArm,
     readVerificationRuns,
@@ -98,31 +101,49 @@ async function probeMcpInitialize({command, args, cwd}) {
  * @param {{armDir: String, seedNodeModulesDir: String, scriptArgs: String[], env?: Object, checkPaths: String[]}} options
  */
 async function verifyArmDevServerAnswers({armDir, seedNodeModulesDir, scriptArgs, env = {}, checkPaths}) {
-    const armNodeModules = path.join(armDir, 'node_modules');
-    let   createdSymlink = false;
+    const armNodeModules      = path.join(armDir, 'node_modules'),
+          armLockPath         = path.join(armDir, 'package-lock.json'),
+          hadLockBefore       = await fs.pathExists(armLockPath),
+          armPkg              = await fs.readJson(path.join(armDir, 'package.json')),
+          expectedNeoVer      = armPkg.dependencies?.['neo.mjs'] || null;
+    let   createdNodeModules  = false;
 
     if (!await fs.pathExists(armNodeModules)) {
-        if (await fs.pathExists(seedNodeModulesDir)) {
+        let canUseSeed = Boolean(seedNodeModulesDir) && await fs.pathExists(seedNodeModulesDir);
+        if (canUseSeed && expectedNeoVer) {
+            const seedNeoPkgPath = path.join(seedNodeModulesDir, 'neo.mjs/package.json'),
+                  seedServerPath = path.join(seedNodeModulesDir, 'neo.mjs/buildScripts/util/fileServer.mjs'),
+                  seedNeoPkg     = (await fs.pathExists(seedNeoPkgPath)) ? await fs.readJson(seedNeoPkgPath) : null;
+            canUseSeed = seedNeoPkg?.version === expectedNeoVer && await fs.pathExists(seedServerPath);
+        }
+
+        if (canUseSeed) {
             await fs.ensureSymlink(seedNodeModulesDir, armNodeModules, 'dir');
-            createdSymlink = true;
+            createdNodeModules = true;
         } else {
-            execFileSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], {
+            execFileSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], {
                 cwd  : armDir,
                 stdio: 'inherit'
             });
+            createdNodeModules = true;
         }
     }
 
     const port  = await getFreePort(),
           child = spawn('npm', scriptArgs.map(a => a.replace('{PORT}', String(port))), {
-              cwd  : armDir,
-              env  : {...process.env, PORT: String(port), ...env},
-              stdio: ['ignore', 'pipe', 'pipe']
+              cwd     : armDir,
+              detached: true,
+              env     : {...process.env, PORT: String(port), ...env},
+              stdio   : ['ignore', 'pipe', 'pipe']
           });
+
+    let serverLog = '';
+    child.stdout?.on('data', chunk => { serverLog = (serverLog + chunk.toString('utf8')).slice(-4000); });
+    child.stderr?.on('data', chunk => { serverLog = (serverLog + chunk.toString('utf8')).slice(-4000); });
 
     try {
         const baseUrl  = `http://localhost:${port}`,
-              deadline = Date.now() + 20000;
+              deadline = Date.now() + 30000;
         let ready = false;
 
         while (Date.now() < deadline) {
@@ -138,16 +159,20 @@ async function verifyArmDevServerAnswers({armDir, seedNodeModulesDir, scriptArgs
             await new Promise(r => setTimeout(r, 200));
         }
 
-        expect(ready, `Dev server in ${armDir} did not answer 200 on ${checkPaths[0]}`).toBe(true);
+        expect(ready, `Dev server in ${armDir} did not answer 200 on ${checkPaths[0]}. Log:\n${serverLog}`).toBe(true);
 
         for (const checkPath of checkPaths) {
             const res = await fetch(`${baseUrl}${checkPath}`);
             expect(res.status, `Expected 200 for ${checkPath} in ${armDir}`).toBe(200);
         }
     } finally {
+        try { process.kill(-child.pid, 'SIGTERM'); } catch {}
         child.kill('SIGTERM');
-        if (createdSymlink) {
+        if (createdNodeModules) {
             await fs.remove(armNodeModules);
+        }
+        if (!hadLockBefore && await fs.pathExists(armLockPath)) {
+            await fs.remove(armLockPath);
         }
     }
 }
@@ -180,7 +205,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
     });
 
     test('all three arm workspaces carry isolated starter trees, launchable MCP servers, and serving dev servers', async () => {
-        test.setTimeout(60000);
+        test.setTimeout(120000);
 
         expect(ARMS).toEqual([
             'arm-a-react-ag-grid-mcp',
@@ -206,6 +231,10 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(armAGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
         expect(armBGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
         expect(armCGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
+        expect(armAGemini.mcp.allowed).toEqual(['ag-mcp']);
+        expect(armBGemini.admin.mcp.enabled).toBe(false);
+        expect(armBGemini.mcp.allowed).toEqual([]);
+        expect(armCGemini.mcp.allowed).toEqual(['neural-link']);
         expect(Object.keys(armAGemini.mcpServers)).toEqual(['ag-mcp']);
         expect(Object.keys(armBGemini.mcpServers)).toEqual([]);
         expect(Object.keys(armCGemini.mcpServers)).toEqual(['neural-link']);
@@ -259,19 +288,32 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             checkPaths        : ['/', '/src/main.jsx']
         });
 
-        await verifyArmDevServerAnswers({
-            armDir            : armBDir,
-            seedNodeModulesDir: path.join(ROOT_DIR, 'apps/bigData/neo/node_modules'),
-            scriptArgs        : ['run', 'server-start:headless'],
-            checkPaths        : ['/apps/gridbench/index.html', '/src/MicroLoader.mjs', '/node_modules/neo.mjs/src/Main.mjs']
+        const sharedNeo14SeedDir = path.join(os.tmpdir(), `neo-agent-bench-neo14-seed-${Date.now()}`);
+        await fs.ensureDir(sharedNeo14SeedDir);
+        await fs.copy(path.join(armBDir, 'package.json'), path.join(sharedNeo14SeedDir, 'package.json'));
+        execFileSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], {
+            cwd  : sharedNeo14SeedDir,
+            stdio: 'inherit'
         });
+        const neo14NodeModules = path.join(sharedNeo14SeedDir, 'node_modules');
 
-        await verifyArmDevServerAnswers({
-            armDir            : armCDir,
-            seedNodeModulesDir: path.join(ROOT_DIR, 'apps/bigData/neo/node_modules'),
-            scriptArgs        : ['run', 'server-start:headless'],
-            checkPaths        : ['/apps/gridbench/index.html', '/src/MicroLoader.mjs', '/node_modules/neo.mjs/src/Main.mjs']
-        });
+        try {
+            await verifyArmDevServerAnswers({
+                armDir            : armBDir,
+                seedNodeModulesDir: neo14NodeModules,
+                scriptArgs        : ['run', 'server-start:headless'],
+                checkPaths        : ['/apps/gridbench/index.html', '/src/MicroLoader.mjs', '/node_modules/neo.mjs/src/Main.mjs']
+            });
+
+            await verifyArmDevServerAnswers({
+                armDir            : armCDir,
+                seedNodeModulesDir: neo14NodeModules,
+                scriptArgs        : ['run', 'server-start:headless'],
+                checkPaths        : ['/apps/gridbench/index.html', '/src/MicroLoader.mjs', '/node_modules/neo.mjs/src/Main.mjs']
+            });
+        } finally {
+            await fs.remove(sharedNeo14SeedDir);
+        }
     });
 
     test('parseTranscriptTelemetry adapts Claude Code and Codex JSONL transcripts and runner verification logs', () => {
@@ -815,7 +857,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(stagedCodexToml).toContain('[mcp_servers.neural-link.env]');
             expect(stagedCodexToml).toContain(`NEO_NL_PORT = "${customNlPortC}"`);
             expect(stagedNeoConfig.neuralLinkUrl).toBe(`ws://127.0.0.1:${customNlPortC}`);
-            expect(stagedPkg.scripts['server-start:headless']).toContain(`PORT=${customAppPortC} webpack serve`);
+            expect(stagedPkg.scripts['server-start:headless']).toContain(`fileServer.mjs --no-open --port ${customAppPortC}`);
             expect(stagedAgentsMd).toContain(`http://localhost:${customAppPortC}/apps/gridbench/index.html`);
             expect(stagedAgentsMd).not.toContain('http://localhost:8080');
             expect(await fs.pathExists(path.join(stagedC.stageRoot, 'node_modules'))).toBe(true);
@@ -1149,7 +1191,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 inputTokens : 3000,
                 outputTokens: 600,
                 cachedTokens: 12000,
-                total       : 3600
+                total       : 15600
             },
             toolCallsByServer: {
                 docsKbQueries         : 1,
@@ -1161,12 +1203,174 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             verificationFailures: 0
         });
 
-        // End-to-end production spawn check for `runCleanRoomArm({ harness: 'gemini', sandbox: true })`
+        // RA-2a: Gemini CLI v0.38.1 StreamJsonFormatter replay where `total_tokens` (250) includes cached (60) + reasoning/thought (130) + uncached input (40) + candidate output (20)
+        const geminiThoughtReplay = [
+            JSON.stringify({
+                type      : 'init',
+                timestamp : '2026-11-26T01:00:00.000Z',
+                session_id: 'gem-thought-01',
+                model     : 'gemini-3.1-pro-preview'
+            }),
+            JSON.stringify({
+                type     : 'result',
+                timestamp: '2026-11-26T01:00:05.000Z',
+                status   : 'success',
+                stats    : {
+                    total_tokens : 250,
+                    input_tokens : 100,
+                    output_tokens: 20,
+                    cached       : 60,
+                    input        : 40,
+                    duration_ms  : 5000,
+                    tool_calls   : 0,
+                    models       : {
+                        'gemini-3.1-pro-preview': {
+                            total_tokens : 250,
+                            input_tokens : 100,
+                            output_tokens: 20,
+                            cached       : 60,
+                            input        : 40
+                        }
+                    }
+                }
+            })
+        ].join('\n');
+
+        const thoughtTelemetry = parseTranscriptTelemetry(geminiThoughtReplay, {
+            arm     : 'arm-b-neo-kb-only',
+            versions: {harnessVersion: '0.38.1'}
+        });
+        expect(thoughtTelemetry.harness).toBe('gemini');
+        expect(thoughtTelemetry.totalTokens).toEqual({
+            inputTokens : 40,
+            outputTokens: 20,
+            cachedTokens: 60,
+            total       : 250
+        });
+
+        // RA-2b: Generic `type: "message"` record with `usage` + `toolCalls` must NOT be hijacked by the Gemini branch
+        const genericMessageLine = JSON.stringify({
+            type     : 'message',
+            timestamp: '2026-11-26T01:05:00.000Z',
+            role     : 'assistant',
+            content  : 'Queried AG Grid docs.',
+            usage    : {inputTokens: 45, outputTokens: 15},
+            toolCalls: [{serverName: 'ag-mcp', toolName: 'search_docs', input: {query: 'rowGrouping'}}]
+        });
+        const genericMessageTelemetry = parseTranscriptTelemetry(genericMessageLine, {
+            arm: 'arm-a-react-ag-grid-mcp'
+        });
+        expect(genericMessageTelemetry.harness).toBe('generic');
+        expect(genericMessageTelemetry.totalTokens).toEqual({
+            inputTokens : 45,
+            outputTokens: 15,
+            cachedTokens: 0,
+            total       : 60
+        });
+        expect(genericMessageTelemetry.toolCallsByServer.docsKbQueries).toBe(1);
+
+        // RA-1: Effective Gemini CLI v0.38.1 configuration isolation across Arms A, B, and C under poisoned user + system settings
+        const poisonDir         = path.join(os.tmpdir(), `neo-gemini-poison-${Date.now()}`),
+              poisonHome        = path.join(poisonDir, 'home'),
+              poisonSysSettings = path.join(poisonDir, 'system-settings.json'),
+              prevHome          = process.env.HOME;
+
+        await fs.ensureDir(path.join(poisonHome, '.gemini'));
+        await fs.writeJson(path.join(poisonHome, '.gemini/oauth_creds.json'), {refresh_token: 'stub-oauth'}, {spaces: 2});
+        await fs.writeJson(path.join(poisonHome, '.gemini/settings.json'), {
+            security  : {
+                auth       : {selectedType: 'oauth-personal'},
+                folderTrust: {enabled: true}
+            },
+            mcpServers: {
+                'leaked-user-mcp': {command: 'node', args: ['leak-user.js']},
+                'neural-link'    : {command: 'npx', args: ['-y', 'neo-neural-link'], env: {NEO_NL_PORT: '1111'}}
+            }
+        }, {spaces: 2});
+        await fs.writeJson(poisonSysSettings, {
+            security  : {folderTrust: {enabled: true}},
+            mcpServers: {
+                'leaked-sys-mcp': {command: 'node', args: ['leak-sys.js']},
+                'neural-link'   : {command: 'npx', args: ['-y', 'neo-neural-link'], env: {NEO_NL_PORT: '2222'}}
+            }
+        }, {spaces: 2});
+
+        // Counterexample control: without clean-room isolation, system/user settings leak into B and override C's port
+        const unisolatedArmC = await resolveEffectiveGeminiMcpConfig({
+            armDir: path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link'),
+            env   : {HOME: poisonHome, GEMINI_CLI_SYSTEM_SETTINGS_PATH: poisonSysSettings}
+        });
+        expect(unisolatedArmC.effectiveMcpServers['neural-link'].env.NEO_NL_PORT).toBe('2222');
+
+        process.env.HOME = poisonHome;
+        let isoA = null, isoB = null, isoC = null;
+        try {
+            const isoNlPort = await allocateFreePort(0);
+            isoA = await stageArmWorkspace({arm: 'arm-a-react-ag-grid-mcp', installDeps: false});
+            isoB = await stageArmWorkspace({arm: 'arm-b-neo-kb-only', installDeps: false});
+            isoC = await stageArmWorkspace({arm: 'arm-c-neo-kb-neural-link', nlPort: isoNlPort, installDeps: false});
+
+            const poisonedBaseEnv = {
+                ...process.env,
+                HOME                           : poisonHome,
+                GEMINI_CLI_SYSTEM_SETTINGS_PATH: poisonSysSettings
+            };
+
+            const effA = await resolveEffectiveGeminiMcpConfig({
+                armDir                   : isoA.armDir,
+                env                      : buildCleanRoomChildEnv(isoA, poisonedBaseEnv),
+                cliArgs                  : buildAgentSpawnSpec({arm: 'arm-a-react-ag-grid-mcp', harness: 'gemini', prompt: 'p'}).spawnArgs,
+                defaultSystemSettingsPath: poisonSysSettings
+            });
+            expect(effA.mcpEnabled).toBe(true);
+            expect(Object.keys(effA.effectiveMcpServers)).toEqual(['ag-mcp']);
+            expect(effA.mergedSettings.security?.auth?.selectedType).toBe('oauth-personal');
+            expect(await fs.pathExists(path.join(isoA.geminiHomeDir, '.gemini/oauth_creds.json'))).toBe(true);
+
+            const effB = await resolveEffectiveGeminiMcpConfig({
+                armDir                   : isoB.armDir,
+                env                      : buildCleanRoomChildEnv(isoB, poisonedBaseEnv),
+                cliArgs                  : buildAgentSpawnSpec({arm: 'arm-b-neo-kb-only', harness: 'gemini', prompt: 'p'}).spawnArgs,
+                defaultSystemSettingsPath: poisonSysSettings
+            });
+            expect(effB.mcpEnabled).toBe(false);
+            expect(Object.keys(effB.effectiveMcpServers)).toEqual([]);
+
+            const effC = await resolveEffectiveGeminiMcpConfig({
+                armDir                   : isoC.armDir,
+                env                      : buildCleanRoomChildEnv(isoC, poisonedBaseEnv),
+                cliArgs                  : buildAgentSpawnSpec({arm: 'arm-c-neo-kb-neural-link', harness: 'gemini', prompt: 'p'}).spawnArgs,
+                defaultSystemSettingsPath: poisonSysSettings
+            });
+            expect(effC.mcpEnabled).toBe(true);
+            expect(Object.keys(effC.effectiveMcpServers)).toEqual(['neural-link']);
+            expect(effC.effectiveMcpServers['neural-link'].env.NEO_NL_PORT).toBe(String(isoNlPort));
+        } finally {
+            process.env.HOME = prevHome;
+            if (isoA) await fs.remove(isoA.stageRoot);
+            if (isoB) await fs.remove(isoB.stageRoot);
+            if (isoC) await fs.remove(isoC.stageRoot);
+            await fs.remove(poisonDir);
+        }
+
+        // RA-3: Programmatic and CLI launches share model default resolution (Claude -> 'sonnet', Gemini/Codex -> omit `-m` unless supplied)
+        const claudeDefaultSpec = buildAgentSpawnSpec({arm: 'arm-b-neo-kb-only', prompt: 'p'}),
+              geminiDefaultSpec = buildAgentSpawnSpec({arm: 'arm-c-neo-kb-neural-link', harness: 'gemini', prompt: 'p'}),
+              codexDefaultSpec  = buildAgentSpawnSpec({arm: 'arm-c-neo-kb-neural-link', harness: 'codex', prompt: 'p'});
+
+        expect(claudeDefaultSpec.spawnArgs).toContain('--model');
+        expect(claudeDefaultSpec.spawnArgs).toContain('sonnet');
+        expect(geminiDefaultSpec.spawnArgs).not.toContain('-m');
+        expect(codexDefaultSpec.spawnArgs).not.toContain('-m');
+
+        // End-to-end production spawn checks for programmatic `runCleanRoomArm` AND CLI `--run-arm` with omitted vs explicit model
         const fakeBinDir  = path.join(os.tmpdir(), `neo-gemini-shim-${Date.now()}`),
               tempOutDir  = path.join(os.tmpdir(), `neo-gemini-out-${Date.now()}`),
+              tempCliOut  = path.join(os.tmpdir(), `neo-gemini-cli-out-${Date.now()}`),
               shimPath    = path.join(fakeBinDir, 'gemini'),
               appPort     = await allocateFreePort(0),
               nlPort      = await allocateFreePort(0),
+              cliAppPort  = await allocateFreePort(0),
               prevPath    = process.env.PATH;
 
         await fs.ensureDir(fakeBinDir);
@@ -1175,26 +1379,38 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             'const fs = require("node:fs");',
             'const args = process.argv.slice(2);',
             'if (args.includes("--version")) { console.log("0.38.1"); process.exit(0); }',
-            'const settings = JSON.parse(fs.readFileSync(".gemini/settings.json", "utf8"));',
-            'if (settings.mcpServers["neural-link"].env.NEO_NL_PORT !== process.env.NEO_NL_PORT) process.exit(2);',
+            'if (!process.env.GEMINI_CLI_HOME || !process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH || !process.env.GEMINI_CLI_TRUSTED_FOLDERS_PATH) process.exit(6);',
             'if (!args.includes("--output-format") || !args.includes("stream-json")) process.exit(3);',
             'if (!args.includes("--approval-mode") || !args.includes("yolo")) process.exit(4);',
-            'if (!args.includes("--sandbox") || !args.includes("--allowed-mcp-server-names") || !args.includes("neural-link")) process.exit(5);',
-            'const t0 = new Date().toISOString();',
-            'console.log(JSON.stringify({type: "init", timestamp: t0, session_id: "shim-1", model: "gemini-3.1-pro-preview"}));',
-            'console.log(JSON.stringify({type: "tool_use", timestamp: t0, tool_name: "neural-link_inspect_store", tool_id: "c1", parameters: {}}));',
-            'fs.mkdirSync("../../results", {recursive: true});',
-            'fs.appendFileSync("../../results/arm-c-neo-kb-neural-link-verify-runs.jsonl", JSON.stringify({type: "benchmark_verification", timestamp: new Date(Date.now() + 25).toISOString(), arm: "arm-c-neo-kb-neural-link", pass: true, durationMs: 15}) + "\\n");',
-            'console.log(JSON.stringify({type: "result", timestamp: new Date(Date.now() + 30).toISOString(), status: "success", stats: {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000, duration_ms: 30, tool_calls: 1, models: {"gemini-3.1-pro-preview": {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000}}}}));'
+            'if (process.env.NEO_NL_PORT) {',
+            '    const settings = JSON.parse(fs.readFileSync(".gemini/settings.json", "utf8"));',
+            '    if (settings.mcpServers["neural-link"].env.NEO_NL_PORT !== process.env.NEO_NL_PORT) process.exit(2);',
+            '    if (!args.includes("--sandbox") || !args.includes("--allowed-mcp-server-names") || !args.includes("neural-link")) process.exit(5);',
+            '    if (args.includes("-m")) process.exit(7);',
+            '    const t0 = new Date().toISOString();',
+            '    console.log(JSON.stringify({type: "init", timestamp: t0, session_id: "shim-1", model: "gemini-3.1-pro-preview"}));',
+            '    console.log(JSON.stringify({type: "tool_use", timestamp: t0, tool_name: "neural-link_inspect_store", tool_id: "c1", parameters: {}}));',
+            '    fs.mkdirSync("../../results", {recursive: true});',
+            '    fs.appendFileSync("../../results/arm-c-neo-kb-neural-link-verify-runs.jsonl", JSON.stringify({type: "benchmark_verification", timestamp: new Date(Date.now() + 25).toISOString(), arm: "arm-c-neo-kb-neural-link", pass: true, durationMs: 15}) + "\\n");',
+            '    console.log(JSON.stringify({type: "result", timestamp: new Date(Date.now() + 30).toISOString(), status: "success", stats: {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000, duration_ms: 30, tool_calls: 1, models: {"gemini-3.1-pro-preview": {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000}}}}));',
+            '} else {',
+            '    const sysSettings = JSON.parse(fs.readFileSync(process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH, "utf8"));',
+            '    if (sysSettings.admin?.mcp?.enabled !== false) process.exit(8);',
+            '    if (!args.includes("--allowed-mcp-server-names") || !args.includes("__none__")) process.exit(9);',
+            '    if (args.includes("-m")) process.exit(10);',
+            '    const t0 = new Date().toISOString();',
+            '    console.log(JSON.stringify({type: "init", timestamp: t0, session_id: "shim-cli", model: "gemini-2.5-pro"}));',
+            '    console.log(JSON.stringify({type: "result", timestamp: new Date(Date.now() + 10).toISOString(), status: "success", stats: {total_tokens: 250, input_tokens: 100, output_tokens: 20, cached: 60, input: 40, duration_ms: 10, tool_calls: 0, models: {"gemini-2.5-pro": {total_tokens: 250, input_tokens: 100, output_tokens: 20, cached: 60, input: 40}}}}));',
+            '}'
         ].join('\n');
         await fs.writeFile(shimPath, shimScript, {mode: 0o755});
         process.env.PATH = `${fakeBinDir}:${prevPath}`;
 
         try {
+            // 1. Programmatic `runCleanRoomArm` omitting `model` -> must NOT pass `-m`
             const liveRes = await runCleanRoomArm({
                 arm        : 'arm-c-neo-kb-neural-link',
                 harness    : 'gemini',
-                model      : 'gemini-3.1-pro-preview',
                 sandbox    : true,
                 outDir     : tempOutDir,
                 appPort,
@@ -1213,14 +1429,39 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 inputTokens : 1000,
                 outputTokens: 200,
                 cachedTokens: 4000,
-                total       : 1200
+                total       : 5200
             });
             expect(liveRes.telemetry.toolCallsByServer.neuralLinkRuntimeCalls).toBe(1);
             expect(liveRes.telemetry.sessionDurationMs).toBe(30);
+
+            // 2. CLI `--run-arm` omitting `--model` -> must ALSO omit `-m` and enforce Arm B zero-MCP isolation
+            execFileSync(
+                process.execPath,
+                [
+                    path.join(ROOT_DIR, 'agent-benchmarks/runner/runAgentBenchmark.mjs'),
+                    '--run-arm', 'arm-b-neo-kb-only',
+                    '--harness', 'gemini',
+                    '--no-install',
+                    '--app-port', String(cliAppPort),
+                    '--out-dir', tempCliOut
+                ],
+                {cwd: ROOT_DIR, env: process.env, encoding: 'utf8'}
+            );
+            const reportFiles = (await fs.readdir(tempCliOut)).filter(f => f.startsWith('agent-benchmark-') && f.endsWith('.json'));
+            expect(reportFiles).toHaveLength(1);
+            const cliReport = await fs.readJson(path.join(tempCliOut, reportFiles[0]));
+            expect(cliReport.arms[0].model).toBe('gemini-2.5-pro');
+            expect(cliReport.arms[0].totalTokens).toEqual({
+                inputTokens : 40,
+                outputTokens: 20,
+                cachedTokens: 60,
+                total       : 250
+            });
         } finally {
             process.env.PATH = prevPath;
             await fs.remove(fakeBinDir);
             await fs.remove(tempOutDir);
+            await fs.remove(tempCliOut);
         }
     });
 });

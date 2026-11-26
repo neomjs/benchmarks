@@ -1,9 +1,17 @@
 {
+    "admin": {
+        "mcp": {
+            "enabled": false
+        }
+    },
     "context": {
         "fileName": [
             "AGENTS.md",
             "GEMINI.md"
         ]
+    },
+    "mcp": {
+        "allowed": []
     },
     "mcpServers": {}
 }

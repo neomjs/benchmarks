@@ -232,8 +232,18 @@ export function adaptTranscriptEntry(entry = {}) {
         };
     }
 
-    // 2b. Gemini CLI `stream-json` envelopes (`init`, `message`, `tool_use`, `tool_result`, `error`, and `result` with `stats`)
-    if (entry.type === 'init') {
+    // 2b. Gemini CLI `stream-json` envelopes (`init`, `message`, `tool_use`, `tool_result`, `error`, and `result` with `stats`).
+    // Guard against hijacking generic JSONL records (`type: 'message'` with `usage` / `toolCalls` / `verification*` / non-Gemini `harness`).
+    const hasGenericPayload = Boolean(
+        entry.usage ||
+        entry.toolCalls ||
+        entry.tool_calls ||
+        entry.verificationPassed !== undefined ||
+        entry.verificationFailed !== undefined ||
+        (entry.harness && entry.harness !== 'gemini')
+    );
+
+    if (!hasGenericPayload && entry.type === 'init') {
         return {
             harness        : 'gemini',
             harnessVersion : entry.gemini_cli_version || entry.version || null,
@@ -246,7 +256,7 @@ export function adaptTranscriptEntry(entry = {}) {
         };
     }
 
-    if (entry.type === 'tool_use' && (entry.tool_name || entry.name)) {
+    if (!hasGenericPayload && entry.type === 'tool_use' && (entry.tool_name || entry.name)) {
         const {serverName, toolName} = splitMcpToolName('', entry.tool_name || entry.name || '');
         return {
             harness        : 'gemini',
@@ -265,12 +275,15 @@ export function adaptTranscriptEntry(entry = {}) {
     }
 
     if (
-        entry.type === 'tool_result' ||
-        entry.type === 'error' ||
-        (entry.type === 'message' && typeof entry.role === 'string')
+        !hasGenericPayload && (
+            (entry.type === 'tool_result' && (entry.tool_id !== undefined || entry.status !== undefined)) ||
+            (entry.type === 'error' && (entry.severity !== undefined || entry.status !== undefined || entry.error !== undefined)) ||
+            (entry.type === 'message' && typeof entry.role === 'string' && typeof entry.content === 'string')
+        )
     ) {
+        const isExplicitGemini = entry.type !== 'message' || typeof entry.delta === 'boolean' || entry.harness === 'gemini';
         return {
-            harness        : 'gemini',
+            harness        : isExplicitGemini ? 'gemini' : null,
             harnessVersion : entry.gemini_cli_version || entry.version || null,
             model          : entry.model || null,
             timestamp,
@@ -281,13 +294,16 @@ export function adaptTranscriptEntry(entry = {}) {
         };
     }
 
-    if (entry.type === 'result' && entry.stats && typeof entry.stats === 'object') {
+    if (!hasGenericPayload && entry.type === 'result' && entry.stats && typeof entry.stats === 'object') {
         const s              = entry.stats,
               cachedTokens   = Number(s.cached || 0),
               inputTokens    = typeof s.input === 'number'
                   ? Number(s.input)
                   : Math.max(0, Number(s.input_tokens || 0) - cachedTokens),
               outputTokens   = Number(s.output_tokens || 0),
+              totalTokens    = typeof s.total_tokens === 'number'
+                  ? Number(s.total_tokens)
+                  : null,
               modelFromStats = s.models && typeof s.models === 'object'
                   ? Object.keys(s.models)[0] || null
                   : null;
@@ -299,7 +315,12 @@ export function adaptTranscriptEntry(entry = {}) {
             timestamp,
             usageId        : null,
             usage          : null,
-            fallbackUsage  : {inputTokens, outputTokens, cachedTokens},
+            fallbackUsage  : {
+                inputTokens,
+                outputTokens,
+                cachedTokens,
+                ...(totalTokens !== null ? {totalTokens} : {})
+            },
             durationMs     : typeof s.duration_ms === 'number'
                 ? s.duration_ms
                 : (typeof entry.duration_ms === 'number' ? entry.duration_ms : null),
@@ -430,7 +451,10 @@ export function adaptTranscriptEntry(entry = {}) {
           usage = u ? {
               inputTokens : Number(u.inputTokens ?? u.input_tokens ?? 0),
               outputTokens: Number(u.outputTokens ?? u.output_tokens ?? 0),
-              cachedTokens: Number(u.cachedTokens ?? u.cached_tokens ?? 0)
+              cachedTokens: Number(u.cachedTokens ?? u.cached_tokens ?? 0),
+              ...(typeof (u.totalTokens ?? u.total_tokens) === 'number'
+                  ? {totalTokens: Number(u.totalTokens ?? u.total_tokens)}
+                  : {})
           } : null;
 
     const rawCalls  = entry.toolCalls || entry.tool_calls || [],
@@ -490,16 +514,18 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
 } = {}) {
     const lines = String(jsonlContent).split('\n').map(l => l.trim()).filter(Boolean);
 
-    let firstTimestamp     = null,
-        detectedHarness    = harness,
-        detectedHarnessVer = versions.harnessVersion || null,
-        detectedModel      = model,
-        inputTokens        = 0,
-        outputTokens       = 0,
-        cachedTokens       = 0,
-        sawPerMessageUsage = false,
-        fallbackUsage      = null,
-        fallbackDurationMs = null;
+    let firstTimestamp      = null,
+        detectedHarness     = harness,
+        detectedHarnessVer  = versions.harnessVersion || null,
+        detectedModel       = model,
+        inputTokens         = 0,
+        outputTokens        = 0,
+        cachedTokens        = 0,
+        perMsgReportedTotal = 0,
+        hasPerMsgTotal      = false,
+        sawPerMessageUsage  = false,
+        fallbackUsage       = null,
+        fallbackDurationMs  = null;
 
     const collectedVerifications = [],
           seenUsageIds           = new Set();
@@ -544,6 +570,10 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
                 inputTokens  += adapted.usage.inputTokens;
                 outputTokens += adapted.usage.outputTokens;
                 cachedTokens += adapted.usage.cachedTokens;
+                if (typeof adapted.usage.totalTokens === 'number') {
+                    perMsgReportedTotal += adapted.usage.totalTokens;
+                    hasPerMsgTotal = true;
+                }
             }
         }
 
@@ -564,10 +594,14 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         }
     }
 
+    let reportedTotalTokens = hasPerMsgTotal ? perMsgReportedTotal : null;
     if (!sawPerMessageUsage && fallbackUsage) {
         inputTokens  = fallbackUsage.inputTokens;
         outputTokens = fallbackUsage.outputTokens;
         cachedTokens = fallbackUsage.cachedTokens;
+        if (typeof fallbackUsage.totalTokens === 'number') {
+            reportedTotalTokens = fallbackUsage.totalTokens;
+        }
     }
 
     for (const run of verificationRuns) {
@@ -613,7 +647,7 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
             inputTokens,
             outputTokens,
             cachedTokens,
-            total: inputTokens + outputTokens
+            total: reportedTotalTokens !== null ? reportedTotalTokens : (inputTokens + outputTokens)
         },
         toolCallsByServer,
         verificationFailures
@@ -808,7 +842,7 @@ export async function stageArmWorkspace({
         const pkg = await fs.readJson(pkgJsonPath);
         pkg.scripts = {
             ...pkg.scripts,
-            'server-start:headless': `PORT=${resolvedAppPort} webpack serve -c ./node_modules/neo.mjs/buildScripts/webpack/webpack.server.config.mjs`
+            'server-start:headless': `node ./node_modules/neo.mjs/buildScripts/util/fileServer.mjs --no-open --port ${resolvedAppPort}`
         };
         await fs.writeJson(pkgJsonPath, pkg, {spaces: 4});
 
@@ -879,6 +913,61 @@ export async function stageArmWorkspace({
         });
     }
 
+    // Isolate Gemini CLI user/system/trusted-folder configuration inside stageRoot so host `~/.gemini/settings.json`
+    // and system `/etc/gemini-cli/settings.json` (or macOS `/Library/Application Support/GeminiCli/settings.json`)
+    // can neither leak inherited user MCP servers into Arm B nor override Arm C's staged `NEO_NL_PORT`.
+    const geminiIsolationDir        = path.join(resolvedStageRoot, '.gemini-isolation'),
+          geminiHomeDir             = path.join(geminiIsolationDir, 'home'),
+          geminiHomeDotDir          = path.join(geminiHomeDir, '.gemini'),
+          geminiSystemDefaultsPath  = path.join(geminiIsolationDir, 'system-defaults.json'),
+          geminiSystemSettingsPath  = path.join(geminiIsolationDir, 'system-settings.json'),
+          geminiTrustedFoldersPath  = path.join(geminiIsolationDir, 'trustedFolders.json'),
+          hostGeminiDir             = path.join(process.env.HOME || os.homedir(), '.gemini');
+
+    await fs.ensureDir(geminiHomeDotDir);
+
+    // Preserve only host OAuth/account credential files and `security.auth` so authenticated runs work without inheriting MCP servers
+    let preservedAuth = null;
+    const hostSettingsPath = path.join(hostGeminiDir, 'settings.json');
+    if (await fs.pathExists(hostSettingsPath)) {
+        try {
+            const hostSettings = await fs.readJson(hostSettingsPath);
+            if (hostSettings?.security?.auth) {
+                preservedAuth = hostSettings.security.auth;
+            }
+        } catch {}
+    }
+    for (const authFile of ['oauth_creds.json', 'google_accounts.json', 'installation_id', 'state.json']) {
+        const srcAuth = path.join(hostGeminiDir, authFile);
+        if (await fs.pathExists(srcAuth)) {
+            await fs.copy(srcAuth, path.join(geminiHomeDotDir, authFile));
+        }
+    }
+
+    await fs.writeJson(
+        path.join(geminiHomeDotDir, 'settings.json'),
+        preservedAuth ? {security: {auth: preservedAuth}} : {},
+        {spaces: 4}
+    );
+    await fs.writeJson(geminiSystemDefaultsPath, {}, {spaces: 4});
+    await fs.writeJson(
+        geminiSystemSettingsPath,
+        arm === 'arm-b-neo-kb-only'
+            ? {admin: {mcp: {enabled: false}}, mcpServers: {}}
+            : {admin: {mcp: {enabled: true}}},
+        {spaces: 4}
+    );
+    const realArmDir     = await fs.realpath(armDir),
+          resolvedArmDir = path.resolve(armDir);
+    await fs.writeJson(
+        geminiTrustedFoldersPath,
+        {
+            [realArmDir]    : 'TRUST_FOLDER',
+            [resolvedArmDir]: 'TRUST_FOLDER'
+        },
+        {spaces: 4}
+    );
+
     const appUrl        = arm === 'arm-a-react-ag-grid-mcp'
               ? `http://localhost:${resolvedAppPort}`
               : `http://localhost:${resolvedAppPort}/apps/gridbench/index.html`,
@@ -890,8 +979,125 @@ export async function stageArmWorkspace({
         appPort  : resolvedAppPort,
         nlPort   : resolvedNlPort,
         appUrl,
-        verifyLogPath
+        verifyLogPath,
+        geminiHomeDir,
+        geminiSystemDefaultsPath,
+        geminiSystemSettingsPath,
+        geminiTrustedFoldersPath
     };
+}
+
+/**
+ * @summary Builds the clean-room child process environment for a staged arm workspace, injecting isolated ports and Gemini CLI config paths.
+ * @param {Object} staged Result from `stageArmWorkspace`.
+ * @param {Object} [baseEnv=process.env]
+ * @returns {Object}
+ */
+export function buildCleanRoomChildEnv(staged, baseEnv = process.env) {
+    return sanitizeCleanRoomEnv(baseEnv, {
+        PORT                           : String(staged.appPort),
+        ...(staged.nlPort ? {NEO_NL_PORT: String(staged.nlPort)} : {}),
+        ...(staged.geminiHomeDir ? {GEMINI_CLI_HOME: staged.geminiHomeDir} : {}),
+        ...(staged.geminiSystemDefaultsPath ? {GEMINI_CLI_SYSTEM_DEFAULTS_PATH: staged.geminiSystemDefaultsPath} : {}),
+        ...(staged.geminiSystemSettingsPath ? {GEMINI_CLI_SYSTEM_SETTINGS_PATH: staged.geminiSystemSettingsPath} : {}),
+        ...(staged.geminiTrustedFoldersPath ? {GEMINI_CLI_TRUSTED_FOLDERS_PATH: staged.geminiTrustedFoldersPath} : {})
+    });
+}
+
+/**
+ * @summary Deep-merges plain objects following Gemini CLI v0.38.1 `settings.ts` scope precedence (`systemDefaults < user < workspace < system`),
+ * shallow-merging `mcpServers` per server name (`MergeStrategy.SHALLOW_MERGE`) and replacing arrays/primitives.
+ * @param {...Object} scopes
+ * @returns {Object}
+ */
+function mergeGeminiSettingsScopes(...scopes) {
+    const mergePair = (target, source, depth = 0) => {
+        if (!source || typeof source !== 'object' || Array.isArray(source)) return target;
+        const out = {...target};
+        for (const [key, val] of Object.entries(source)) {
+            if (depth === 0 && key === 'mcpServers' && val && typeof val === 'object' && !Array.isArray(val)) {
+                out.mcpServers = {
+                    ...(out.mcpServers && typeof out.mcpServers === 'object' ? out.mcpServers : {}),
+                    ...val
+                };
+            } else if (val && typeof val === 'object' && !Array.isArray(val) && out[key] && typeof out[key] === 'object' && !Array.isArray(out[key])) {
+                out[key] = mergePair(out[key], val, depth + 1);
+            } else if (val !== undefined) {
+                out[key] = Array.isArray(val) ? [...val] : (val && typeof val === 'object' ? mergePair({}, val, depth + 1) : val);
+            }
+        }
+        return out;
+    };
+    return scopes.reduce((acc, scope) => mergePair(acc, scope, 0), {});
+}
+
+/**
+ * @summary Evaluates the effective MCP server map Gemini CLI v0.38.1 constructs after merging `systemDefaults`, `user`,
+ * trusted `workspace`, and `system` settings plus `admin.mcp.enabled` and `--allowed-mcp-server-names` / `mcp.allowed` / `mcp.excluded` filtering.
+ * @param {Object} options
+ * @param {String} options.armDir
+ * @param {Object} [options.env=process.env]
+ * @param {String[]} [options.cliArgs=[]]
+ * @param {String} [options.defaultSystemSettingsPath]
+ * @returns {Promise<{mergedSettings: Object, mcpEnabled: Boolean, effectiveMcpServers: Object}>}
+ */
+export async function resolveEffectiveGeminiMcpConfig({
+    armDir,
+    env                       = process.env,
+    cliArgs                   = [],
+    defaultSystemSettingsPath = ''
+}) {
+    const readJsonIfExists = async p => (p && await fs.pathExists(p)) ? await fs.readJson(p) : {};
+
+    const effectiveHome       = env.GEMINI_CLI_HOME || env.HOME || os.homedir(),
+          userSettingsPath    = path.join(effectiveHome, '.gemini', 'settings.json'),
+          systemSettingsPath  = env.GEMINI_CLI_SYSTEM_SETTINGS_PATH || defaultSystemSettingsPath,
+          systemDefaultsPath  = env.GEMINI_CLI_SYSTEM_DEFAULTS_PATH || (systemSettingsPath ? path.join(path.dirname(systemSettingsPath), 'system-defaults.json') : ''),
+          trustedFoldersPath  = env.GEMINI_CLI_TRUSTED_FOLDERS_PATH || path.join(effectiveHome, '.gemini', 'trustedFolders.json'),
+          workspaceConfigPath = path.join(armDir, '.gemini', 'settings.json');
+
+    const [systemDefaults, userSettings, rawWorkspaceSettings, systemSettings, trustedFolders] = await Promise.all([
+        readJsonIfExists(systemDefaultsPath),
+        readJsonIfExists(userSettingsPath),
+        readJsonIfExists(workspaceConfigPath),
+        readJsonIfExists(systemSettingsPath),
+        readJsonIfExists(trustedFoldersPath)
+    ]);
+
+    const realArmDir = await fs.realpath(armDir).catch(() => path.resolve(armDir)),
+          folderTrustEnabled = systemSettings?.security?.folderTrust?.enabled ?? userSettings?.security?.folderTrust?.enabled ?? false,
+          isTrusted = !folderTrustEnabled || trustedFolders[realArmDir] === 'TRUST_FOLDER' || trustedFolders[armDir] === 'TRUST_FOLDER',
+          workspaceSettings = isTrusted ? rawWorkspaceSettings : {};
+
+    const mergedSettings = mergeGeminiSettingsScopes(systemDefaults, userSettings, workspaceSettings, systemSettings),
+          mcpEnabled     = mergedSettings.admin?.mcp?.enabled ?? true;
+
+    let cliAllowed = null;
+    for (let i = 0; i < cliArgs.length; i++) {
+        if (cliArgs[i] === '--allowed-mcp-server-names') {
+            cliAllowed = cliAllowed || [];
+            if (i + 1 < cliArgs.length && !cliArgs[i + 1].startsWith('-')) {
+                cliAllowed.push(...cliArgs[i + 1].split(',').map(s => s.trim()).filter(Boolean));
+                i++;
+            }
+        } else if (cliArgs[i].startsWith('--allowed-mcp-server-names=')) {
+            cliAllowed = cliAllowed || [];
+            cliAllowed.push(...cliArgs[i].slice('--allowed-mcp-server-names='.length).split(',').map(s => s.trim()).filter(Boolean));
+        }
+    }
+
+    const rawServers   = mcpEnabled ? (mergedSettings.mcpServers || {}) : {},
+          allowedNames = mcpEnabled ? (cliAllowed ?? mergedSettings.mcp?.allowed) : undefined,
+          blockedNames = mcpEnabled ? (cliAllowed ? undefined : mergedSettings.mcp?.excluded) : undefined;
+
+    const effectiveMcpServers = {};
+    for (const [name, cfg] of Object.entries(rawServers)) {
+        if (Array.isArray(allowedNames) && allowedNames.length > 0 && !allowedNames.includes(name)) continue;
+        if (Array.isArray(blockedNames) && blockedNames.length > 0 && blockedNames.includes(name)) continue;
+        effectiveMcpServers[name] = cfg;
+    }
+
+    return {mergedSettings, mcpEnabled, effectiveMcpServers};
 }
 
 /**
@@ -1029,11 +1235,86 @@ export async function readVerificationRuns(verifyLogPath) {
 }
 
 /**
+ * @summary Builds the CLI binary, arguments, and resolved model string for launching a coding-agent harness.
+ * Defaults to `'sonnet'` only for `'claude-code'` and omits `-m` when `model` is omitted on `'gemini'` or `'codex'`.
+ * @param {Object} options
+ * @param {String} options.arm
+ * @param {String} [options.harness='claude-code']
+ * @param {String} [options.model]
+ * @param {String} options.prompt
+ * @param {Boolean} [options.sandbox=false]
+ * @param {String|null} [options.cmd=null]
+ * @returns {{spawnBin: String, spawnArgs: String[], resolvedModel: String}}
+ */
+export function buildAgentSpawnSpec({
+    arm,
+    harness = 'claude-code',
+    model,
+    prompt,
+    sandbox = false,
+    cmd     = null
+}) {
+    const resolvedModel = model !== undefined
+        ? model
+        : (harness === 'claude-code' ? 'sonnet' : '');
+
+    if (cmd) {
+        return {spawnBin: '/bin/sh', spawnArgs: ['-c', cmd], resolvedModel};
+    }
+
+    if (harness === 'codex') {
+        return {
+            spawnBin : 'codex',
+            spawnArgs: ['exec', '--json', '--dangerously-bypass-approvals-and-sandbox', ...(resolvedModel ? ['-m', resolvedModel] : []), prompt],
+            resolvedModel
+        };
+    }
+
+    if (harness === 'gemini') {
+        const allowedMcp = arm === 'arm-a-react-ag-grid-mcp'
+            ? ['--allowed-mcp-server-names', 'ag-mcp']
+            : arm === 'arm-c-neo-kb-neural-link'
+                ? ['--allowed-mcp-server-names', 'neural-link']
+                : ['--allowed-mcp-server-names', '__none__'];
+
+        return {
+            spawnBin : 'gemini',
+            spawnArgs: [
+                '-p', prompt,
+                ...(resolvedModel ? ['-m', resolvedModel] : []),
+                '--output-format', 'stream-json',
+                '--approval-mode', 'yolo',
+                '-e', 'none',
+                ...(sandbox ? ['--sandbox'] : []),
+                ...allowedMcp
+            ],
+            resolvedModel
+        };
+    }
+
+    return {
+        spawnBin : 'claude',
+        spawnArgs: [
+            '-p', prompt,
+            '--model', resolvedModel || 'sonnet',
+            '--output-format', 'stream-json',
+            '--verbose',
+            '--mcp-config', './.mcp.json',
+            '--strict-mcp-config',
+            '--setting-sources', 'project,local',
+            '--permission-mode', 'bypassPermissions',
+            '--no-chrome'
+        ],
+        resolvedModel: resolvedModel || 'sonnet'
+    };
+}
+
+/**
  * @summary Executes one benchmark arm end-to-end inside an isolated clean-room workspace and returns parsed telemetry.
  * @param {Object} options
  * @param {String} options.arm
  * @param {String} [options.harness='claude-code']
- * @param {String} [options.model='sonnet']
+ * @param {String} [options.model] Defaults to `'sonnet'` for `'claude-code'`; omitted for `'gemini'` and `'codex'` so each CLI selects its own default.
  * @param {String|null} [options.cmd=null]
  * @param {String} [options.outDir]
  * @param {Number} [options.timeoutMs=900000]
@@ -1041,6 +1322,7 @@ export async function readVerificationRuns(verifyLogPath) {
  * @param {Number} [options.nlPort]
  * @param {Boolean} [options.keepStage=false]
  * @param {Boolean} [options.installDeps=true]
+ * @param {Boolean} [options.sandbox=false]
  * @param {Boolean} [options.postExitVerify=false]
  * @param {Number} [options.postExitStartupTimeoutMs=15000]
  * @param {Number} [options.postExitVerifyTimeoutMs=15000]
@@ -1049,7 +1331,7 @@ export async function readVerificationRuns(verifyLogPath) {
 export async function runCleanRoomArm({
     arm,
     harness                  = 'claude-code',
-    model                    = 'sonnet',
+    model                    = undefined,
     cmd                      = null,
     outDir                   = path.join(ROOT_DIR, 'agent-benchmarks/results'),
     timeoutMs                = 900000,
@@ -1072,50 +1354,18 @@ export async function runCleanRoomArm({
     await fs.remove(outVerifyLogPath);
     await fs.remove(outPostExitVerifyLogPath);
 
-    const staged = await stageArmWorkspace({arm, appPort, nlPort, installDeps}),
-          prompt = 'Read AGENTS.md and ../../tasks/grid-100k-multi-window/PROMPT.md first, then implement all requirements in this workspace, start the dev server in the background, verify in the running app, and run the benchmark verification command from AGENTS.md until all assertions pass (exit code 0).',
-          childEnv = sanitizeCleanRoomEnv(process.env, {
-              PORT: String(staged.appPort),
-              ...(staged.nlPort ? {NEO_NL_PORT: String(staged.nlPort)} : {})
-          });
+    const staged   = await stageArmWorkspace({arm, appPort, nlPort, installDeps}),
+          prompt   = 'Read AGENTS.md and ../../tasks/grid-100k-multi-window/PROMPT.md first, then implement all requirements in this workspace, start the dev server in the background, verify in the running app, and run the benchmark verification command from AGENTS.md until all assertions pass (exit code 0).',
+          childEnv = buildCleanRoomChildEnv(staged, process.env);
 
-    let spawnBin, spawnArgs;
-    if (cmd) {
-        spawnBin  = '/bin/sh';
-        spawnArgs = ['-c', cmd];
-    } else if (harness === 'codex') {
-        spawnBin  = 'codex';
-        spawnArgs = ['exec', '--json', '--dangerously-bypass-approvals-and-sandbox', ...(model ? ['-m', model] : []), prompt];
-    } else if (harness === 'gemini') {
-        const allowedMcp = arm === 'arm-a-react-ag-grid-mcp'
-            ? ['--allowed-mcp-server-names', 'ag-mcp']
-            : arm === 'arm-c-neo-kb-neural-link'
-                ? ['--allowed-mcp-server-names', 'neural-link']
-                : [];
-        spawnBin  = 'gemini';
-        spawnArgs = [
-            '-p', prompt,
-            ...(model ? ['-m', model] : []),
-            '--output-format', 'stream-json',
-            '--approval-mode', 'yolo',
-            '-e', 'none',
-            ...(sandbox ? ['--sandbox'] : []),
-            ...allowedMcp
-        ];
-    } else {
-        spawnBin  = 'claude';
-        spawnArgs = [
-            '-p', prompt,
-            '--model', model,
-            '--output-format', 'stream-json',
-            '--verbose',
-            '--mcp-config', './.mcp.json',
-            '--strict-mcp-config',
-            '--setting-sources', 'project,local',
-            '--permission-mode', 'bypassPermissions',
-            '--no-chrome'
-        ];
-    }
+    const {spawnBin, spawnArgs} = buildAgentSpawnSpec({
+        arm,
+        harness,
+        model,
+        prompt,
+        sandbox,
+        cmd
+    });
 
     let child            = null,
         runnerServerProc = null,
@@ -1409,13 +1659,12 @@ async function main() {
     const runArms = args.includes('--run-all') ? [...ARMS] : getAllFlags('--run-arm');
     if (runArms.length > 0) {
         const resolvedHarness = harnessOpt || (modelOpt?.startsWith('gemini') ? 'gemini' : 'claude-code'),
-              defaultModel    = resolvedHarness === 'gemini' ? '' : 'sonnet',
               armResults      = [];
         for (const arm of runArms) {
             const {telemetry} = await runCleanRoomArm({
                 arm,
                 harness       : resolvedHarness,
-                model         : modelOpt ?? defaultModel,
+                model         : modelOpt ?? undefined,
                 cmd           : getFlag('--cmd'),
                 outDir,
                 timeoutMs     : getFlag('--timeout-ms') ? Number(getFlag('--timeout-ms')) : 900000,
