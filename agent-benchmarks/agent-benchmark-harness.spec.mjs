@@ -232,7 +232,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(armBGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
         expect(armCGemini.context.fileName).toEqual(['AGENTS.md', 'GEMINI.md']);
         expect(armAGemini.mcp.allowed).toEqual(['ag-mcp']);
-        expect(armBGemini.admin.mcp.enabled).toBe(false);
+        expect(armBGemini.admin).toBeUndefined();
         expect(armBGemini.mcp.allowed).toEqual([]);
         expect(armCGemini.mcp.allowed).toEqual(['neural-link']);
         expect(Object.keys(armAGemini.mcpServers)).toEqual(['ag-mcp']);
@@ -800,9 +800,16 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 NEO_FLEET_BRIDGE_TOKEN: 'secret-bridge-token',
                 NEO_PLANE_DATA_ROOT   : '/private/plane',
                 NEO_NL_PORT           : '8081',
-                AGY_ACCOUNT           : 'work',
-                GEMINI_CLI_IDE_SERVER : '12345',
-                CLAUDECODE            : '1',
+                AGY_ACCOUNT                 : 'work',
+                GEMINI_CLI_IDE_SERVER       : '12345',
+                SANDBOX_ENV                 : 'GEMINI_CLI_SYSTEM_SETTINGS_PATH=/host/sys.json,NEO_NL_PORT=9999',
+                SANDBOX_MOUNTS              : '/host/gemini:/home/node/.gemini:ro',
+                SANDBOX_FLAGS               : '--privileged',
+                SANDBOX_PORTS               : '9999',
+                GEMINI_SANDBOX_PROXY_COMMAND: 'proxy',
+                SEATBELT_PROFILE            : 'custom',
+                BUILD_SANDBOX               : '1',
+                CLAUDECODE                  : '1',
                 CLAUDE_CODE_ENTRYPOINT: 'cli',
                 CLAUDE_CONFIG_DIR     : '/Users/tester/.neo-ai/claude',
                 CODEX_HOME            : '/Users/tester/.neo-ai/codex'
@@ -1269,15 +1276,66 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         });
         expect(genericMessageTelemetry.toolCallsByServer.docsKbQueries).toBe(1);
 
-        // RA-1: Effective Gemini CLI v0.38.1 configuration isolation across Arms A, B, and C under poisoned user + system settings
-        const poisonDir         = path.join(os.tmpdir(), `neo-gemini-poison-${Date.now()}`),
-              poisonHome        = path.join(poisonDir, 'home'),
-              poisonSysSettings = path.join(poisonDir, 'system-settings.json'),
-              prevHome          = process.env.HOME;
+        // RA-2c: Mixed two-message generic transcript where only the second message carries an explicit `totalTokens`
+        // must preserve the first message's fallback `(inputTokens + outputTokens)` instead of dropping it (50 + 80 = 130; 50 + 110 = 160)
+        const mixedGenericTranscript = [
+            JSON.stringify({
+                type     : 'message',
+                timestamp: '2026-11-26T01:06:00.000Z',
+                role     : 'assistant',
+                content  : 'Turn 1 without explicit totalTokens.',
+                usage    : {inputTokens: 30, outputTokens: 20}
+            }),
+            JSON.stringify({
+                type     : 'message',
+                timestamp: '2026-11-26T01:06:05.000Z',
+                role     : 'assistant',
+                content  : 'Turn 2 with explicit totalTokens.',
+                usage    : {inputTokens: 50, outputTokens: 30, totalTokens: 80}
+            })
+        ].join('\n');
+        expect(parseTranscriptTelemetry(mixedGenericTranscript, {arm: 'arm-a-react-ag-grid-mcp'}).totalTokens).toEqual({
+            inputTokens : 80,
+            outputTokens: 50,
+            cachedTokens: 0,
+            total       : 130
+        });
+
+        const mixedGenericWithReasoning = [
+            JSON.stringify({
+                type     : 'message',
+                timestamp: '2026-11-26T01:07:00.000Z',
+                role     : 'assistant',
+                usage    : {inputTokens: 30, outputTokens: 20}
+            }),
+            JSON.stringify({
+                type     : 'message',
+                timestamp: '2026-11-26T01:07:05.000Z',
+                role     : 'assistant',
+                usage    : {inputTokens: 50, outputTokens: 30, cachedTokens: 10, totalTokens: 110}
+            })
+        ].join('\n');
+        expect(parseTranscriptTelemetry(mixedGenericWithReasoning, {arm: 'arm-a-react-ag-grid-mcp'}).totalTokens).toEqual({
+            inputTokens : 80,
+            outputTokens: 50,
+            cachedTokens: 10,
+            total       : 160
+        });
+
+        // RA-1: Effective Gemini CLI v0.38.1 configuration isolation across Arms A, B, and C (both direct and `--sandbox` container inner CLI,
+        // including stageRoot outside os.tmpdir(), poisoned host SANDBOX_ENV/SANDBOX_MOUNTS, poisoned container image system settings,
+        // and file-based `admin.mcp.enabled: false` ignored per `settings.ts#L365-L388`)
+        const poisonDir                  = path.join(ROOT_DIR, `.tmp-gemini-poison-${Date.now()}`),
+              customStageParent          = path.join(ROOT_DIR, `.tmp-gemini-stage-${Date.now()}`),
+              poisonHome                 = path.join(poisonDir, 'home'),
+              poisonSysSettings          = path.join(poisonDir, 'system-settings.json'),
+              poisonContainerSysSettings = path.join(poisonDir, 'container-etc-settings.json'),
+              prevHome                   = process.env.HOME;
 
         await fs.ensureDir(path.join(poisonHome, '.gemini'));
         await fs.writeJson(path.join(poisonHome, '.gemini/oauth_creds.json'), {refresh_token: 'stub-oauth'}, {spaces: 2});
         await fs.writeJson(path.join(poisonHome, '.gemini/settings.json'), {
+            admin     : {mcp: {enabled: false}},
             security  : {
                 auth       : {selectedType: 'oauth-personal'},
                 folderTrust: {enabled: true}
@@ -1288,68 +1346,108 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             }
         }, {spaces: 2});
         await fs.writeJson(poisonSysSettings, {
+            admin     : {mcp: {enabled: false}},
             security  : {folderTrust: {enabled: true}},
             mcpServers: {
                 'leaked-sys-mcp': {command: 'node', args: ['leak-sys.js']},
                 'neural-link'   : {command: 'npx', args: ['-y', 'neo-neural-link'], env: {NEO_NL_PORT: '2222'}}
             }
         }, {spaces: 2});
+        await fs.writeJson(poisonContainerSysSettings, {
+            security  : {folderTrust: {enabled: true}},
+            mcpServers: {
+                'leaked-container-mcp': {command: 'node', args: ['leak-container.js']},
+                'neural-link'         : {command: 'npx', args: ['-y', 'neo-neural-link'], env: {NEO_NL_PORT: '3333'}}
+            }
+        }, {spaces: 2});
 
-        // Counterexample control: without clean-room isolation, system/user settings leak into B and override C's port
+        // Counterexample controls:
+        // 1. File-based `admin.mcp.enabled: false` is ignored by Gemini CLI v0.38.1 (`mcpEnabled === true`), so without clean-room isolation system/user MCP servers leak
         const unisolatedArmC = await resolveEffectiveGeminiMcpConfig({
             armDir: path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link'),
             env   : {HOME: poisonHome, GEMINI_CLI_SYSTEM_SETTINGS_PATH: poisonSysSettings}
         });
+        expect(unisolatedArmC.mcpEnabled).toBe(true);
         expect(unisolatedArmC.effectiveMcpServers['neural-link'].env.NEO_NL_PORT).toBe('2222');
+
+        // 2. Inside `--sandbox`, if host `SANDBOX_ENV` / `SANDBOX_MOUNTS` passthrough is retained or staged paths are not forwarded, inner CLI sees poisoned system/port
+        const unisolatedSandboxArmC = await resolveEffectiveGeminiMcpConfig({
+            armDir                            : path.join(ROOT_DIR, 'agent-benchmarks/arms/arm-c-neo-kb-neural-link'),
+            env                               : {
+                HOME          : poisonHome,
+                SANDBOX_MOUNTS: `${poisonDir}:${poisonDir}:ro`,
+                SANDBOX_ENV   : `GEMINI_CLI_SYSTEM_SETTINGS_PATH=${poisonSysSettings},NEO_NL_PORT=9999`
+            },
+            sandbox                           : true,
+            containerDefaultSystemSettingsPath: poisonContainerSysSettings
+        });
+        expect(unisolatedSandboxArmC.effectiveMcpServers['neural-link'].env.NEO_NL_PORT).toBe('2222');
+        expect(unisolatedSandboxArmC.effectiveEnv.NEO_NL_PORT).toBe('9999');
 
         process.env.HOME = poisonHome;
         let isoA = null, isoB = null, isoC = null;
         try {
             const isoNlPort = await allocateFreePort(0);
-            isoA = await stageArmWorkspace({arm: 'arm-a-react-ag-grid-mcp', installDeps: false});
-            isoB = await stageArmWorkspace({arm: 'arm-b-neo-kb-only', installDeps: false});
-            isoC = await stageArmWorkspace({arm: 'arm-c-neo-kb-neural-link', nlPort: isoNlPort, installDeps: false});
+            isoA = await stageArmWorkspace({arm: 'arm-a-react-ag-grid-mcp', stageRoot: path.join(customStageParent, 'a'), installDeps: false});
+            isoB = await stageArmWorkspace({arm: 'arm-b-neo-kb-only', stageRoot: path.join(customStageParent, 'b'), installDeps: false});
+            isoC = await stageArmWorkspace({arm: 'arm-c-neo-kb-neural-link', stageRoot: path.join(customStageParent, 'c'), nlPort: isoNlPort, installDeps: false});
 
             const poisonedBaseEnv = {
                 ...process.env,
                 HOME                           : poisonHome,
-                GEMINI_CLI_SYSTEM_SETTINGS_PATH: poisonSysSettings
+                GEMINI_CLI_SYSTEM_SETTINGS_PATH: poisonSysSettings,
+                SANDBOX_MOUNTS                 : `${poisonDir}:${poisonDir}:ro`,
+                SANDBOX_ENV                    : `GEMINI_CLI_HOME=${poisonHome},GEMINI_CLI_SYSTEM_SETTINGS_PATH=${poisonSysSettings},NEO_NL_PORT=9999`
             };
 
-            const effA = await resolveEffectiveGeminiMcpConfig({
-                armDir                   : isoA.armDir,
-                env                      : buildCleanRoomChildEnv(isoA, poisonedBaseEnv),
-                cliArgs                  : buildAgentSpawnSpec({arm: 'arm-a-react-ag-grid-mcp', harness: 'gemini', prompt: 'p'}).spawnArgs,
-                defaultSystemSettingsPath: poisonSysSettings
-            });
-            expect(effA.mcpEnabled).toBe(true);
-            expect(Object.keys(effA.effectiveMcpServers)).toEqual(['ag-mcp']);
-            expect(effA.mergedSettings.security?.auth?.selectedType).toBe('oauth-personal');
-            expect(await fs.pathExists(path.join(isoA.geminiHomeDir, '.gemini/oauth_creds.json'))).toBe(true);
+            for (const [sandboxMode, useCurrentUser] of [[false, false], [true, false], [true, true]]) {
+                const effA = await resolveEffectiveGeminiMcpConfig({
+                    armDir                            : isoA.armDir,
+                    env                               : buildCleanRoomChildEnv(isoA, poisonedBaseEnv),
+                    cliArgs                           : buildAgentSpawnSpec({arm: 'arm-a-react-ag-grid-mcp', harness: 'gemini', sandbox: sandboxMode, prompt: 'p'}).spawnArgs,
+                    defaultSystemSettingsPath         : poisonSysSettings,
+                    sandbox                           : sandboxMode,
+                    useCurrentUser,
+                    containerDefaultSystemSettingsPath: poisonContainerSysSettings
+                });
+                expect(effA.mcpEnabled).toBe(true);
+                expect(Object.keys(effA.effectiveMcpServers)).toEqual(['ag-mcp']);
+                expect(effA.mergedSettings.security?.auth?.selectedType).toBe('oauth-personal');
+                expect(await fs.pathExists(path.join(isoA.geminiHomeDir, '.gemini/oauth_creds.json'))).toBe(true);
 
-            const effB = await resolveEffectiveGeminiMcpConfig({
-                armDir                   : isoB.armDir,
-                env                      : buildCleanRoomChildEnv(isoB, poisonedBaseEnv),
-                cliArgs                  : buildAgentSpawnSpec({arm: 'arm-b-neo-kb-only', harness: 'gemini', prompt: 'p'}).spawnArgs,
-                defaultSystemSettingsPath: poisonSysSettings
-            });
-            expect(effB.mcpEnabled).toBe(false);
-            expect(Object.keys(effB.effectiveMcpServers)).toEqual([]);
+                const effB = await resolveEffectiveGeminiMcpConfig({
+                    armDir                            : isoB.armDir,
+                    env                               : buildCleanRoomChildEnv(isoB, poisonedBaseEnv),
+                    cliArgs                           : buildAgentSpawnSpec({arm: 'arm-b-neo-kb-only', harness: 'gemini', sandbox: sandboxMode, prompt: 'p'}).spawnArgs,
+                    defaultSystemSettingsPath         : poisonSysSettings,
+                    sandbox                           : sandboxMode,
+                    useCurrentUser,
+                    containerDefaultSystemSettingsPath: poisonContainerSysSettings
+                });
+                expect(effB.mcpEnabled).toBe(true);
+                expect(Object.keys(effB.effectiveMcpServers)).toEqual([]);
 
-            const effC = await resolveEffectiveGeminiMcpConfig({
-                armDir                   : isoC.armDir,
-                env                      : buildCleanRoomChildEnv(isoC, poisonedBaseEnv),
-                cliArgs                  : buildAgentSpawnSpec({arm: 'arm-c-neo-kb-neural-link', harness: 'gemini', prompt: 'p'}).spawnArgs,
-                defaultSystemSettingsPath: poisonSysSettings
-            });
-            expect(effC.mcpEnabled).toBe(true);
-            expect(Object.keys(effC.effectiveMcpServers)).toEqual(['neural-link']);
-            expect(effC.effectiveMcpServers['neural-link'].env.NEO_NL_PORT).toBe(String(isoNlPort));
+                const effC = await resolveEffectiveGeminiMcpConfig({
+                    armDir                            : isoC.armDir,
+                    env                               : buildCleanRoomChildEnv(isoC, poisonedBaseEnv),
+                    cliArgs                           : buildAgentSpawnSpec({arm: 'arm-c-neo-kb-neural-link', harness: 'gemini', sandbox: sandboxMode, prompt: 'p'}).spawnArgs,
+                    defaultSystemSettingsPath         : poisonSysSettings,
+                    sandbox                           : sandboxMode,
+                    useCurrentUser,
+                    containerDefaultSystemSettingsPath: poisonContainerSysSettings
+                });
+                expect(effC.mcpEnabled).toBe(true);
+                expect(Object.keys(effC.effectiveMcpServers)).toEqual(['neural-link']);
+                expect(effC.effectiveMcpServers['neural-link'].env.NEO_NL_PORT).toBe(String(isoNlPort));
+                expect(effC.effectiveEnv.NEO_NL_PORT).toBe(String(isoNlPort));
+                expect(effC.effectiveEnv.PORT).toBe(String(isoC.appPort));
+            }
         } finally {
             process.env.HOME = prevHome;
             if (isoA) await fs.remove(isoA.stageRoot);
             if (isoB) await fs.remove(isoB.stageRoot);
             if (isoC) await fs.remove(isoC.stageRoot);
+            await fs.remove(customStageParent);
             await fs.remove(poisonDir);
         }
 
@@ -1385,6 +1483,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             'if (process.env.NEO_NL_PORT) {',
             '    const settings = JSON.parse(fs.readFileSync(".gemini/settings.json", "utf8"));',
             '    if (settings.mcpServers["neural-link"].env.NEO_NL_PORT !== process.env.NEO_NL_PORT) process.exit(2);',
+            '    if (!process.env.SANDBOX_ENV || !process.env.SANDBOX_ENV.includes("NEO_NL_PORT=" + process.env.NEO_NL_PORT) || !process.env.SANDBOX_MOUNTS) process.exit(11);',
             '    if (!args.includes("--sandbox") || !args.includes("--allowed-mcp-server-names") || !args.includes("neural-link")) process.exit(5);',
             '    if (args.includes("-m")) process.exit(7);',
             '    const t0 = new Date().toISOString();',
@@ -1395,7 +1494,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             '    console.log(JSON.stringify({type: "result", timestamp: new Date(Date.now() + 30).toISOString(), status: "success", stats: {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000, duration_ms: 30, tool_calls: 1, models: {"gemini-3.1-pro-preview": {total_tokens: 5200, input_tokens: 5000, output_tokens: 200, cached: 4000, input: 1000}}}}));',
             '} else {',
             '    const sysSettings = JSON.parse(fs.readFileSync(process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH, "utf8"));',
-            '    if (sysSettings.admin?.mcp?.enabled !== false) process.exit(8);',
+            '    if (Object.keys(sysSettings.mcpServers || {}).length !== 0 || !process.env.SANDBOX_ENV || !process.env.SANDBOX_MOUNTS) process.exit(8);',
             '    if (!args.includes("--allowed-mcp-server-names") || !args.includes("__none__")) process.exit(9);',
             '    if (args.includes("-m")) process.exit(10);',
             '    const t0 = new Date().toISOString();',

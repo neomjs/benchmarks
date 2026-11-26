@@ -518,14 +518,14 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         detectedHarness     = harness,
         detectedHarnessVer  = versions.harnessVersion || null,
         detectedModel       = model,
-        inputTokens         = 0,
-        outputTokens        = 0,
-        cachedTokens        = 0,
-        perMsgReportedTotal = 0,
-        hasPerMsgTotal      = false,
-        sawPerMessageUsage  = false,
-        fallbackUsage       = null,
-        fallbackDurationMs  = null;
+        inputTokens          = 0,
+        outputTokens         = 0,
+        cachedTokens         = 0,
+        perMsgEffectiveTotal = 0,
+        hasPerMsgTotal       = false,
+        sawPerMessageUsage   = false,
+        fallbackUsage        = null,
+        fallbackDurationMs   = null;
 
     const collectedVerifications = [],
           seenUsageIds           = new Set();
@@ -571,8 +571,10 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
                 outputTokens += adapted.usage.outputTokens;
                 cachedTokens += adapted.usage.cachedTokens;
                 if (typeof adapted.usage.totalTokens === 'number') {
-                    perMsgReportedTotal += adapted.usage.totalTokens;
+                    perMsgEffectiveTotal += adapted.usage.totalTokens;
                     hasPerMsgTotal = true;
+                } else {
+                    perMsgEffectiveTotal += adapted.usage.inputTokens + adapted.usage.outputTokens;
                 }
             }
         }
@@ -594,7 +596,7 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         }
     }
 
-    let reportedTotalTokens = hasPerMsgTotal ? perMsgReportedTotal : null;
+    let reportedTotalTokens = sawPerMessageUsage && hasPerMsgTotal ? perMsgEffectiveTotal : null;
     if (!sawPerMessageUsage && fallbackUsage) {
         inputTokens  = fallbackUsage.inputTokens;
         outputTokens = fallbackUsage.outputTokens;
@@ -669,6 +671,10 @@ export function sanitizeCleanRoomEnv(baseEnv = process.env, extraEnv = {}) {
             key.startsWith('NEO_') ||
             key.startsWith('AGY_') ||
             key.startsWith('GEMINI_CLI_') ||
+            key.startsWith('SANDBOX_') ||
+            key === 'GEMINI_SANDBOX_PROXY_COMMAND' ||
+            key === 'SEATBELT_PROFILE' ||
+            key === 'BUILD_SANDBOX' ||
             key === 'CLAUDECODE' ||
             key === 'CLAUDE_CODE_ENTRYPOINT' ||
             key === 'CLAUDE_CONFIG_DIR' ||
@@ -950,23 +956,15 @@ export async function stageArmWorkspace({
         {spaces: 4}
     );
     await fs.writeJson(geminiSystemDefaultsPath, {}, {spaces: 4});
-    await fs.writeJson(
-        geminiSystemSettingsPath,
-        arm === 'arm-b-neo-kb-only'
-            ? {admin: {mcp: {enabled: false}}, mcpServers: {}}
-            : {admin: {mcp: {enabled: true}}},
-        {spaces: 4}
-    );
+    await fs.writeJson(geminiSystemSettingsPath, {mcpServers: {}}, {spaces: 4});
     const realArmDir     = await fs.realpath(armDir),
-          resolvedArmDir = path.resolve(armDir);
-    await fs.writeJson(
-        geminiTrustedFoldersPath,
-        {
-            [realArmDir]    : 'TRUST_FOLDER',
-            [resolvedArmDir]: 'TRUST_FOLDER'
-        },
-        {spaces: 4}
-    );
+          resolvedArmDir = path.resolve(armDir),
+          trustedFolders = {
+              [realArmDir]    : 'TRUST_FOLDER',
+              [resolvedArmDir]: 'TRUST_FOLDER'
+          };
+    await fs.writeJson(geminiTrustedFoldersPath, trustedFolders, {spaces: 4});
+    await fs.writeJson(path.join(geminiHomeDotDir, 'trustedFolders.json'), trustedFolders, {spaces: 4});
 
     const appUrl        = arm === 'arm-a-react-ag-grid-mcp'
               ? `http://localhost:${resolvedAppPort}`
@@ -980,6 +978,7 @@ export async function stageArmWorkspace({
         nlPort   : resolvedNlPort,
         appUrl,
         verifyLogPath,
+        geminiIsolationDir,
         geminiHomeDir,
         geminiSystemDefaultsPath,
         geminiSystemSettingsPath,
@@ -988,29 +987,139 @@ export async function stageArmWorkspace({
 }
 
 /**
- * @summary Builds the clean-room child process environment for a staged arm workspace, injecting isolated ports and Gemini CLI config paths.
+ * @summary Builds the clean-room child process environment for a staged arm workspace, injecting isolated ports,
+ * Gemini CLI config paths, and container `--sandbox` forwarding (`SANDBOX_ENV` + `SANDBOX_MOUNTS`) while stripping host passthrough.
  * @param {Object} staged Result from `stageArmWorkspace`.
  * @param {Object} [baseEnv=process.env]
  * @returns {Object}
  */
 export function buildCleanRoomChildEnv(staged, baseEnv = process.env) {
+    const isolationDir = staged.geminiIsolationDir || (staged.geminiHomeDir ? path.dirname(staged.geminiHomeDir) : ''),
+          sandboxEnv   = [
+              `PORT=${staged.appPort}`,
+              ...(staged.nlPort ? [`NEO_NL_PORT=${staged.nlPort}`] : []),
+              ...(staged.geminiHomeDir ? [`GEMINI_CLI_HOME=${staged.geminiHomeDir}`] : []),
+              ...(staged.geminiSystemDefaultsPath ? [`GEMINI_CLI_SYSTEM_DEFAULTS_PATH=${staged.geminiSystemDefaultsPath}`] : []),
+              ...(staged.geminiSystemSettingsPath ? [`GEMINI_CLI_SYSTEM_SETTINGS_PATH=${staged.geminiSystemSettingsPath}`] : []),
+              ...(staged.geminiTrustedFoldersPath ? [`GEMINI_CLI_TRUSTED_FOLDERS_PATH=${staged.geminiTrustedFoldersPath}`] : [])
+          ];
+
     return sanitizeCleanRoomEnv(baseEnv, {
         PORT                           : String(staged.appPort),
         ...(staged.nlPort ? {NEO_NL_PORT: String(staged.nlPort)} : {}),
         ...(staged.geminiHomeDir ? {GEMINI_CLI_HOME: staged.geminiHomeDir} : {}),
         ...(staged.geminiSystemDefaultsPath ? {GEMINI_CLI_SYSTEM_DEFAULTS_PATH: staged.geminiSystemDefaultsPath} : {}),
         ...(staged.geminiSystemSettingsPath ? {GEMINI_CLI_SYSTEM_SETTINGS_PATH: staged.geminiSystemSettingsPath} : {}),
-        ...(staged.geminiTrustedFoldersPath ? {GEMINI_CLI_TRUSTED_FOLDERS_PATH: staged.geminiTrustedFoldersPath} : {})
+        ...(staged.geminiTrustedFoldersPath ? {GEMINI_CLI_TRUSTED_FOLDERS_PATH: staged.geminiTrustedFoldersPath} : {}),
+        ...(isolationDir ? {SANDBOX_MOUNTS: `${isolationDir}:${isolationDir}:rw`} : {}),
+        SANDBOX_ENV                    : sandboxEnv.join(',')
     });
 }
 
 /**
+ * @summary Simulates the container inner-CLI environment and mounted host paths constructed by Gemini CLI v0.38.1
+ * `packages/cli/src/utils/sandbox.ts` (`start_sandbox`) so tests can verify what the inner `gemini` process sees under `--sandbox`.
+ * @param {Object} options
+ * @param {String} options.workdir
+ * @param {Object} [options.hostEnv={}]
+ * @param {Boolean} [options.useCurrentUser=false]
+ * @returns {{innerEnv: Object, mountedPathMap: Array<{from: String, to: String}>, resolveMountedHostPath: (containerPath: String) => String|null}}
+ */
+export function resolveGeminiSandboxInnerEnv({
+    workdir,
+    hostEnv        = {},
+    useCurrentUser = false
+}) {
+    const resolvedWorkdir  = path.resolve(workdir),
+          userHomeOnHost   = path.resolve(hostEnv.GEMINI_CLI_HOME || hostEnv.HOME || os.homedir()),
+          userGeminiOnHost = path.join(userHomeOnHost, '.gemini'),
+          tmpDirOnHost     = path.resolve(os.tmpdir()),
+          mountedPathMap   = [
+              {from: resolvedWorkdir, to: resolvedWorkdir},
+              {from: userGeminiOnHost, to: '/home/node/.gemini'},
+              ...(userGeminiOnHost !== '/home/node/.gemini' ? [{from: userGeminiOnHost, to: userGeminiOnHost}] : []),
+              {from: tmpDirOnHost, to: tmpDirOnHost},
+              ...(userHomeOnHost !== path.resolve(os.homedir()) ? [{from: userHomeOnHost, to: userHomeOnHost}] : [])
+          ];
+
+    if (hostEnv.SANDBOX_MOUNTS) {
+        for (const rawMount of String(hostEnv.SANDBOX_MOUNTS).split(',')) {
+            const trimmed = rawMount.trim();
+            if (!trimmed) continue;
+            const [from, to] = trimmed.split(':');
+            if (from) {
+                mountedPathMap.push({from: path.resolve(from), to: path.resolve(to || from)});
+            }
+        }
+    }
+
+    const innerEnv = {
+        HOME   : useCurrentUser ? userHomeOnHost : '/home/node',
+        SANDBOX: 'gemini-cli-sandbox-0'
+    };
+
+    for (const passthroughKey of [
+        'GEMINI_CLI_TEST_VAR',
+        'GEMINI_API_KEY',
+        'GOOGLE_API_KEY',
+        'GOOGLE_GEMINI_BASE_URL',
+        'GOOGLE_VERTEX_BASE_URL',
+        'GOOGLE_GENAI_USE_VERTEXAI',
+        'GOOGLE_CLOUD_PROJECT',
+        'GOOGLE_CLOUD_LOCATION',
+        'GEMINI_MODEL',
+        'TERM',
+        'COLORTERM',
+        'GEMINI_CLI_IDE_SERVER_PORT',
+        'GEMINI_CLI_IDE_WORKSPACE_PATH',
+        'TERM_PROGRAM'
+    ]) {
+        if (hostEnv[passthroughKey]) {
+            innerEnv[passthroughKey] = String(hostEnv[passthroughKey]);
+        }
+    }
+
+    if (hostEnv.SANDBOX_ENV) {
+        for (const rawPair of String(hostEnv.SANDBOX_ENV).split(',')) {
+            const pair = rawPair.trim();
+            if (!pair) continue;
+            const eqIdx = pair.indexOf('=');
+            if (eqIdx <= 0) {
+                throw new Error('SANDBOX_ENV must be a comma-separated list of key=value pairs');
+            }
+            innerEnv[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+        }
+    }
+
+    if (useCurrentUser) {
+        innerEnv.HOME = userHomeOnHost;
+    }
+
+    const resolveMountedHostPath = containerPath => {
+        if (!containerPath) return null;
+        const resolved = path.resolve(containerPath);
+        // Later volume mounts win if paths overlap, matching Docker/Podman mount precedence
+        for (let i = mountedPathMap.length - 1; i >= 0; i--) {
+            const {from, to} = mountedPathMap[i];
+            if (resolved === to || resolved.startsWith(to + path.sep)) {
+                return path.join(from, path.relative(to, resolved));
+            }
+        }
+        return null;
+    };
+
+    return {innerEnv, mountedPathMap, resolveMountedHostPath};
+}
+
+/**
  * @summary Deep-merges plain objects following Gemini CLI v0.38.1 `settings.ts` scope precedence (`systemDefaults < user < workspace < system`),
- * shallow-merging `mcpServers` per server name (`MergeStrategy.SHALLOW_MERGE`) and replacing arrays/primitives.
- * @param {...Object} scopes
+ * shallow-merging `mcpServers` per server name (`MergeStrategy.SHALLOW_MERGE`), replacing arrays/primitives, and discarding file-based `admin`
+ * settings in `computeMergedSettings` (`settings.ts#L365-L388`).
+ * @param {Object[]} scopes
+ * @param {Object} [remoteAdminSettings]
  * @returns {Object}
  */
-function mergeGeminiSettingsScopes(...scopes) {
+function mergeGeminiSettingsScopes(scopes, remoteAdminSettings = undefined) {
     const mergePair = (target, source, depth = 0) => {
         if (!source || typeof source !== 'object' || Array.isArray(source)) return target;
         const out = {...target};
@@ -1028,48 +1137,93 @@ function mergeGeminiSettingsScopes(...scopes) {
         }
         return out;
     };
-    return scopes.reduce((acc, scope) => mergePair(acc, scope, 0), {});
+    const merged = scopes.reduce((acc, scope) => mergePair(acc, scope, 0), {});
+
+    // Gemini CLI v0.38.1 `LoadedSettings#computeMergedSettings` ignores all file-based `admin` settings and resets
+    // `merged.admin` to schema defaults (`mcp.enabled: true`) overridden only by `_remoteAdminSettings?.admin`.
+    const adminDefaults = {
+        secureModeEnabled: false,
+        extensions       : {enabled: true},
+        mcp              : {enabled: true},
+        skills           : {enabled: true}
+    };
+    merged.admin = mergePair(adminDefaults, remoteAdminSettings?.admin || {}, 1);
+    return merged;
 }
 
 /**
  * @summary Evaluates the effective MCP server map Gemini CLI v0.38.1 constructs after merging `systemDefaults`, `user`,
- * trusted `workspace`, and `system` settings plus `admin.mcp.enabled` and `--allowed-mcp-server-names` / `mcp.allowed` / `mcp.excluded` filtering.
+ * trusted `workspace`, and `system` settings (discarding file-based `admin` settings per `settings.ts#L365-L388`) plus
+ * `--allowed-mcp-server-names` / `mcp.allowed` / `mcp.excluded` filtering, either directly or inside the `--sandbox` container (`sandbox.ts`).
  * @param {Object} options
  * @param {String} options.armDir
  * @param {Object} [options.env=process.env]
  * @param {String[]} [options.cliArgs=[]]
  * @param {String} [options.defaultSystemSettingsPath]
- * @returns {Promise<{mergedSettings: Object, mcpEnabled: Boolean, effectiveMcpServers: Object}>}
+ * @param {Boolean} [options.sandbox=false]
+ * @param {Boolean} [options.useCurrentUser=false]
+ * @param {String} [options.containerDefaultSystemSettingsPath='']
+ * @param {Object} [options.remoteAdminSettings]
+ * @returns {Promise<{mergedSettings: Object, mcpEnabled: Boolean, effectiveMcpServers: Object, effectiveEnv: Object}>}
  */
 export async function resolveEffectiveGeminiMcpConfig({
     armDir,
-    env                       = process.env,
-    cliArgs                   = [],
-    defaultSystemSettingsPath = ''
+    env                                = process.env,
+    cliArgs                            = [],
+    defaultSystemSettingsPath          = '',
+    sandbox                            = false,
+    useCurrentUser                     = false,
+    containerDefaultSystemSettingsPath = '',
+    remoteAdminSettings                = undefined
 }) {
-    const readJsonIfExists = async p => (p && await fs.pathExists(p)) ? await fs.readJson(p) : {};
+    const sandboxCtx   = sandbox ? resolveGeminiSandboxInnerEnv({workdir: armDir, hostEnv: env, useCurrentUser}) : null,
+          effectiveEnv = sandboxCtx ? sandboxCtx.innerEnv : env;
 
-    const effectiveHome       = env.GEMINI_CLI_HOME || env.HOME || os.homedir(),
+    const readConfigJson = async (targetPath, {containerImageFallbackPath = ''} = {}) => {
+        if (!targetPath) {
+            if (containerImageFallbackPath && await fs.pathExists(containerImageFallbackPath)) {
+                return fs.readJson(containerImageFallbackPath);
+            }
+            return {};
+        }
+        if (sandboxCtx) {
+            const mappedHostPath = sandboxCtx.resolveMountedHostPath(targetPath);
+            if (mappedHostPath && await fs.pathExists(mappedHostPath)) {
+                return fs.readJson(mappedHostPath);
+            }
+            if (containerImageFallbackPath && await fs.pathExists(containerImageFallbackPath)) {
+                return fs.readJson(containerImageFallbackPath);
+            }
+            return {};
+        }
+        return (await fs.pathExists(targetPath)) ? fs.readJson(targetPath) : {};
+    };
+
+    const effectiveHome       = effectiveEnv.GEMINI_CLI_HOME || effectiveEnv.HOME || os.homedir(),
           userSettingsPath    = path.join(effectiveHome, '.gemini', 'settings.json'),
-          systemSettingsPath  = env.GEMINI_CLI_SYSTEM_SETTINGS_PATH || defaultSystemSettingsPath,
-          systemDefaultsPath  = env.GEMINI_CLI_SYSTEM_DEFAULTS_PATH || (systemSettingsPath ? path.join(path.dirname(systemSettingsPath), 'system-defaults.json') : ''),
-          trustedFoldersPath  = env.GEMINI_CLI_TRUSTED_FOLDERS_PATH || path.join(effectiveHome, '.gemini', 'trustedFolders.json'),
+          systemSettingsPath  = effectiveEnv.GEMINI_CLI_SYSTEM_SETTINGS_PATH || (sandbox ? '' : defaultSystemSettingsPath),
+          systemDefaultsPath  = effectiveEnv.GEMINI_CLI_SYSTEM_DEFAULTS_PATH || (systemSettingsPath ? path.join(path.dirname(systemSettingsPath), 'system-defaults.json') : ''),
+          trustedFoldersPath  = effectiveEnv.GEMINI_CLI_TRUSTED_FOLDERS_PATH || path.join(effectiveHome, '.gemini', 'trustedFolders.json'),
           workspaceConfigPath = path.join(armDir, '.gemini', 'settings.json');
 
     const [systemDefaults, userSettings, rawWorkspaceSettings, systemSettings, trustedFolders] = await Promise.all([
-        readJsonIfExists(systemDefaultsPath),
-        readJsonIfExists(userSettingsPath),
-        readJsonIfExists(workspaceConfigPath),
-        readJsonIfExists(systemSettingsPath),
-        readJsonIfExists(trustedFoldersPath)
+        readConfigJson(systemDefaultsPath),
+        readConfigJson(userSettingsPath),
+        readConfigJson(workspaceConfigPath),
+        readConfigJson(systemSettingsPath, {containerImageFallbackPath: sandbox ? containerDefaultSystemSettingsPath : ''}),
+        readConfigJson(trustedFoldersPath)
     ]);
 
-    const realArmDir = await fs.realpath(armDir).catch(() => path.resolve(armDir)),
+    const realArmDir         = await fs.realpath(armDir).catch(() => path.resolve(armDir)),
+          resolvedArmDir     = path.resolve(armDir),
           folderTrustEnabled = systemSettings?.security?.folderTrust?.enabled ?? userSettings?.security?.folderTrust?.enabled ?? false,
-          isTrusted = !folderTrustEnabled || trustedFolders[realArmDir] === 'TRUST_FOLDER' || trustedFolders[armDir] === 'TRUST_FOLDER',
-          workspaceSettings = isTrusted ? rawWorkspaceSettings : {};
+          isTrusted          = !folderTrustEnabled ||
+              trustedFolders[realArmDir] === 'TRUST_FOLDER' ||
+              trustedFolders[resolvedArmDir] === 'TRUST_FOLDER' ||
+              trustedFolders[armDir] === 'TRUST_FOLDER',
+          workspaceSettings  = isTrusted ? rawWorkspaceSettings : {};
 
-    const mergedSettings = mergeGeminiSettingsScopes(systemDefaults, userSettings, workspaceSettings, systemSettings),
+    const mergedSettings = mergeGeminiSettingsScopes([systemDefaults, userSettings, workspaceSettings, systemSettings], remoteAdminSettings),
           mcpEnabled     = mergedSettings.admin?.mcp?.enabled ?? true;
 
     let cliAllowed = null;
@@ -1093,11 +1247,11 @@ export async function resolveEffectiveGeminiMcpConfig({
     const effectiveMcpServers = {};
     for (const [name, cfg] of Object.entries(rawServers)) {
         if (Array.isArray(allowedNames) && allowedNames.length > 0 && !allowedNames.includes(name)) continue;
-        if (Array.isArray(blockedNames) && blockedNames.length > 0 && blockedNames.includes(name)) continue;
+        if (Array.isArray(blockedNames) && allowedNames !== cliAllowed && blockedNames.length > 0 && blockedNames.includes(name)) continue;
         effectiveMcpServers[name] = cfg;
     }
 
-    return {mergedSettings, mcpEnabled, effectiveMcpServers};
+    return {mergedSettings, mcpEnabled, effectiveMcpServers, effectiveEnv};
 }
 
 /**

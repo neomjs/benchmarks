@@ -1,9 +1,4 @@
 {
-    "admin": {
-        "mcp": {
-            "enabled": false
-        }
-    },
     "context": {
         "fileName": [
             "AGENTS.md",
