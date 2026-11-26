@@ -1,0 +1,23 @@
+{
+    "context": {
+        "fileName": [
+            "AGENTS.md",
+            "GEMINI.md"
+        ]
+    },
+    "mcp": {
+        "allowed": [
+            "ag-mcp"
+        ]
+    },
+    "mcpServers": {
+        "ag-mcp": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "ag-mcp"
+            ],
+            "trust": true
+        }
+    }
+}

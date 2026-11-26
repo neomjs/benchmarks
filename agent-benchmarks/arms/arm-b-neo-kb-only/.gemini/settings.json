@@ -1,0 +1,12 @@
+{
+    "context": {
+        "fileName": [
+            "AGENTS.md",
+            "GEMINI.md"
+        ]
+    },
+    "mcp": {
+        "allowed": []
+    },
+    "mcpServers": {}
+}
