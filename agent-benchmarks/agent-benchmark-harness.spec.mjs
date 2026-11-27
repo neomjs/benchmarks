@@ -1917,16 +1917,79 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 baseEnv
             })).rejects.toThrow(/Unverified --cmd override cannot produce a comparable Codex benchmark result/);
 
-            const spoofedCodexViaCmd = await runCleanRoomArm({
-                arm        : 'arm-b-neo-kb-only',
-                cmd        : 'printf \'%s\\n\' \'{"type":"session_meta","cli_version":"0.171.0","model":"gpt-5.4"}\' \'{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}\'',
-                outDir     : outDirOk,
-                installDeps: false,
-                baseEnv
-            });
-            expect(spoofedCodexViaCmd.telemetry.harness).toBe('custom-cmd');
-            expect(spoofedCodexViaCmd.telemetry.comparable).toBe(false);
-            expect(buildComparisonReport([spoofedCodexViaCmd.telemetry]).arms).toEqual([]);
+            const outDirCustomCmd      = path.join(tempRoot, 'out-custom-cmd'),
+                  outDirCustomReplay   = path.join(tempRoot, 'out-custom-replay'),
+                  outDirCustomReplayB  = path.join(tempRoot, 'out-custom-replay-arm-flag'),
+                  outDirRealReplay     = path.join(tempRoot, 'out-real-replay');
+
+            execFileSync(
+                process.execPath,
+                [
+                    path.join(ROOT_DIR, 'agent-benchmarks/runner/runAgentBenchmark.mjs'),
+                    '--run-arm', 'arm-b-neo-kb-only',
+                    '--no-install',
+                    '--out-dir', outDirCustomCmd,
+                    '--cmd', 'printf \'%s\\n\' \'{"type":"session_meta","cli_version":"0.171.0","model":"gpt-5.4"}\' \'{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}\''
+                ],
+                {cwd: ROOT_DIR, env: baseEnv, encoding: 'utf8'}
+            );
+
+            const customLiveReports = (await fs.readdir(outDirCustomCmd)).filter(f => f.startsWith('agent-benchmark-') && f.endsWith('.json'));
+            expect(customLiveReports).toHaveLength(1);
+            expect((await fs.readJson(path.join(outDirCustomCmd, customLiveReports[0]))).arms).toEqual([]);
+
+            const savedCustomTranscriptPath = path.join(outDirCustomCmd, 'arm-b-neo-kb-only-transcript.jsonl'),
+                  replayedCustomTelemetry   = parseTranscriptTelemetry(
+                      await fs.readFile(savedCustomTranscriptPath, 'utf8'),
+                      {arm: 'arm-b-neo-kb-only', harness: 'codex'}
+                  );
+            expect(replayedCustomTelemetry.harness).toBe('custom-cmd');
+            expect(replayedCustomTelemetry.comparable).toBe(false);
+            expect(buildComparisonReport([replayedCustomTelemetry]).arms).toEqual([]);
+
+            // Replay without `--harness` (`--from-transcript`) AND with `--harness codex` (`--arm-b-transcript`) both preserve `comparable: false` (0 rows)
+            execFileSync(
+                process.execPath,
+                [
+                    path.join(ROOT_DIR, 'agent-benchmarks/runner/runAgentBenchmark.mjs'),
+                    '--from-transcript', `arm-b-neo-kb-only=${savedCustomTranscriptPath}`,
+                    '--out-dir', outDirCustomReplay
+                ],
+                {cwd: ROOT_DIR, env: baseEnv, encoding: 'utf8'}
+            );
+            const customReplayReports = (await fs.readdir(outDirCustomReplay)).filter(f => f.startsWith('agent-benchmark-') && f.endsWith('.json'));
+            expect(customReplayReports).toHaveLength(1);
+            expect((await fs.readJson(path.join(outDirCustomReplay, customReplayReports[0]))).arms).toEqual([]);
+
+            execFileSync(
+                process.execPath,
+                [
+                    path.join(ROOT_DIR, 'agent-benchmarks/runner/runAgentBenchmark.mjs'),
+                    '--arm-b-transcript', savedCustomTranscriptPath,
+                    '--harness', 'codex',
+                    '--out-dir', outDirCustomReplayB
+                ],
+                {cwd: ROOT_DIR, env: baseEnv, encoding: 'utf8'}
+            );
+            const customReplayReportsB = (await fs.readdir(outDirCustomReplayB)).filter(f => f.startsWith('agent-benchmark-') && f.endsWith('.json'));
+            expect(customReplayReportsB).toHaveLength(1);
+            expect((await fs.readJson(path.join(outDirCustomReplayB, customReplayReportsB[0]))).arms).toEqual([]);
+
+            // Positive replay control: saved transcript from a preflight-verified Codex run still produces 1 Codex comparison row on `--from-transcript`
+            execFileSync(
+                process.execPath,
+                [
+                    path.join(ROOT_DIR, 'agent-benchmarks/runner/runAgentBenchmark.mjs'),
+                    '--from-transcript', `arm-b-neo-kb-only=${path.join(outDirOk, 'arm-b-neo-kb-only-transcript.jsonl')}`,
+                    '--out-dir', outDirRealReplay
+                ],
+                {cwd: ROOT_DIR, env: baseEnv, encoding: 'utf8'}
+            );
+            const realReplayReports = (await fs.readdir(outDirRealReplay)).filter(f => f.startsWith('agent-benchmark-') && f.endsWith('.json'));
+            expect(realReplayReports).toHaveLength(1);
+            const realReplayJson = await fs.readJson(path.join(outDirRealReplay, realReplayReports[0]));
+            expect(realReplayJson.arms).toHaveLength(1);
+            expect(realReplayJson.arms[0].harness).toBe('codex');
 
             // RA-3b: Launch descriptor validation rejects tampered Arm A command/args and Arm C `--version` / port tampering
             await fs.writeFile(path.join(stagedA.armDir, '.codex/config.toml'), '[mcp_servers.ag-mcp]\ncommand = "echo"\nargs = ["fake-ag-mcp"]\n', 'utf8');

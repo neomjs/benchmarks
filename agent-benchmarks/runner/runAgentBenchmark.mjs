@@ -118,7 +118,11 @@ export function isAgentTranscriptEvent(entry = {}) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         return false;
     }
-    if (entry.type === 'benchmark_verification' || entry.type === 'benchmark_launch_failure') {
+    if (
+        entry.type === 'benchmark_verification' ||
+        entry.type === 'benchmark_launch_failure' ||
+        entry.type === 'benchmark_run_metadata'
+    ) {
         return false;
     }
 
@@ -346,7 +350,25 @@ export function classifyToolCall(call = {}) {
 export function adaptTranscriptEntry(entry = {}) {
     const timestamp = entry.timestamp || entry.created_at || entry.payload?.timestamp || null;
 
-    // 1. Runner-emitted verification or launch-failure log lines
+    // 1. Runner-emitted metadata, verification, or launch-failure log lines
+    if (entry.type === 'benchmark_run_metadata') {
+        return {
+            harness        : null,
+            harnessVersion : null,
+            model          : null,
+            timestamp      : null,
+            usageId        : null,
+            usage          : null,
+            toolCalls      : [],
+            verificationRun: null,
+            runMetadata    : {
+                harness   : entry.harness || null,
+                customCmd : Boolean(entry.customCmd),
+                comparable: entry.comparable
+            }
+        };
+    }
+
     if (entry.type === 'benchmark_launch_failure') {
         return {
             harness        : entry.harness || null,
@@ -717,7 +739,8 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         sawPerMessageUsage   = false,
         fallbackUsage        = null,
         fallbackDurationMs   = null,
-        recordedLaunchFail   = null;
+        recordedLaunchFail   = null,
+        recordedRunMeta      = null;
 
     const collectedVerifications = [],
           seenUsageIds           = new Set(),
@@ -784,6 +807,9 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         }
         if (adapted.launchFailure) {
             recordedLaunchFail = adapted.launchFailure;
+        }
+        if (adapted.runMetadata) {
+            recordedRunMeta = adapted.runMetadata;
         }
 
         for (const call of adapted.toolCalls) {
@@ -858,6 +884,14 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
     if (recordedLaunchFail) {
         parsedResult.runOutcome    = 'launch_failure';
         parsedResult.launchFailure = recordedLaunchFail;
+    }
+
+    if (recordedRunMeta?.comparable === false) {
+        parsedResult.comparable = false;
+    }
+    if (recordedRunMeta?.customCmd) {
+        parsedResult.harness    = recordedRunMeta.harness || 'custom-cmd';
+        parsedResult.comparable = false;
     }
 
     return parsedResult;
@@ -2017,7 +2051,16 @@ export async function runCleanRoomArm({
             await stageHarnessCredentials(staged, {harness, baseEnv});
         }
 
-        await fs.writeFile(stagedTranscriptPath, '', 'utf8');
+        const initialTranscript = cmd
+            ? JSON.stringify({
+                type      : 'benchmark_run_metadata',
+                arm,
+                harness   : 'custom-cmd',
+                customCmd : true,
+                comparable: false
+            }) + '\n'
+            : '';
+        await fs.writeFile(stagedTranscriptPath, initialTranscript, 'utf8');
 
         child = spawn(spawnBin, spawnArgs, {
             cwd     : staged.armDir,
@@ -2126,11 +2169,6 @@ export async function runCleanRoomArm({
             ? 'launch_failure'
             : (telemetry.pass ? 'passed' : 'task_failed');
         telemetry.launchFailure = telemetry.launchFailure || null;
-
-        if (cmd && telemetry.harness === 'codex') {
-            telemetry.harness    = 'custom-cmd';
-            telemetry.comparable = false;
-        }
 
         if (telemetry.harness === 'unknown' && harness) {
             telemetry.harness = cmd ? 'custom-cmd' : harness;
