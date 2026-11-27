@@ -68,7 +68,25 @@ node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
   --post-exit-verify \
   --model claude-sonnet-4-6 \
   --out-dir ./agent-benchmarks/results
+
+# Run all 3 arms sequentially on Codex CLI inside a disposable Linux container
+# Prerequisite inside the disposable container (e.g. mcr.microsoft.com/playwright:v1.62.1-noble):
+#   npm install -g @openai/codex
+#   printenv OPENAI_API_KEY | codex login --with-api-key   # or: codex login --device-auth
+# Non-model MCP discovery preflight (verifies A=['ag-mcp'], B=[], C=['neural-link'] + staged NEO_NL_PORT):
+node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
+  --preflight-codex \
+  --no-install
+
+# Full 3-arm Codex run (automatically runs verifyCodexMcpPreflight before each arm's codex exec):
+node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
+  --run-all \
+  --post-exit-verify \
+  --harness codex \
+  --out-dir ./agent-benchmarks/results
 ```
+
+For `--harness codex`, `stageArmWorkspace` creates an isolated per-arm `CODEX_HOME` inside the temporary stage root, copies only `auth.json` when present (keeping host `~/.codex` untouched and ignoring outer user `config.toml` MCP servers), marks the staged arm path `trust_level = "trusted"`, and verifies `codex mcp list --json` before starting `codex exec`. If a CLI exits non-zero or is terminated before emitting its first agent event, `runCleanRoomArm` records `runOutcome: "launch_failure"` (`LAUNCH_FAILURE` in Markdown reports, with credentials scrubbed from diagnostics) rather than scoring it as a task failure (`FAIL`).
 
 ### Verify a Running Arm Workspace
 Start the target arm's dev server and run `verify.spec.mjs` against its URL (each verification run is appended to `agent-benchmarks/results/<arm>-verify-runs.jsonl` by default):
