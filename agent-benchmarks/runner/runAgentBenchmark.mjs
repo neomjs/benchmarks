@@ -35,6 +35,40 @@ export function expectedArmMcpServers(arm) {
 }
 
 /**
+ * @summary Returns the canonical stdio MCP launch descriptors expected for a staged benchmark arm.
+ * @param {String} arm
+ * @param {Object} [options]
+ * @param {Number|String|null} [options.nlPort=null]
+ * @returns {Object<String, {type: String, command: String, args: String[], env: Object<String, String>}>}
+ */
+export function expectedArmMcpDescriptors(arm, {nlPort = null} = {}) {
+    if (arm === 'arm-a-react-ag-grid-mcp') {
+        return {
+            'ag-mcp': {
+                type   : 'stdio',
+                command: 'npx',
+                args   : ['-y', 'ag-mcp'],
+                env    : {}
+            }
+        };
+    }
+    if (arm === 'arm-b-neo-kb-only') {
+        return {};
+    }
+    if (arm === 'arm-c-neo-kb-neural-link') {
+        return {
+            'neural-link': {
+                type   : 'stdio',
+                command: 'npx',
+                args   : ['-y', 'neo-neural-link'],
+                env    : nlPort !== null && nlPort !== undefined ? {NEO_NL_PORT: String(nlPort)} : {}
+            }
+        };
+    }
+    throw new Error(`Unknown benchmark arm: ${arm}. Expected one of: ${ARMS.join(', ')}`);
+}
+
+/**
  * @summary Scrubs API keys, bearer/basic tokens, URL credentials, and secret env/JSON assignments from diagnostic text.
  * @param {String} [text='']
  * @returns {String}
@@ -46,6 +80,32 @@ export function redactCredentials(text = '') {
         .replace(/\b([A-Za-z0-9_]*(?:API_KEY|ACCESS_TOKEN|REFRESH_TOKEN|CLIENT_SECRET|BRIDGE_TOKEN|SECRET|PASSWORD|CREDENTIAL|TOKEN|AUTH_TOKEN)[A-Za-z0-9_]*)\s*([:=])\s*("[^"]*"|'[^']*'|[^\s"',;]+)/gi, '$1$2[REDACTED]')
         .replace(/\b(Authorization\s*:\s*(?:Bearer|Basic)|Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{6,}/gi, '$1 [REDACTED]')
         .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{10,}|ya29\.[A-Za-z0-9._-]+|gh[pousr]_[A-Za-z0-9_]{8,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g, '[REDACTED]');
+}
+
+/**
+ * @summary Recursively scrubs credential material from every string field in a persisted transcript or diagnostic value.
+ * @param {*} value
+ * @returns {*}
+ */
+export function redactDiagnosticValue(value) {
+    if (typeof value === 'string') {
+        return redactCredentials(value);
+    }
+    if (Array.isArray(value)) {
+        return value.map(item => redactDiagnosticValue(item));
+    }
+    if (value && typeof value === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(value)) {
+            if (/^(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret|authorization|credential)$/i.test(k) && typeof v === 'string') {
+                out[k] = '[REDACTED]';
+            } else {
+                out[k] = redactDiagnosticValue(v);
+            }
+        }
+        return out;
+    }
+    return value;
 }
 
 /**
@@ -72,7 +132,8 @@ export function isAgentTranscriptEvent(entry = {}) {
     }
 
     // Codex CLI: `thread.started`, `turn.started`, `session_meta`, `turn_context`, `error`, `turn.failed`,
-    // and `item.completed` with `item.type === 'error'` are pre-agent or error envelopes.
+    // and `item.*` with `item.type === 'error'` are pre-agent or error envelopes; started/updated/completed
+    // non-error items prove the agent began executing work.
     if (
         entry.type === 'thread.started' ||
         entry.type === 'turn.started' ||
@@ -89,7 +150,7 @@ export function isAgentTranscriptEvent(entry = {}) {
     if (entry.type === 'event_msg') {
         return entry.payload?.type !== 'error';
     }
-    if (entry.type === 'item.completed') {
+    if (entry.type === 'item.started' || entry.type === 'item.updated' || entry.type === 'item.completed') {
         return Boolean(entry.item && typeof entry.item === 'object' && entry.item.type !== 'error');
     }
 
@@ -501,10 +562,15 @@ export function adaptTranscriptEntry(entry = {}) {
         };
     }
 
-    // 3. Codex CLI JSONL (`session_meta`, `turn_context`, `item.completed`, `turn.completed`, `event_msg`, `response_item`)
+    // 3. Codex CLI JSONL (`thread.started`, `turn.started`, `turn.failed`, `session_meta`, `turn_context`, `item.*`, `turn.completed`, `event_msg`, `response_item`)
     if (
+        entry.type === 'thread.started' ||
+        entry.type === 'turn.started' ||
+        entry.type === 'turn.failed' ||
         entry.type === 'session_meta' ||
         entry.type === 'turn_context' ||
+        entry.type === 'item.started' ||
+        entry.type === 'item.updated' ||
         entry.type === 'item.completed' ||
         entry.type === 'turn.completed' ||
         entry.type === 'event_msg' ||
@@ -519,21 +585,25 @@ export function adaptTranscriptEntry(entry = {}) {
 
         const toolCalls = [];
         if (entry.item && typeof entry.item === 'object') {
+            const itemId = entry.item.id ? String(entry.item.id) : null;
             if (entry.item.type === 'mcp_tool_call') {
                 const {serverName, toolName} = splitMcpToolName(entry.item.server || '', entry.item.tool || '');
                 toolCalls.push({
+                    ...(itemId ? {id: itemId} : {}),
                     serverName,
                     toolName,
                     input: entry.item.arguments || {}
                 });
             } else if (entry.item.type === 'command_execution') {
                 toolCalls.push({
+                    ...(itemId ? {id: itemId} : {}),
                     serverName: '',
                     toolName  : 'command_execution',
                     input     : {command: entry.item.command || ''}
                 });
             } else if (entry.item.type === 'file_change') {
                 toolCalls.push({
+                    ...(itemId ? {id: itemId} : {}),
                     serverName: '',
                     toolName  : 'file_change',
                     input     : entry.item
@@ -548,6 +618,7 @@ export function adaptTranscriptEntry(entry = {}) {
             }
             const {serverName, toolName} = splitMcpToolName('', entry.payload.name || '');
             toolCalls.push({
+                ...(entry.payload.call_id ? {id: String(entry.payload.call_id)} : {}),
                 serverName,
                 toolName,
                 input: parsedArgs
@@ -649,7 +720,8 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         recordedLaunchFail   = null;
 
     const collectedVerifications = [],
-          seenUsageIds           = new Set();
+          seenUsageIds           = new Set(),
+          seenToolCallIds        = new Set();
 
     const toolCallsByServer = {
         docsKbQueries         : 0,
@@ -715,6 +787,10 @@ export function parseTranscriptTelemetry(jsonlContent = '', {
         }
 
         for (const call of adapted.toolCalls) {
+            if (call.id) {
+                if (seenToolCallIds.has(call.id)) continue;
+                seenToolCallIds.add(call.id);
+            }
             const bucket = classifyToolCall(call);
             toolCallsByServer[bucket]++;
         }
@@ -896,7 +972,89 @@ export async function allocateFreePort(preferredPort = 0) {
 }
 
 /**
+ * @summary Copies only the selected harness's authentication files into a staged clean-room home directory.
+ * Standalone discovery (`stageAuth: false`) and other harnesses never copy foreign credentials.
+ * @param {Object} staged Result from `stageArmWorkspace`.
+ * @param {Object} [options]
+ * @param {String|null} [options.harness=null]
+ * @param {Object} [options.baseEnv=process.env]
+ * @returns {Promise<void>}
+ */
+export async function stageHarnessCredentials(staged, {harness = null, baseEnv = process.env} = {}) {
+    if (!staged) return;
+    const effectiveHostHome = baseEnv?.HOME || process.env.HOME || os.homedir();
+
+    if (harness === 'codex' && staged.codexHomeDir) {
+        const hostCodexDir      = baseEnv?.CODEX_HOME
+            ? path.resolve(baseEnv.CODEX_HOME)
+            : path.join(effectiveHostHome, '.codex');
+        const hostCodexAuthPath = path.join(hostCodexDir, 'auth.json');
+        if (await fs.pathExists(hostCodexAuthPath)) {
+            const destCodexAuthPath = path.join(staged.codexHomeDir, 'auth.json');
+            await fs.copy(hostCodexAuthPath, destCodexAuthPath);
+            await fs.chmod(destCodexAuthPath, 0o600).catch(() => {});
+        }
+        return;
+    }
+
+    if (harness === 'gemini' && staged.geminiHomeDir) {
+        const hostGeminiDir    = path.join(effectiveHostHome, '.gemini'),
+              geminiHomeDotDir = path.join(staged.geminiHomeDir, '.gemini'),
+              hostSettingsPath = path.join(hostGeminiDir, 'settings.json');
+        await fs.ensureDir(geminiHomeDotDir);
+
+        let preservedAuth = null;
+        if (await fs.pathExists(hostSettingsPath)) {
+            try {
+                const hostSettings = await fs.readJson(hostSettingsPath);
+                if (hostSettings?.security?.auth) {
+                    preservedAuth = hostSettings.security.auth;
+                }
+            } catch {}
+        }
+
+        for (const authFile of ['oauth_creds.json', 'google_accounts.json', 'installation_id', 'state.json']) {
+            const srcAuth = path.join(hostGeminiDir, authFile);
+            if (await fs.pathExists(srcAuth)) {
+                const destAuth = path.join(geminiHomeDotDir, authFile);
+                await fs.copy(srcAuth, destAuth);
+                await fs.chmod(destAuth, 0o600).catch(() => {});
+            }
+        }
+
+        await fs.writeJson(
+            path.join(geminiHomeDotDir, 'settings.json'),
+            preservedAuth ? {security: {auth: preservedAuth}} : {},
+            {spaces: 4}
+        );
+    }
+}
+
+/**
+ * @summary Removes any staged authentication files from a clean-room workspace so retained (`--keep-stage`) stages never hold credentials.
+ * @param {Object} staged Result from `stageArmWorkspace`.
+ * @returns {Promise<void>}
+ */
+export async function cleanupStagedCredentials(staged) {
+    if (!staged) return;
+    if (staged.codexHomeDir) {
+        await fs.remove(path.join(staged.codexHomeDir, 'auth.json')).catch(() => {});
+    }
+    if (staged.geminiHomeDir) {
+        const geminiHomeDotDir = path.join(staged.geminiHomeDir, '.gemini');
+        for (const authFile of ['oauth_creds.json', 'google_accounts.json', 'installation_id', 'state.json']) {
+            await fs.remove(path.join(geminiHomeDotDir, authFile)).catch(() => {});
+        }
+        const stagedGeminiSettings = path.join(geminiHomeDotDir, 'settings.json');
+        if (await fs.pathExists(stagedGeminiSettings)) {
+            await fs.writeJson(stagedGeminiSettings, {}, {spaces: 4}).catch(() => {});
+        }
+    }
+}
+
+/**
  * @summary Stages an isolated clean-room copy of an arm workspace with collision-free dev and Neural Link ports.
+ * Keeps discovery credential-free by default (`stageAuth = false`) and stages credentials only for the selected harness when requested.
  * @param {Object} options
  * @param {String} options.arm
  * @param {String} [options.stageRoot]
@@ -904,6 +1062,9 @@ export async function allocateFreePort(preferredPort = 0) {
  * @param {Number} [options.nlPort]
  * @param {Boolean} [options.installDeps=true]
  * @param {String} [options.rootDir=ROOT_DIR]
+ * @param {Object} [options.baseEnv=process.env]
+ * @param {String|null} [options.harness=null]
+ * @param {Boolean} [options.stageAuth=false]
  * @returns {Promise<{stageRoot: String, armDir: String, appPort: Number, nlPort: Number|null, appUrl: String, verifyLogPath: String}>}
  */
 export async function stageArmWorkspace({
@@ -913,7 +1074,9 @@ export async function stageArmWorkspace({
     nlPort,
     installDeps = true,
     rootDir     = ROOT_DIR,
-    baseEnv     = process.env
+    baseEnv     = process.env,
+    harness     = null,
+    stageAuth   = false
 }) {
     if (!ARMS.includes(arm)) {
         throw new Error(`Unknown benchmark arm: ${arm}. Expected one of: ${ARMS.join(', ')}`);
@@ -1051,43 +1214,16 @@ export async function stageArmWorkspace({
         });
     }
 
-    // Isolate Gemini CLI user/system/trusted-folder configuration inside stageRoot so host `~/.gemini/settings.json`
-    // and system `/etc/gemini-cli/settings.json` (or macOS `/Library/Application Support/GeminiCli/settings.json`)
-    // can neither leak inherited user MCP servers into Arm B nor override Arm C's staged `NEO_NL_PORT`.
-    const geminiIsolationDir        = path.join(resolvedStageRoot, '.gemini-isolation'),
-          geminiHomeDir             = path.join(geminiIsolationDir, 'home'),
-          geminiHomeDotDir          = path.join(geminiHomeDir, '.gemini'),
-          geminiSystemDefaultsPath  = path.join(geminiIsolationDir, 'system-defaults.json'),
-          geminiSystemSettingsPath  = path.join(geminiIsolationDir, 'system-settings.json'),
-          geminiTrustedFoldersPath  = path.join(geminiIsolationDir, 'trustedFolders.json'),
-          effectiveHostHome         = baseEnv?.HOME || process.env.HOME || os.homedir(),
-          hostGeminiDir             = path.join(effectiveHostHome, '.gemini');
+    // Isolate Gemini CLI and Codex CLI (`CODEX_HOME`) configuration inside `stageRoot` without copying host credentials by default.
+    const geminiIsolationDir       = path.join(resolvedStageRoot, '.gemini-isolation'),
+          geminiHomeDir            = path.join(geminiIsolationDir, 'home'),
+          geminiHomeDotDir         = path.join(geminiHomeDir, '.gemini'),
+          geminiSystemDefaultsPath = path.join(geminiIsolationDir, 'system-defaults.json'),
+          geminiSystemSettingsPath = path.join(geminiIsolationDir, 'system-settings.json'),
+          geminiTrustedFoldersPath = path.join(geminiIsolationDir, 'trustedFolders.json');
 
     await fs.ensureDir(geminiHomeDotDir);
-
-    // Preserve only host OAuth/account credential files and `security.auth` so authenticated runs work without inheriting MCP servers
-    let preservedAuth = null;
-    const hostSettingsPath = path.join(hostGeminiDir, 'settings.json');
-    if (await fs.pathExists(hostSettingsPath)) {
-        try {
-            const hostSettings = await fs.readJson(hostSettingsPath);
-            if (hostSettings?.security?.auth) {
-                preservedAuth = hostSettings.security.auth;
-            }
-        } catch {}
-    }
-    for (const authFile of ['oauth_creds.json', 'google_accounts.json', 'installation_id', 'state.json']) {
-        const srcAuth = path.join(hostGeminiDir, authFile);
-        if (await fs.pathExists(srcAuth)) {
-            await fs.copy(srcAuth, path.join(geminiHomeDotDir, authFile));
-        }
-    }
-
-    await fs.writeJson(
-        path.join(geminiHomeDotDir, 'settings.json'),
-        preservedAuth ? {security: {auth: preservedAuth}} : {},
-        {spaces: 4}
-    );
+    await fs.writeJson(path.join(geminiHomeDotDir, 'settings.json'), {}, {spaces: 4});
     await fs.writeJson(geminiSystemDefaultsPath, {}, {spaces: 4});
     await fs.writeJson(geminiSystemSettingsPath, {mcpServers: {}}, {spaces: 4});
     const realArmDir     = await fs.realpath(armDir),
@@ -1099,23 +1235,10 @@ export async function stageArmWorkspace({
     await fs.writeJson(geminiTrustedFoldersPath, trustedFolders, {spaces: 4});
     await fs.writeJson(path.join(geminiHomeDotDir, 'trustedFolders.json'), trustedFolders, {spaces: 4});
 
-    // Isolate Codex CLI user profile (`CODEX_HOME`) inside `stageRoot` so host `~/.codex/config.toml` neither leaks
-    // unrelated user MCP servers nor drops project `.codex/config.toml` due to untrusted temporary paths, while keeping
-    // the host profile untouched and preserving only `auth.json` when present.
     const codexIsolationDir = path.join(resolvedStageRoot, '.codex-isolation'),
-          codexHomeDir      = path.join(codexIsolationDir, 'codex-home'),
-          hostCodexDir      = baseEnv?.CODEX_HOME
-              ? path.resolve(baseEnv.CODEX_HOME)
-              : path.join(effectiveHostHome, '.codex');
+          codexHomeDir      = path.join(codexIsolationDir, 'codex-home');
 
     await fs.ensureDir(codexHomeDir);
-    const hostCodexAuthPath = path.join(hostCodexDir, 'auth.json');
-    if (await fs.pathExists(hostCodexAuthPath)) {
-        const destCodexAuthPath = path.join(codexHomeDir, 'auth.json');
-        await fs.copy(hostCodexAuthPath, destCodexAuthPath);
-        await fs.chmod(destCodexAuthPath, 0o600).catch(() => {});
-    }
-
     const codexTrustedPaths = Array.from(new Set([realArmDir, resolvedArmDir])),
           codexConfigLines  = [
               '# Auto-generated clean-room Codex user config (trusts only this staged benchmark arm)',
@@ -1132,7 +1255,7 @@ export async function stageArmWorkspace({
               : `http://localhost:${resolvedAppPort}/apps/gridbench/index.html`,
           verifyLogPath = path.join(resolvedStageRoot, 'agent-benchmarks/results', `${arm}-verify-runs.jsonl`);
 
-    return {
+    const stagedResult = {
         stageRoot: resolvedStageRoot,
         armDir,
         appPort  : resolvedAppPort,
@@ -1147,6 +1270,12 @@ export async function stageArmWorkspace({
         codexIsolationDir,
         codexHomeDir
     };
+
+    if (stageAuth && harness) {
+        await stageHarnessCredentials(stagedResult, {harness, baseEnv});
+    }
+
+    return stagedResult;
 }
 
 /**
@@ -1202,7 +1331,8 @@ export async function verifyCodexMcpPreflight({
     codexBin  = 'codex',
     timeoutMs = 15000
 }) {
-    const expected = expectedArmMcpServers(arm);
+    const expected            = expectedArmMcpServers(arm),
+          expectedDescriptors = expectedArmMcpDescriptors(arm, {nlPort});
     let stdout = '';
 
     try {
@@ -1263,17 +1393,43 @@ export async function verifyCodexMcpPreflight({
         throw failure;
     }
 
+    const realArmDir     = await fs.realpath(armDir).catch(() => path.resolve(armDir)),
+          resolvedArmDir = path.resolve(armDir);
     let observedNlPort = null;
-    if (arm === 'arm-c-neo-kb-neural-link') {
-        const nlEntry   = enabledEntries.find(entry => entry.name === 'neural-link'),
-              transport = nlEntry?.transport || {},
-              cmdOk     = transport.command === 'npx' && Array.isArray(transport.args) && transport.args.includes('neo-neural-link');
 
-        observedNlPort = transport.env?.NEO_NL_PORT !== undefined ? String(transport.env.NEO_NL_PORT) : null;
+    for (const [serverName, spec] of Object.entries(expectedDescriptors)) {
+        const entry       = enabledEntries.find(item => item.name === serverName),
+              transport   = entry?.transport || {},
+              observedEnv = transport.env && typeof transport.env === 'object' && !Array.isArray(transport.env) ? transport.env : {},
+              typeOk      = !transport.type || transport.type === spec.type,
+              cmdOk       = transport.command === spec.command,
+              argsOk      = Array.isArray(transport.args) &&
+                  transport.args.length === spec.args.length &&
+                  transport.args.every((arg, idx) => arg === spec.args[idx]),
+              envVarsOk   = !Array.isArray(transport.env_vars) || transport.env_vars.length === 0;
 
-        if (!cmdOk || (nlPort !== null && nlPort !== undefined && observedNlPort !== String(nlPort))) {
+        let cwdOk = transport.cwd === null || transport.cwd === undefined;
+        if (!cwdOk && typeof transport.cwd === 'string') {
+            const realTransportCwd = await fs.realpath(transport.cwd).catch(() => path.resolve(transport.cwd));
+            cwdOk = path.resolve(transport.cwd) === resolvedArmDir || realTransportCwd === realArmDir;
+        }
+
+        let envOk = false;
+        if (serverName === 'neural-link') {
+            observedNlPort = observedEnv.NEO_NL_PORT !== undefined ? String(observedEnv.NEO_NL_PORT) : null;
+            const envKeys = Object.keys(observedEnv);
+            envOk = envKeys.length === 1 &&
+                envKeys[0] === 'NEO_NL_PORT' &&
+                (nlPort !== null && nlPort !== undefined
+                    ? observedNlPort === String(nlPort)
+                    : /^\d+$/.test(String(observedNlPort || '')));
+        } else {
+            envOk = Object.keys(observedEnv).length === 0;
+        }
+
+        if (!typeOk || !cmdOk || !argsOk || !cwdOk || !envVarsOk || !envOk) {
             const failure = new Error(
-                `Codex MCP preflight connection mismatch for ${arm} (neural-link): expected command="npx" args=["-y","neo-neural-link"] NEO_NL_PORT=${nlPort ?? 'any'}, observed command=${JSON.stringify(transport.command)} args=${JSON.stringify(transport.args)} NEO_NL_PORT=${observedNlPort ?? 'unset'}`
+                `Codex MCP preflight descriptor mismatch for ${arm} (${serverName}): expected type=${JSON.stringify(spec.type)} command=${JSON.stringify(spec.command)} args=${JSON.stringify(spec.args)} env=${JSON.stringify(spec.env)}, observed type=${JSON.stringify(transport.type ?? null)} command=${JSON.stringify(transport.command)} args=${JSON.stringify(transport.args)} env=${redactCredentials(JSON.stringify(observedEnv))} cwd=${redactCredentials(JSON.stringify(transport.cwd ?? null))}`
             );
             failure.code     = 'BENCHMARK_MCP_PREFLIGHT_FAILED';
             failure.arm      = arm;
@@ -1778,18 +1934,24 @@ export async function runCleanRoomArm({
     baseEnv                  = process.env,
     codexBin                 = 'codex'
 }) {
+    if (harness === 'codex' && cmd) {
+        const overrideErr = new Error(
+            `Unverified --cmd override cannot produce a comparable Codex benchmark result for ${arm}; use --codex-bin so verifyCodexMcpPreflight validates the effective CLI configuration.`
+        );
+        overrideErr.code = 'BENCHMARK_UNVERIFIED_CODEX_OVERRIDE';
+        overrideErr.arm  = arm;
+        throw overrideErr;
+    }
+
     const resolvedOutDir           = path.resolve(ROOT_DIR, outDir),
           transcriptPath           = path.join(resolvedOutDir, `${arm}-transcript.jsonl`),
           outVerifyLogPath         = path.join(resolvedOutDir, `${arm}-verify-runs.jsonl`),
           outPostExitVerifyLogPath = path.join(resolvedOutDir, `${arm}-post-exit-verify.jsonl`);
 
-    await fs.ensureDir(resolvedOutDir);
-    await fs.remove(outVerifyLogPath);
-    await fs.remove(outPostExitVerifyLogPath);
-
-    const staged   = await stageArmWorkspace({arm, appPort, nlPort, installDeps, baseEnv}),
-          prompt   = 'Read AGENTS.md and ../../tasks/grid-100k-multi-window/PROMPT.md first, then implement all requirements in this workspace, start the dev server in the background, verify in the running app, and run the benchmark verification command from AGENTS.md until all assertions pass (exit code 0).',
-          childEnv = buildCleanRoomChildEnv(staged, baseEnv);
+    const staged               = await stageArmWorkspace({arm, appPort, nlPort, installDeps, baseEnv, harness, stageAuth: false}),
+          stagedTranscriptPath = path.join(staged.stageRoot, `${arm}-live-transcript.jsonl`),
+          prompt               = 'Read AGENTS.md and ../../tasks/grid-100k-multi-window/PROMPT.md first, then implement all requirements in this workspace, start the dev server in the background, verify in the running app, and run the benchmark verification command from AGENTS.md until all assertions pass (exit code 0).',
+          childEnv             = buildCleanRoomChildEnv(staged, baseEnv);
 
     const {spawnBin, spawnArgs} = buildAgentSpawnSpec({
         arm,
@@ -1821,24 +1983,27 @@ export async function runCleanRoomArm({
                 if (isAgentTranscriptEvent(parsed)) {
                     sawAgentEvent = true;
                 } else if (parsed.type === 'turn.failed' && parsed.error?.message) {
-                    lastErrorLine = String(parsed.error.message);
+                    lastErrorLine = redactCredentials(String(parsed.error.message));
                 } else if (parsed.type === 'error' && (parsed.message || parsed.error?.message)) {
-                    lastErrorLine = String(parsed.message || parsed.error.message);
+                    lastErrorLine = redactCredentials(String(parsed.message || parsed.error.message));
+                } else if (parsed.type === 'item.completed' && parsed.item?.type === 'error' && parsed.item?.message) {
+                    lastErrorLine = redactCredentials(String(parsed.item.message));
                 } else if (parsed.is_error && (parsed.result || parsed.error)) {
-                    lastErrorLine = String(parsed.result || parsed.error);
+                    lastErrorLine = redactCredentials(String(parsed.result || parsed.error));
                 }
                 if (!parsed.timestamp && !parsed.created_at) {
                     parsed.timestamp = new Date().toISOString();
                 }
-                const outLine = JSON.stringify(parsed) + '\n';
-                writeChain = writeChain.then(() => fs.appendFile(transcriptPath, outLine, 'utf8'));
+                const safeRecord = redactDiagnosticValue(parsed),
+                      outLine    = JSON.stringify(safeRecord) + '\n';
+                writeChain = writeChain.then(() => fs.appendFile(stagedTranscriptPath, outLine, 'utf8'));
             }
         } catch {}
     };
 
     try {
-        // Gate Codex launches on live non-model `codex mcp list --json` discovery BEFORE creating a transcript or spawning `codex exec`
-        if (harness === 'codex' && !cmd) {
+        // Gate Codex launches on credential-free, non-model `codex mcp list --json` discovery BEFORE touching `resolvedOutDir` or staging credentials
+        if (harness === 'codex') {
             await verifyCodexMcpPreflight({
                 arm,
                 armDir  : staged.armDir,
@@ -1848,7 +2013,11 @@ export async function runCleanRoomArm({
             });
         }
 
-        await fs.writeFile(transcriptPath, '', 'utf8');
+        if (!cmd && (harness === 'codex' || harness === 'gemini')) {
+            await stageHarnessCredentials(staged, {harness, baseEnv});
+        }
+
+        await fs.writeFile(stagedTranscriptPath, '', 'utf8');
 
         child = spawn(spawnBin, spawnArgs, {
             cwd     : staged.armDir,
@@ -1930,8 +2099,14 @@ export async function runCleanRoomArm({
                 signal    : childExitSignal,
                 diagnostic: redactCredentials(rawDiag || `CLI exited before first agent event (code=${childExitCode}, signal=${childExitSignal})`).slice(0, 1000)
             };
-            await fs.appendFile(transcriptPath, JSON.stringify(launchRecord) + '\n', 'utf8');
+            await fs.appendFile(stagedTranscriptPath, JSON.stringify(launchRecord) + '\n', 'utf8');
         }
+
+        // Replace previous trial files in `resolvedOutDir` ONLY after admission and CLI spawn have succeeded
+        await fs.ensureDir(resolvedOutDir);
+        await fs.copy(stagedTranscriptPath, transcriptPath, {overwrite: true});
+        await fs.remove(outVerifyLogPath);
+        await fs.remove(outPostExitVerifyLogPath);
 
         const verificationRuns = await readVerificationRuns(staged.verifyLogPath);
         if (await fs.pathExists(staged.verifyLogPath)) {
@@ -1952,8 +2127,13 @@ export async function runCleanRoomArm({
             : (telemetry.pass ? 'passed' : 'task_failed');
         telemetry.launchFailure = telemetry.launchFailure || null;
 
+        if (cmd && telemetry.harness === 'codex') {
+            telemetry.harness    = 'custom-cmd';
+            telemetry.comparable = false;
+        }
+
         if (telemetry.harness === 'unknown' && harness) {
-            telemetry.harness = harness;
+            telemetry.harness = cmd ? 'custom-cmd' : harness;
         }
         if (telemetry.model === 'unknown' && model) {
             telemetry.model = model;
@@ -2051,6 +2231,7 @@ export async function runCleanRoomArm({
         if (staged.nlPort) {
             await terminatePortListeners(staged.nlPort);
         }
+        await cleanupStagedCredentials(staged);
         if (!keepStage) {
             await fs.remove(staged.stageRoot);
         }
@@ -2058,7 +2239,7 @@ export async function runCleanRoomArm({
 }
 
 /**
- * @summary Builds a structured comparison report object across the supplied arm telemetry entries.
+ * @summary Builds a structured comparison report object across the supplied comparable arm telemetry entries.
  * @param {Array<Object>} armResults
  * @returns {{generatedAt: String, task: String, arms: Array<Object>}}
  */
@@ -2067,6 +2248,8 @@ export function buildComparisonReport(armResults = []) {
         generatedAt: new Date().toISOString(),
         task       : 'grid-100k-multi-window',
         arms       : armResults
+            .filter(entry => entry?.comparable !== false)
+            .map(entry => redactDiagnosticValue(entry))
     };
 }
 
@@ -2166,7 +2349,8 @@ async function main() {
                 arm,
                 appPort    : getFlag('--app-port') ? Number(getFlag('--app-port')) : undefined,
                 nlPort     : getFlag('--nl-port')  ? Number(getFlag('--nl-port'))  : undefined,
-                installDeps: !args.includes('--no-install')
+                installDeps: !args.includes('--no-install'),
+                stageAuth  : false
             });
             const childEnv = buildCleanRoomChildEnv(staged, process.env);
             try {
@@ -2184,6 +2368,7 @@ async function main() {
                     nlPort  : check.nlPort
                 });
             } finally {
+                await cleanupStagedCredentials(staged);
                 if (!args.includes('--keep-stage')) {
                     await fs.remove(staged.stageRoot);
                 }

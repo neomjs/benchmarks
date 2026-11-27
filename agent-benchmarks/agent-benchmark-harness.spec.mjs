@@ -13,6 +13,8 @@ import {
     buildAgentSpawnSpec,
     buildCleanRoomChildEnv,
     classifyToolCall,
+    cleanupStagedCredentials,
+    expectedArmMcpDescriptors,
     expectedArmMcpServers,
     isAgentTranscriptEvent,
     isPortListening,
@@ -20,12 +22,14 @@ import {
     buildComparisonReport,
     formatComparisonMarkdown,
     redactCredentials,
+    redactDiagnosticValue,
     resolveEffectiveGeminiMcpConfig,
     runArmVerification,
     runCleanRoomArm,
     readVerificationRuns,
     sanitizeCleanRoomEnv,
     stageArmWorkspace,
+    stageHarnessCredentials,
     verifyCodexMcpPreflight
 } from './runner/runAgentBenchmark.mjs';
 
@@ -1392,9 +1396,9 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         let isoA = null, isoB = null, isoC = null;
         try {
             const isoNlPort = await allocateFreePort(0);
-            isoA = await stageArmWorkspace({arm: 'arm-a-react-ag-grid-mcp', stageRoot: path.join(customStageParent, 'a'), installDeps: false});
-            isoB = await stageArmWorkspace({arm: 'arm-b-neo-kb-only', stageRoot: path.join(customStageParent, 'b'), installDeps: false});
-            isoC = await stageArmWorkspace({arm: 'arm-c-neo-kb-neural-link', stageRoot: path.join(customStageParent, 'c'), nlPort: isoNlPort, installDeps: false});
+            isoA = await stageArmWorkspace({arm: 'arm-a-react-ag-grid-mcp', stageRoot: path.join(customStageParent, 'a'), installDeps: false, harness: 'gemini', stageAuth: true});
+            isoB = await stageArmWorkspace({arm: 'arm-b-neo-kb-only', stageRoot: path.join(customStageParent, 'b'), installDeps: false, harness: 'gemini', stageAuth: true});
+            isoC = await stageArmWorkspace({arm: 'arm-c-neo-kb-neural-link', stageRoot: path.join(customStageParent, 'c'), nlPort: isoNlPort, installDeps: false, harness: 'gemini', stageAuth: true});
 
             const poisonedBaseEnv = {
                 ...process.env,
@@ -1572,8 +1576,15 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(expectedArmMcpServers('arm-a-react-ag-grid-mcp')).toEqual(['ag-mcp']);
         expect(expectedArmMcpServers('arm-b-neo-kb-only')).toEqual([]);
         expect(expectedArmMcpServers('arm-c-neo-kb-neural-link')).toEqual(['neural-link']);
+        expect(expectedArmMcpDescriptors('arm-a-react-ag-grid-mcp')).toEqual({
+            'ag-mcp': {type: 'stdio', command: 'npx', args: ['-y', 'ag-mcp'], env: {}}
+        });
+        expect(expectedArmMcpDescriptors('arm-b-neo-kb-only')).toEqual({});
+        expect(expectedArmMcpDescriptors('arm-c-neo-kb-neural-link', {nlPort: 18081})).toEqual({
+            'neural-link': {type: 'stdio', command: 'npx', args: ['-y', 'neo-neural-link'], env: {NEO_NL_PORT: '18081'}}
+        });
 
-        // 1. Credential redaction covers env assignments, Bearer/Basic headers, JSON keys, URL basic auth, and API token prefixes
+        // 1. Credential redaction covers env assignments, Bearer/Basic headers, JSON keys, URL basic auth, API token prefixes, and recursive JSONL objects
         const rawSecretDiag = [
             'OPENAI_API_KEY=sk-proj-supersecret1234567890',
             'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlMTIzNDU2',
@@ -1588,44 +1599,54 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         expect(scrubbedDiag).not.toContain('hunter2secret');
         expect(scrubbedDiag).toContain('[REDACTED]');
 
-        // 2. Agent-event classification distinguishes Codex/Gemini/Claude bootstrap & auth errors from real agent turns
+        const scrubbedObj = redactDiagnosticValue({
+            type : 'turn.failed',
+            error: {message: 'Bearer sk-live-leaked-secret-99999999', api_key: 'raw-custom-secret'}
+        });
+        expect(JSON.stringify(scrubbedObj)).not.toContain('sk-live-leaked-secret');
+        expect(JSON.stringify(scrubbedObj)).not.toContain('raw-custom-secret');
+
+        // 2. Agent-event classification distinguishes bootstrap & auth errors from started OR completed agent work (`RA-4`)
         expect(isAgentTranscriptEvent({type: 'thread.started', thread_id: 't1'})).toBe(false);
         expect(isAgentTranscriptEvent({type: 'turn.started'})).toBe(false);
         expect(isAgentTranscriptEvent({type: 'error', message: '401 Unauthorized'})).toBe(false);
+        expect(isAgentTranscriptEvent({type: 'item.started', item: {id: 'i0', type: 'error', message: 'auth error'}})).toBe(false);
         expect(isAgentTranscriptEvent({type: 'item.completed', item: {id: 'i0', type: 'error', message: 'fallback failed'}})).toBe(false);
         expect(isAgentTranscriptEvent({type: 'turn.failed', error: {message: '401 Unauthorized'}})).toBe(false);
-        expect(isAgentTranscriptEvent({type: 'item.completed', item: {id: 'i1', type: 'mcp_tool_call', server: 'ag-mcp', tool: 'search_docs'}})).toBe(true);
+        expect(isAgentTranscriptEvent({type: 'item.started', item: {id: 'i1', type: 'command_execution', command: 'npm run dev'}})).toBe(true);
+        expect(isAgentTranscriptEvent({type: 'item.started', item: {id: 'i2', type: 'mcp_tool_call', server: 'ag-mcp', tool: 'search_docs'}})).toBe(true);
+        expect(isAgentTranscriptEvent({type: 'item.completed', item: {id: 'i2', type: 'mcp_tool_call', server: 'ag-mcp', tool: 'search_docs'}})).toBe(true);
         expect(isAgentTranscriptEvent({type: 'turn.completed', usage: {input_tokens: 100, output_tokens: 20}})).toBe(true);
 
-        // 3. Outer host profile control (`~/.codex/config.toml` with unrelated server + `auth.json`) + TOML-realistic Codex shim
-        //    that enforces trusted `[projects."<cwd>"]` discovery, merges user/system/project `.codex/config.toml` layers,
-        //    and records every `exec` invocation so we prove preflight failures stop BEFORE any model attempt.
+        // 3. Outer host profile control (`~/.codex/{config.toml,auth.json}` + `~/.gemini/oauth_creds.json`) + TOML-realistic Codex shim
         const tempRoot       = path.join(os.tmpdir(), `neo-codex-17-${Date.now()}`),
               hostHome       = path.join(tempRoot, 'host-home'),
               hostCodexDir   = path.join(hostHome, '.codex'),
+              hostGeminiDir  = path.join(hostHome, '.gemini'),
               etcCodexConfig = path.join(tempRoot, 'etc-codex-config.toml'),
               execLogPath    = path.join(tempRoot, 'codex-exec-invocations.jsonl'),
               shimDir        = path.join(tempRoot, 'bin'),
               codexShimPath  = path.join(shimDir, 'codex'),
+              claudeShimPath = path.join(shimDir, 'claude'),
+              geminiShimPath = path.join(shimDir, 'gemini'),
               outDirOk       = path.join(tempRoot, 'out-ok'),
               outDirMismatch = path.join(tempRoot, 'out-mismatch'),
-              outDirLaunch   = path.join(tempRoot, 'out-launch');
+              outDirLaunch   = path.join(tempRoot, 'out-launch'),
+              outDirSeeded   = path.join(tempRoot, 'out-seeded'),
+              keepStageDir   = path.join(tempRoot, 'kept-stage');
 
         await fs.ensureDir(hostCodexDir);
+        await fs.ensureDir(hostGeminiDir);
         await fs.ensureDir(shimDir);
 
-        const hostConfigContent = [
-            '[mcp_servers.unrelated-host-mcp]',
-            'command = "node"',
-            'args    = ["host-leak.js"]',
-            ''
-        ].join('\n');
-        const hostAuthContent = JSON.stringify({auth_mode: 'apikey', OPENAI_API_KEY: 'sk-test-host-preserved-only'}, null, 2);
+        const hostConfigContent     = '[mcp_servers.unrelated-host-mcp]\ncommand = "node"\nargs    = ["host-leak.js"]\n',
+              hostAuthContent       = JSON.stringify({auth_mode: 'apikey', OPENAI_API_KEY: 'sk-test-host-preserved-only'}, null, 2),
+              hostGeminiCredContent = JSON.stringify({refresh_token: 'ya29.syntheticGeminiRefreshSecret12345'}, null, 2);
         await fs.writeFile(path.join(hostCodexDir, 'config.toml'), hostConfigContent, 'utf8');
         await fs.writeFile(path.join(hostCodexDir, 'auth.json'), hostAuthContent, {mode: 0o600});
+        await fs.writeFile(path.join(hostGeminiDir, 'oauth_creds.json'), hostGeminiCredContent, {mode: 0o600});
         await fs.writeFile(etcCodexConfig, '', 'utf8');
 
-        // Realistic Codex CLI shim modeling 0.171.0+ project-trust & multi-layer TOML MCP discovery + `exec --json` modes
         const codexShimSource = [
             '#!/usr/bin/env node',
             'const fs = require("node:fs");',
@@ -1680,6 +1701,9 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             'const isTrusted = userCfg.trusted.has(cwd) || userCfg.trusted.has(realCwd);',
             'const projCfg = isTrusted ? parseCodexToml(path.join(cwd, ".codex/config.toml")) : {servers: {}};',
             'if (args[0] === "mcp" && args[1] === "list" && args.includes("--json")) {',
+            '    if (process.env.TEST_ASSERT_NO_AUTH_ON_PREFLIGHT === "1" && fs.existsSync(path.join(codexHome, "auth.json"))) {',
+            '        console.error("LEAKED_AUTH_DURING_PREFLIGHT"); process.exit(9);',
+            '    }',
             '    const merged = {...sysCfg.servers, ...userCfg.servers, ...projCfg.servers};',
             '    const list = Object.entries(merged).map(([name, cfg]) => ({',
             '        name,',
@@ -1694,8 +1718,10 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             '    process.exit(0);',
             '}',
             'if (args[0] === "exec") {',
+            '    const sawCodexAuth = fs.existsSync(path.join(codexHome, "auth.json"));',
+            '    const sawGeminiAuth = process.env.GEMINI_CLI_HOME && fs.existsSync(path.join(process.env.GEMINI_CLI_HOME, ".gemini/oauth_creds.json"));',
             '    if (process.env.TEST_CODEX_EXEC_LOG) {',
-            '        fs.appendFileSync(process.env.TEST_CODEX_EXEC_LOG, JSON.stringify({cwd, args}) + "\\n");',
+            '        fs.appendFileSync(process.env.TEST_CODEX_EXEC_LOG, JSON.stringify({cwd, args, sawCodexAuth, sawGeminiAuth: Boolean(sawGeminiAuth)}) + "\\n");',
             '    }',
             '    if (process.env.TEST_CODEX_MODE === "auth-fail") {',
             '        console.log(JSON.stringify({type: "thread.started", thread_id: "t-auth-fail"}));',
@@ -1705,10 +1731,25 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             '        console.error("ERROR codex_api: header Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJlMTIz");',
             '        process.exit(1);',
             '    }',
+            '    if (process.env.TEST_CODEX_MODE === "interrupted-cmd") {',
+            '        const t0 = new Date().toISOString();',
+            '        console.log(JSON.stringify({type: "thread.started", thread_id: "t-int-cmd"}));',
+            '        console.log(JSON.stringify({type: "turn.started"}));',
+            '        console.log(JSON.stringify({type: "item.started", timestamp: t0, item: {id: "item_cmd_1", type: "command_execution", command: "npm run dev"}}));',
+            '        process.exit(1);',
+            '    }',
+            '    if (process.env.TEST_CODEX_MODE === "interrupted-mcp") {',
+            '        const t0 = new Date().toISOString();',
+            '        console.log(JSON.stringify({type: "thread.started", thread_id: "t-int-mcp"}));',
+            '        console.log(JSON.stringify({type: "turn.started"}));',
+            '        console.log(JSON.stringify({type: "item.started", timestamp: t0, item: {id: "item_mcp_1", type: "mcp_tool_call", server: "ag-mcp", tool: "search_docs", arguments: {query: "virtual"}}}));',
+            '        process.exit(1);',
+            '    }',
             '    if (process.env.TEST_CODEX_MODE === "task-fail") {',
             '        const t0 = new Date().toISOString();',
             '        console.log(JSON.stringify({type: "session_meta", timestamp: t0, cli_version: "0.171.0-shim", model: "gpt-5.4"}));',
-            '        console.log(JSON.stringify({type: "item.completed", timestamp: t0, item: {type: "command_execution", command: "npm run dev"}}));',
+            '        console.log(JSON.stringify({type: "item.started", timestamp: t0, item: {id: "item_1", type: "command_execution", command: "npm run dev"}}));',
+            '        console.log(JSON.stringify({type: "item.completed", timestamp: t0, item: {id: "item_1", type: "command_execution", command: "npm run dev"}}));',
             '        console.log(JSON.stringify({type: "turn.completed", timestamp: t0, usage: {input_tokens: 300, output_tokens: 50, cached_input_tokens: 0}}));',
             '        process.exit(0);',
             '    }',
@@ -1721,19 +1762,47 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
         ].join('\n');
         await fs.writeFile(codexShimPath, codexShimSource, {mode: 0o755});
 
+        // Claude & Gemini shims asserting cross-harness credential isolation (`RA-2`)
+        await fs.writeFile(claudeShimPath, [
+            '#!/usr/bin/env node',
+            'const fs = require("node:fs");',
+            'const path = require("node:path");',
+            'if (process.argv.includes("--version")) { console.log("2.1.120"); process.exit(0); }',
+            'if (process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, "auth.json"))) process.exit(21);',
+            'if (process.env.GEMINI_CLI_HOME && fs.existsSync(path.join(process.env.GEMINI_CLI_HOME, ".gemini/oauth_creds.json"))) process.exit(22);',
+            'console.log(JSON.stringify({type: "assistant", timestamp: new Date().toISOString(), message: {id: "mc1", model: "claude-sonnet-4-6", usage: {input_tokens: 50, output_tokens: 10}, content: [{type: "text", text: "ok"}]}}));'
+        ].join('\n'), {mode: 0o755});
+        await fs.writeFile(geminiShimPath, [
+            '#!/usr/bin/env node',
+            'const fs = require("node:fs");',
+            'const path = require("node:path");',
+            'if (process.argv.includes("--version")) { console.log("0.38.1"); process.exit(0); }',
+            'if (process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, "auth.json"))) process.exit(31);',
+            'if (!process.env.GEMINI_CLI_HOME || !fs.existsSync(path.join(process.env.GEMINI_CLI_HOME, ".gemini/oauth_creds.json"))) process.exit(32);',
+            'const t0 = new Date().toISOString();',
+            'console.log(JSON.stringify({type: "init", timestamp: t0, model: "gemini-3.1-pro-preview"}));',
+            'console.log(JSON.stringify({type: "result", timestamp: t0, status: "success", stats: {total_tokens: 60, input_tokens: 50, output_tokens: 10, cached: 0, input: 50, duration_ms: 5}}));'
+        ].join('\n'), {mode: 0o755});
+
         let stagedA = null, stagedB = null, stagedC = null;
         try {
             const baseEnv = {
                 ...process.env,
-                HOME                : hostHome,
-                TEST_CODEX_ETC_CONFIG: etcCodexConfig,
-                TEST_CODEX_EXEC_LOG : execLogPath
+                HOME                    : hostHome,
+                PATH                    : `${shimDir}:${process.env.PATH}`,
+                TEST_CODEX_ETC_CONFIG   : etcCodexConfig,
+                TEST_CODEX_EXEC_LOG     : execLogPath
             };
 
             const nlPortC = await allocateFreePort(0);
+            // Default `stageArmWorkspace` (`stageAuth: false`) is 100% credential-free (`RA-2`)
             stagedA = await stageArmWorkspace({arm: 'arm-a-react-ag-grid-mcp', installDeps: false, baseEnv});
             stagedB = await stageArmWorkspace({arm: 'arm-b-neo-kb-only', installDeps: false, baseEnv});
             stagedC = await stageArmWorkspace({arm: 'arm-c-neo-kb-neural-link', nlPort: nlPortC, installDeps: false, baseEnv});
+
+            expect(await fs.pathExists(path.join(stagedA.codexHomeDir, 'auth.json'))).toBe(false);
+            expect(await fs.pathExists(path.join(stagedC.codexHomeDir, 'auth.json'))).toBe(false);
+            expect(await fs.pathExists(path.join(stagedC.geminiHomeDir, '.gemini/oauth_creds.json'))).toBe(false);
 
             // Negative control (unisolated): without `buildCleanRoomChildEnv` (`CODEX_HOME` unset), untrusted staged C drops `neural-link` AND leaks `unrelated-host-mcp`
             await expect(verifyCodexMcpPreflight({
@@ -1744,25 +1813,25 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 codexBin: codexShimPath
             })).rejects.toThrow(/Codex MCP preflight mismatch for arm-c-neo-kb-neural-link: expected \[neural-link\], observed \[unrelated-host-mcp\]/);
 
-            // Positive AC-1 check: staged clean-room env resolves exact `['ag-mcp']`, `[]`, and `['neural-link']` (retaining `NEO_NL_PORT`),
-            // copies `auth.json` into isolated `CODEX_HOME`, and leaves host `~/.codex` untouched
+            // Positive AC-1 check: staged clean-room env resolves exact `['ag-mcp']`, `[]`, and `['neural-link']` (retaining `NEO_NL_PORT`)
+            // WITHOUT copying `auth.json` during discovery (`TEST_ASSERT_NO_AUTH_ON_PREFLIGHT=1`)
             const preA = await verifyCodexMcpPreflight({
                 arm     : 'arm-a-react-ag-grid-mcp',
                 armDir  : stagedA.armDir,
-                env     : buildCleanRoomChildEnv(stagedA, baseEnv),
+                env     : {...buildCleanRoomChildEnv(stagedA, baseEnv), TEST_ASSERT_NO_AUTH_ON_PREFLIGHT: '1'},
                 codexBin: codexShimPath
             });
             const preB = await verifyCodexMcpPreflight({
                 arm     : 'arm-b-neo-kb-only',
                 armDir  : stagedB.armDir,
-                env     : buildCleanRoomChildEnv(stagedB, baseEnv),
+                env     : {...buildCleanRoomChildEnv(stagedB, baseEnv), TEST_ASSERT_NO_AUTH_ON_PREFLIGHT: '1'},
                 codexBin: codexShimPath
             });
             const preC = await verifyCodexMcpPreflight({
                 arm     : 'arm-c-neo-kb-neural-link',
                 armDir  : stagedC.armDir,
                 nlPort  : nlPortC,
-                env     : buildCleanRoomChildEnv(stagedC, baseEnv),
+                env     : {...buildCleanRoomChildEnv(stagedC, baseEnv), TEST_ASSERT_NO_AUTH_ON_PREFLIGHT: '1'},
                 codexBin: codexShimPath
             });
 
@@ -1770,11 +1839,9 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(preB.observed).toEqual([]);
             expect(preC.observed).toEqual(['neural-link']);
             expect(preC.nlPort).toBe(String(nlPortC));
-            expect(await fs.pathExists(path.join(stagedC.codexHomeDir, 'auth.json'))).toBe(true);
-            expect(await fs.readFile(path.join(hostCodexDir, 'config.toml'), 'utf8')).toBe(hostConfigContent);
-            expect(await fs.readFile(path.join(hostCodexDir, 'auth.json'), 'utf8')).toBe(hostAuthContent);
 
-            // AC-1 CLI entry point (`--preflight-codex --no-install --codex-bin`) runs without any `codex exec` model calls
+            // AC-1 CLI entry point (`--preflight-codex --no-install --keep-stage`) stays credential-free even when kept (`RA-2`)
+            await fs.ensureDir(keepStageDir);
             const cliPreflightRaw = execFileSync(
                 process.execPath,
                 [
@@ -1783,7 +1850,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                     '--no-install',
                     '--codex-bin', codexShimPath
                 ],
-                {cwd: ROOT_DIR, env: baseEnv, encoding: 'utf8'}
+                {cwd: ROOT_DIR, env: {...baseEnv, TEST_ASSERT_NO_AUTH_ON_PREFLIGHT: '1'}, encoding: 'utf8'}
             );
             const cliPreflight = JSON.parse(cliPreflightRaw);
             expect(cliPreflight.ok).toBe(true);
@@ -1795,21 +1862,112 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(cliPreflight.arms[2].nlPort).toBeTruthy();
             expect(await fs.pathExists(execLogPath)).toBe(false);
 
-            // AC-2a: Outer system configuration injecting an unrelated extra server (`etc-extra`) stops `runCleanRoomArm` and `--run-arm`
-            // BEFORE any `codex exec` model attempt or comparison report is emitted
-            await fs.writeFile(etcCodexConfig, '[mcp_servers.etc-extra]\ncommand = "echo"\n', 'utf8');
-            await expect(runCleanRoomArm({
+            // RA-2: Cross-harness auth isolation (`claude-code` gets neither; `gemini` gets only Gemini creds; `codex` gets only Codex `auth.json` after preflight, and `keepStage: true` cleans credentials on exit)
+            const claudeRes = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                harness    : 'claude-code',
+                outDir     : outDirOk,
+                installDeps: false,
+                baseEnv
+            });
+            expect(claudeRes.telemetry.runOutcome).toBe('task_failed');
+
+            const geminiRes = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                harness    : 'gemini',
+                outDir     : outDirOk,
+                installDeps: false,
+                baseEnv
+            });
+            expect(geminiRes.telemetry.runOutcome).toBe('task_failed');
+
+            const codexKeptStageBefore = new Set(await fs.readdir(os.tmpdir()));
+            await runCleanRoomArm({
                 arm        : 'arm-b-neo-kb-only',
                 harness    : 'codex',
                 codexBin   : codexShimPath,
+                outDir     : outDirOk,
+                keepStage  : true,
+                installDeps: false,
+                baseEnv    : {...baseEnv, TEST_ASSERT_NO_AUTH_ON_PREFLIGHT: '1'}
+            });
+            const codexExecEntries = (await fs.readFile(execLogPath, 'utf8')).trim().split('\n').map(l => JSON.parse(l));
+            expect(codexExecEntries).toHaveLength(1);
+            expect(codexExecEntries[0].sawCodexAuth).toBe(true);
+            expect(codexExecEntries[0].sawGeminiAuth).toBe(false);
+
+            const newKeptDirs = (await fs.readdir(os.tmpdir())).filter(
+                name => name.startsWith('neo-agent-bench-arm-b-neo-kb-only-') && !codexKeptStageBefore.has(name)
+            );
+            expect(newKeptDirs).toHaveLength(1);
+            const retainedStagePath = path.join(os.tmpdir(), newKeptDirs[0]);
+            expect(await fs.pathExists(path.join(retainedStagePath, '.codex-isolation/codex-home/config.toml'))).toBe(true);
+            expect(await fs.pathExists(path.join(retainedStagePath, '.codex-isolation/codex-home/auth.json'))).toBe(false);
+            expect(await fs.pathExists(path.join(retainedStagePath, '.gemini-isolation/home/.gemini/oauth_creds.json'))).toBe(false);
+            await fs.remove(retainedStagePath);
+            await fs.remove(execLogPath);
+
+            // RA-3a: Unverified `--cmd` overrides are rejected on `--harness codex` and excluded from comparable Codex results
+            await expect(runCleanRoomArm({
+                arm        : 'arm-a-react-ag-grid-mcp',
+                harness    : 'codex',
+                cmd        : 'echo "{}"',
                 outDir     : outDirMismatch,
                 installDeps: false,
                 baseEnv
-            })).rejects.toThrow(/Codex MCP preflight mismatch for arm-b-neo-kb-only: expected \[\], observed \[etc-extra\]/);
+            })).rejects.toThrow(/Unverified --cmd override cannot produce a comparable Codex benchmark result/);
 
-            expect(await fs.pathExists(execLogPath)).toBe(false);
-            expect(await fs.pathExists(path.join(outDirMismatch, 'arm-b-neo-kb-only-transcript.jsonl'))).toBe(false);
+            const spoofedCodexViaCmd = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                cmd        : 'printf \'%s\\n\' \'{"type":"session_meta","cli_version":"0.171.0","model":"gpt-5.4"}\' \'{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}\'',
+                outDir     : outDirOk,
+                installDeps: false,
+                baseEnv
+            });
+            expect(spoofedCodexViaCmd.telemetry.harness).toBe('custom-cmd');
+            expect(spoofedCodexViaCmd.telemetry.comparable).toBe(false);
+            expect(buildComparisonReport([spoofedCodexViaCmd.telemetry]).arms).toEqual([]);
 
+            // RA-3b: Launch descriptor validation rejects tampered Arm A command/args and Arm C `--version` / port tampering
+            await fs.writeFile(path.join(stagedA.armDir, '.codex/config.toml'), '[mcp_servers.ag-mcp]\ncommand = "echo"\nargs = ["fake-ag-mcp"]\n', 'utf8');
+            await expect(verifyCodexMcpPreflight({
+                arm     : 'arm-a-react-ag-grid-mcp',
+                armDir  : stagedA.armDir,
+                env     : buildCleanRoomChildEnv(stagedA, baseEnv),
+                codexBin: codexShimPath
+            })).rejects.toThrow(/Codex MCP preflight descriptor mismatch for arm-a-react-ag-grid-mcp \(ag-mcp\)/);
+
+            await fs.writeFile(
+                path.join(stagedC.armDir, '.codex/config.toml'),
+                `[mcp_servers.neural-link]\ncommand = "npx"\nargs = ["-y", "neo-neural-link", "--version"]\n\n[mcp_servers.neural-link.env]\nNEO_NL_PORT = "${nlPortC}"\n`,
+                'utf8'
+            );
+            await expect(verifyCodexMcpPreflight({
+                arm     : 'arm-c-neo-kb-neural-link',
+                armDir  : stagedC.armDir,
+                nlPort  : nlPortC,
+                env     : buildCleanRoomChildEnv(stagedC, baseEnv),
+                codexBin: codexShimPath
+            })).rejects.toThrow(/Codex MCP preflight descriptor mismatch for arm-c-neo-kb-neural-link \(neural-link\)/);
+
+            // RA-5 & AC-2: Seed all 3 prior trial files (`transcript`, `verify-runs`, `post-exit-verify`), reject preflight on the same arm & outDir,
+            // and verify all 3 remain byte-identical and replayable while zero `codex exec` attempt or new report is emitted
+            await fs.ensureDir(outDirSeeded);
+            const seededTranscriptPath = path.join(outDirSeeded, 'arm-a-react-ag-grid-mcp-transcript.jsonl'),
+                  seededVerifyPath     = path.join(outDirSeeded, 'arm-a-react-ag-grid-mcp-verify-runs.jsonl'),
+                  seededPostVerifyPath = path.join(outDirSeeded, 'arm-a-react-ag-grid-mcp-post-exit-verify.jsonl'),
+                  seededTranscriptRaw  = [
+                      JSON.stringify({type: 'session_meta', timestamp: '2026-11-27T09:00:00.000Z', cli_version: '0.171.0', model: 'gpt-5.4'}),
+                      JSON.stringify({type: 'turn.completed', timestamp: '2026-11-27T09:00:10.000Z', usage: {input_tokens: 500, output_tokens: 100, cached_input_tokens: 200}})
+                  ].join('\n') + '\n',
+                  seededVerifyRaw      = JSON.stringify({type: 'benchmark_verification', timestamp: '2026-11-27T09:00:08.000Z', arm: 'arm-a-react-ag-grid-mcp', pass: true, durationMs: 42}) + '\n',
+                  seededPostVerifyRaw  = JSON.stringify({type: 'runner_post_exit_verification', timestamp: '2026-11-27T09:00:12.000Z', arm: 'arm-a-react-ag-grid-mcp', ran: true, pass: true, durationMs: 40}) + '\n';
+
+            await fs.writeFile(seededTranscriptPath, seededTranscriptRaw, 'utf8');
+            await fs.writeFile(seededVerifyPath, seededVerifyRaw, 'utf8');
+            await fs.writeFile(seededPostVerifyPath, seededPostVerifyRaw, 'utf8');
+
+            await fs.writeFile(etcCodexConfig, '[mcp_servers.etc-extra]\ncommand = "echo"\n', 'utf8');
             let cliStopped = false;
             try {
                 execFileSync(
@@ -1820,7 +1978,7 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                         '--harness', 'codex',
                         '--no-install',
                         '--codex-bin', codexShimPath,
-                        '--out-dir', outDirMismatch
+                        '--out-dir', outDirSeeded
                     ],
                     {cwd: ROOT_DIR, env: baseEnv, encoding: 'utf8', stdio: 'pipe'}
                 );
@@ -1830,10 +1988,19 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             }
             expect(cliStopped).toBe(true);
             expect(await fs.pathExists(execLogPath)).toBe(false);
-            const mismatchReports = (await fs.pathExists(outDirMismatch))
-                ? (await fs.readdir(outDirMismatch)).filter(f => f.startsWith('agent-benchmark-'))
-                : [];
+            expect(await fs.readFile(seededTranscriptPath, 'utf8')).toBe(seededTranscriptRaw);
+            expect(await fs.readFile(seededVerifyPath, 'utf8')).toBe(seededVerifyRaw);
+            expect(await fs.readFile(seededPostVerifyPath, 'utf8')).toBe(seededPostVerifyRaw);
+            const mismatchReports = (await fs.readdir(outDirSeeded)).filter(f => f.startsWith('agent-benchmark-'));
             expect(mismatchReports).toHaveLength(0);
+
+            const replayedSeeded = parseTranscriptTelemetry(
+                await fs.readFile(seededTranscriptPath, 'utf8'),
+                {arm: 'arm-a-react-ag-grid-mcp', verificationRuns: await readVerificationRuns(seededVerifyPath)}
+            );
+            expect(replayedSeeded.pass).toBe(true);
+            expect(replayedSeeded.timeToGreenMs).toBe(8000);
+            expect(replayedSeeded.totalTokens.total).toBe(600);
 
             // Restore clean system config and verify missing-server control on Arm A also stops before model attempt
             await fs.writeFile(etcCodexConfig, '', 'utf8');
@@ -1845,37 +2012,79 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
                 codexBin: codexShimPath
             })).rejects.toThrow(/Codex MCP preflight mismatch for arm-a-react-ag-grid-mcp: expected \[ag-mcp\], observed \[\]/);
 
-            // AC-3: Pre-agent-event CLI exit (`TEST_CODEX_MODE=auth-fail`, exit 1 after `thread.started`/`turn.failed` with leaked secrets)
-            // produces `runOutcome: 'launch_failure'` (`LAUNCH_FAILURE` in Markdown, credentials scrubbed), distinct from an agent that ran
-            // and failed the grid task (`TEST_CODEX_MODE=task-fail` -> `runOutcome: 'task_failed'`, `FAIL` in Markdown)
-            const launchFailRes = await runCleanRoomArm({
-                arm           : 'arm-a-react-ag-grid-mcp',
-                harness       : 'codex',
-                codexBin      : codexShimPath,
-                outDir        : outDirLaunch,
-                installDeps   : false,
-                postExitVerify: true,
-                baseEnv       : {...baseEnv, TEST_CODEX_MODE: 'auth-fail'}
-            });
-            expect(launchFailRes.telemetry.pass).toBe(false);
-            expect(launchFailRes.telemetry.runOutcome).toBe('launch_failure');
-            expect(launchFailRes.telemetry.launchFailure).toMatchObject({
-                exitCode     : 1,
-                sawAgentEvent: false
-            });
-            expect(launchFailRes.telemetry.launchFailure.diagnostic).toContain('401 Unauthorized');
-            expect(launchFailRes.telemetry.launchFailure.diagnostic).not.toContain('sk-live-leaked-secret');
-            expect(launchFailRes.telemetry.launchFailure.diagnostic).not.toContain('eyJhbGciOiJIUzI1NiJ9');
-            expect(launchFailRes.telemetry.launchFailure.diagnostic).toContain('[REDACTED]');
+            // AC-3, RA-1, & RA-4:
+            // (a) Bootstrap-only CLI failure (`auth-fail`) via CLI `--run-arm` scrubs credentials from the COMPLETE saved transcript AND JSON/MD reports
+            let authCliExitCode = 0;
+            try {
+                execFileSync(
+                    process.execPath,
+                    [
+                        path.join(ROOT_DIR, 'agent-benchmarks/runner/runAgentBenchmark.mjs'),
+                        '--run-arm', 'arm-a-react-ag-grid-mcp',
+                        '--harness', 'codex',
+                        '--no-install',
+                        '--codex-bin', codexShimPath,
+                        '--out-dir', outDirLaunch
+                    ],
+                    {cwd: ROOT_DIR, env: {...baseEnv, TEST_CODEX_MODE: 'auth-fail'}, encoding: 'utf8', stdio: 'pipe'}
+                );
+            } catch (err) {
+                authCliExitCode = err.status ?? 1;
+            }
+            expect(authCliExitCode).toBe(1);
 
-            // Transcript-only re-parse (`--from-transcript` path) also preserves `launch_failure` distinction
-            const reparsedLaunchFail = parseTranscriptTelemetry(
-                await fs.readFile(launchFailRes.transcriptPath, 'utf8'),
-                {arm: 'arm-a-react-ag-grid-mcp'}
-            );
+            const savedLaunchTranscript = await fs.readFile(path.join(outDirLaunch, 'arm-a-react-ag-grid-mcp-transcript.jsonl'), 'utf8'),
+                  launchOutFiles        = await fs.readdir(outDirLaunch),
+                  launchJsonReportRaw   = await fs.readFile(path.join(outDirLaunch, launchOutFiles.find(f => f.endsWith('.json'))), 'utf8'),
+                  launchMdReportRaw     = await fs.readFile(path.join(outDirLaunch, launchOutFiles.find(f => f.endsWith('.md'))), 'utf8');
+
+            for (const artifactRaw of [savedLaunchTranscript, launchJsonReportRaw, launchMdReportRaw]) {
+                expect(artifactRaw).not.toContain('sk-live-leaked-secret');
+                expect(artifactRaw).not.toContain('eyJhbGciOiJIUzI1NiJ9');
+                expect(artifactRaw).not.toContain('sk-test-host-preserved-only');
+            }
+            expect(savedLaunchTranscript).toContain('[REDACTED]');
+            expect(launchMdReportRaw).toContain('LAUNCH_FAILURE');
+
+            const reparsedLaunchFail = parseTranscriptTelemetry(savedLaunchTranscript, {arm: 'arm-a-react-ag-grid-mcp'});
             expect(reparsedLaunchFail.runOutcome).toBe('launch_failure');
             expect(reparsedLaunchFail.launchFailure?.exitCode).toBe(1);
 
+            // (b) Interrupted work after `item.started` (`command_execution` and `mcp_tool_call`, `RA-4`) records `task_failed` (`FAIL`), NOT `LAUNCH_FAILURE`, both live and on replay
+            const intCmdRes = await runCleanRoomArm({
+                arm        : 'arm-b-neo-kb-only',
+                harness    : 'codex',
+                codexBin   : codexShimPath,
+                outDir     : outDirOk,
+                installDeps: false,
+                baseEnv    : {...baseEnv, TEST_CODEX_MODE: 'interrupted-cmd'}
+            });
+            expect(intCmdRes.telemetry.runOutcome).toBe('task_failed');
+            expect(intCmdRes.telemetry.launchFailure).toBeNull();
+            expect(intCmdRes.telemetry.toolCallsByServer.shellTestRuns).toBe(1);
+
+            const intMcpRes = await runCleanRoomArm({
+                arm        : 'arm-a-react-ag-grid-mcp',
+                harness    : 'codex',
+                codexBin   : codexShimPath,
+                outDir     : outDirOk,
+                installDeps: false,
+                baseEnv    : {...baseEnv, TEST_CODEX_MODE: 'interrupted-mcp'}
+            });
+            expect(intMcpRes.telemetry.runOutcome).toBe('task_failed');
+            expect(intMcpRes.telemetry.launchFailure).toBeNull();
+            expect(intMcpRes.telemetry.toolCallsByServer.docsKbQueries).toBe(1);
+
+            const replayedIntMcp = parseTranscriptTelemetry(
+                await fs.readFile(intMcpRes.transcriptPath, 'utf8'),
+                {arm: 'arm-a-react-ag-grid-mcp'}
+            );
+            expect(replayedIntMcp.harness).toBe('codex');
+            expect(replayedIntMcp.runOutcome).toBeUndefined();
+            expect(replayedIntMcp.launchFailure).toBeUndefined();
+            expect(replayedIntMcp.toolCallsByServer.docsKbQueries).toBe(1);
+
+            // (c) Completed item (`item.started` + `item.completed` with same `id`) deduplicates tool call count and reports `task_failed` (`FAIL`)
             const taskFailRes = await runCleanRoomArm({
                 arm        : 'arm-b-neo-kb-only',
                 harness    : 'codex',
@@ -1887,18 +2096,22 @@ test.describe('3-Arm Coding-Agent Benchmark Harness (#2)', () => {
             expect(taskFailRes.telemetry.pass).toBe(false);
             expect(taskFailRes.telemetry.runOutcome).toBe('task_failed');
             expect(taskFailRes.telemetry.launchFailure).toBeNull();
+            expect(taskFailRes.telemetry.toolCallsByServer.shellTestRuns).toBe(1);
             expect(taskFailRes.telemetry.totalTokens.total).toBe(350);
 
             const combinedMd = formatComparisonMarkdown(buildComparisonReport([
-                launchFailRes.telemetry,
+                reparsedLaunchFail,
+                intMcpRes.telemetry,
                 taskFailRes.telemetry
             ]));
             expect(combinedMd).toContain('| `arm-a-react-ag-grid-mcp` | `codex` | `unknown` | `ag-grid-community@36.2.0` | LAUNCH_FAILURE |');
+            expect(combinedMd).toContain('| `arm-a-react-ag-grid-mcp` | `codex` | `unknown` | `ag-grid-community@36.2.0` | FAIL |');
             expect(combinedMd).toContain('| `arm-b-neo-kb-only` | `codex` | `gpt-5.4` | `neo.mjs@14.0.0` | FAIL |');
 
-            // Host `~/.codex` profile remained completely untouched across all runs
+            // Host `~/.codex` and `~/.gemini` profiles remained completely untouched across all runs
             expect(await fs.readFile(path.join(hostCodexDir, 'config.toml'), 'utf8')).toBe(hostConfigContent);
             expect(await fs.readFile(path.join(hostCodexDir, 'auth.json'), 'utf8')).toBe(hostAuthContent);
+            expect(await fs.readFile(path.join(hostGeminiDir, 'oauth_creds.json'), 'utf8')).toBe(hostGeminiCredContent);
         } finally {
             if (stagedA) await fs.remove(stagedA.stageRoot);
             if (stagedB) await fs.remove(stagedB.stageRoot);
