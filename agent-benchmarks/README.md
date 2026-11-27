@@ -68,7 +68,25 @@ node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
   --post-exit-verify \
   --model claude-sonnet-4-6 \
   --out-dir ./agent-benchmarks/results
+
+# Run all 3 arms sequentially on Codex CLI inside a disposable Linux container
+# Prerequisite inside the disposable container (e.g. mcr.microsoft.com/playwright:v1.62.1-noble):
+#   npm install -g @openai/codex
+#   printenv OPENAI_API_KEY | codex login --with-api-key   # or: codex login --device-auth
+# Non-model MCP discovery preflight (verifies A=['ag-mcp'], B=[], C=['neural-link'] + staged NEO_NL_PORT):
+node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
+  --preflight-codex \
+  --no-install
+
+# Full 3-arm Codex run (automatically runs verifyCodexMcpPreflight before each arm's codex exec):
+node ./agent-benchmarks/runner/runAgentBenchmark.mjs \
+  --run-all \
+  --post-exit-verify \
+  --harness codex \
+  --out-dir ./agent-benchmarks/results
 ```
+
+For `--harness codex`, `stageArmWorkspace` prepares a credential-free isolated `CODEX_HOME` inside the temporary stage root (ignoring outer user `config.toml` MCP servers, keeping host `~/.codex` untouched, and marking the staged arm path `trust_level = "trusted"`), verifies `codex mcp list --json` against each arm's exact launch descriptors (`command`, `args`, and Arm C `NEO_NL_PORT`) before touching `--out-dir` or staging `auth.json` (which is copied only for authenticated Codex runs and scrubbed on exit even with `--keep-stage`), and rejects unverified `--cmd` overrides from comparable Codex results. Bootstrap exits before the first started or completed agent event record `runOutcome: "launch_failure"` (`LAUNCH_FAILURE`, with credentials scrubbed from both transcripts and reports), while runs interrupted after an agent item starts record `task_failed` (`FAIL`).
 
 ### Verify a Running Arm Workspace
 Start the target arm's dev server and run `verify.spec.mjs` against its URL (each verification run is appended to `agent-benchmarks/results/<arm>-verify-runs.jsonl` by default):
